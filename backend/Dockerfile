@@ -8,8 +8,6 @@ RUN --mount=type=cache,target=/root/.m2 mvn -q -B -DskipTests package
 
 FROM eclipse-temurin:21-jre-alpine
 RUN addgroup -S nora && adduser -S nora -G nora
-# El directorio pertenece a "nora": un volumen nuevo montado aquí hereda este propietario
-RUN mkdir -p /data/files && chown nora:nora /data/files
 WORKDIR /app
 COPY --from=build /app/target/nora.jar app.jar
 USER nora

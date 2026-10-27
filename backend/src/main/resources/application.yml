@@ -54,4 +54,8 @@ app:
     max-active-rooms: ${NORA_DEFAULT_MAX_ROOMS:5}
     max-participants: ${NORA_DEFAULT_MAX_PARTICIPANTS:25}
   storage:
-    dir: ${NORA_STORAGE_DIR:/data/files}
+    endpoint: ${NORA_GARAGE_ENDPOINT:http://garage:3900}
+    admin-endpoint: ${NORA_GARAGE_ADMIN_ENDPOINT:http://garage:3903}
+    admin-token: ${NORA_GARAGE_ADMIN_TOKEN}
+    bucket: ${NORA_GARAGE_BUCKET:nora-files}
+    region: garage

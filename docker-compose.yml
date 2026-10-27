@@ -24,15 +24,35 @@ services:
     networks: [internal]
     cap_add: [CHOWN, SETUID, SETGID, FOWNER, DAC_OVERRIDE]
 
+  garage:
+    <<: *hardening
+    image: dxflrs/garage:v1.0.1
+    environment:
+      GARAGE_RPC_SECRET: "${NORA_GARAGE_RPC_SECRET:?Falta .env, ejecuta ./setup.sh}"
+      GARAGE_ADMIN_TOKEN: "${NORA_GARAGE_ADMIN_TOKEN:?Falta .env, ejecuta ./setup.sh}"
+    volumes:
+      - ./garage/garage.toml:/etc/garage.toml:ro
+      - nora_garage_meta:/var/lib/garage/meta
+      - nora_garage_data:/var/lib/garage/data
+    read_only: true
+    healthcheck:
+      test: ["CMD", "/garage", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [internal]   # sin puertos publicados y sin salida a Internet: solo la API llega aquí
+
   backend:
     <<: *hardening
     build: ./backend
     depends_on:
       db: { condition: service_healthy }
+      garage: { condition: service_healthy }
     environment:
       NORA_DB_HOST: db
       NORA_DB_PASSWORD: ${NORA_DB_PASSWORD}
       NORA_JWT_SECRET: "${NORA_JWT_SECRET:?Falta .env, ejecuta ./setup.sh}"
+      NORA_GARAGE_ADMIN_TOKEN: "${NORA_GARAGE_ADMIN_TOKEN}"
       NORA_ADMIN_EMAIL: ${NORA_ADMIN_EMAIL:-}
       NORA_ADMIN_PASSWORD: ${NORA_ADMIN_PASSWORD:-}
       NORA_ALLOWED_ORIGINS: ${NORA_ALLOWED_ORIGINS:-}
@@ -43,8 +63,6 @@ services:
       NORA_DEFAULT_ROOM_MINUTES: ${NORA_DEFAULT_ROOM_MINUTES:-120}
       NORA_DEFAULT_MAX_ROOMS: ${NORA_DEFAULT_MAX_ROOMS:-5}
       NORA_DEFAULT_MAX_PARTICIPANTS: ${NORA_DEFAULT_MAX_PARTICIPANTS:-25}
-    volumes:
-      - nora_files:/data/files   # solo el backend monta este volumen; no hay otro acceso a los archivos
     read_only: true
     tmpfs:
       - /tmp:size=1g
@@ -84,4 +102,5 @@ networks:
 
 volumes:
   nora_pgdata: {}
-  nora_files: {}
+  nora_garage_meta: {}
+  nora_garage_data: {}
