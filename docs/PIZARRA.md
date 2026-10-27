@@ -17,8 +17,8 @@ La herramienta **Pizarra** de cada sala es un lienzo infinito para dibujar, esqu
 **Guardar, exportar e importar:**
 | Acción | Dónde | Qué hace |
 |---|---|---|
-| Autoguardado | siempre | Todo cambio se guarda al instante en el documento compartido (como Miro): no hay que «guardar para no perder». |
-| **Guardar** (Ctrl+S) | cabecera | Escribe la pizarra en su archivo **`.excalidraw`** en Archivos. El indicador dice si el archivo está al día. |
+| Autoguardado | siempre | Cada movimiento se guarda al instante en el documento compartido (como Miro) **y**, un segundo después de que haces una pausa (o como mucho cada 10 s mientras dibujas sin parar), se escribe también en su archivo **`.excalidraw`** de Archivos. Lo hace una sola persona (la «líder»), no todas a la vez. Al cerrar se termina de guardar: **en una pizarra no existe «cerrar sin guardar»**, no hay nada que descartar. |
+| **Guardar** (Ctrl+S) | cabecera | Fuerza el guardado en el archivo ahora mismo y crea un punto en el historial. El indicador muestra «Guardando…» o «Archivo guardado hace…». |
 | **Descargar** | cabecera | `.excalidraw` (pizarra editable), **PNG** (con la escena incrustada: se puede volver a importar), **SVG** (vectorial, también con la escena) y **PDF**. |
 | **Guardar una copia en la sala** | menú «⋯» | Guarda un `.excalidraw`, PNG o SVG nuevo en Archivos. |
 | **Exportar imagen…** | menú de Excalidraw | El diálogo de Excalidraw (solo selección, fondo, tema oscuro, escala 1×/2×/3×, copiar al portapapeles). |

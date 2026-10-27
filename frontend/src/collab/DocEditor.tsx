@@ -172,29 +172,64 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
   }
 
   /** Guardar = escribir el contenido actual en el archivo de la sala (el mismo que se ve en Archivos). */
-  async function saveToFile(): Promise<boolean> {
-    if (!editable || busy) return false
-    setBusy('Guardando…')
+  const saving = useRef(false)
+  /**
+   * manual: botón Guardar (aviso y versión) · close: al cerrar una pizarra (espera, sin aviso) · auto: autoguardado de la
+   * pizarra en segundo plano (no se ve ni bloquea nada).
+   */
+  async function saveToFile(mode: 'manual' | 'close' | 'auto' = 'manual'): Promise<boolean> {
+    if (!editable || saving.current || (mode !== 'auto' && busy)) return false
+    saving.current = true
+    if (mode !== 'auto') setBusy('Guardando…')
     try {
       const { res } = await post(null, 'file')
       if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => null))?.message ?? `Error ${res.status}`)
       const f = (await res.json()) as { name: string }
-      toast(`Guardado en «${f.name}»`, 'success')
+      if (mode === 'manual') {
+        toast(`Guardado en «${f.name}»`, 'success')
+        void provider.saveVersion('Guardado en el archivo').catch(() => {})
+      }
       onSaved?.()
-      uploadThumb()
-      void provider.saveVersion('Guardado en el archivo').catch(() => {})
+      if (mode !== 'close') uploadThumb(mode === 'auto')
       return true
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'No se pudo guardar', 'error')
+      if (mode !== 'auto') toast(e instanceof Error ? e.message : 'No se pudo guardar', 'error')
       return false
     } finally {
-      setBusy('')
+      saving.current = false
+      if (mode !== 'auto') setBusy('')
     }
   }
 
+  // La pizarra se guarda sola en su archivo tras cada cambio (la persona «líder» lo hace, así no escriben todos a la vez)
+  const autosave = doc.kind === 'BOARD' && editable
+  const savedRef = useRef(saved)
+  savedRef.current = saved
+  useEffect(() => {
+    if (!autosave) return
+    let lastSeq = provider.seq
+    let lastChange = Date.now()
+    let lastWrite = 0
+    const t = setInterval(() => {
+      if (provider.seq !== lastSeq) {
+        lastSeq = provider.seq
+        lastChange = Date.now()
+      }
+      if (provider.seq <= savedRef.current.seq || provider.state !== 'ready' || provider.seedState !== 'DONE' || !provider.isLeader()) return
+      const now = Date.now()
+      if (now - lastChange < 1000 && now - lastWrite < 10_000) return // se espera a que pare un momento, pero como mucho 10 s seguidos sin guardar
+      lastWrite = now
+      void saveRef.current('auto')
+    }, 500)
+    return () => clearInterval(t)
+  }, [autosave, provider])
+
   /** Miniatura de la pizarra para la galería: se sube al guardar y al cerrar (empieza a dibujarse antes de que el editor desaparezca). */
-  function uploadThumb() {
+  const lastThumb = useRef(0)
+  function uploadThumb(throttle = false) {
     if (doc.kind !== 'BOARD' || !board || !editable) return
+    if (throttle && Date.now() - lastThumb.current < 30_000) return
+    lastThumb.current = Date.now()
     void board.thumbnail().then((blob) => blob && fetch(`/api/rooms/${code}/docs/${doc.id}/thumbnail`, {
       method: 'PUT', headers: { Authorization: `Bearer ${getAccessToken() ?? ''}`, 'Content-Type': blob.type || 'image/jpeg' }, body: blob,
     })).catch(() => {})
@@ -277,13 +312,13 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
   ]
 
   // Ctrl/Cmd+S guarda en el archivo
-  const saveRef = useRef(saveToFile)
+  const saveRef = useRef<typeof saveToFile>(saveToFile)
   saveRef.current = saveToFile
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault()
-        void saveRef.current()
+        void saveRef.current('manual')
       }
     }
     window.addEventListener('keydown', onKey)
@@ -291,8 +326,14 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
   }, [])
 
   // Al cerrar: si el archivo no tiene lo último y nadie más está dentro, se ofrece guardar
-  function requestClose() {
+  async function requestClose() {
     const dirty = provider.seq > saved.seq
+    if (autosave && !deleted) {
+      // la pizarra se guarda sola: al cerrar se termina de guardar y no hay nada que descartar (solo si no se puede guardar se avisa)
+      if (dirty && !(await saveToFile('close'))) setClosing(true)
+      else closeNow()
+      return
+    }
     if (editable && dirty && peers.length <= 1 && !deleted) setClosing(true)
     else closeNow()
   }
@@ -308,7 +349,7 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
           <input className="docapp-name" value={name} aria-label="Nombre del documento" readOnly={!editable} maxLength={120}
             onChange={(e) => setName(e.target.value)} onBlur={(e) => void rename(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
           <span className={`sync ${unsaved === 'true' || state !== 'ready' ? 'busy' : 'ok'}`} role="status" title="Los cambios se comparten con todos en tiempo real">{status}</span>
-          <FileState provider={provider} saved={saved} name={`${doc.name}${doc.sourceExt ? `.${doc.sourceExt}` : ''}`} />
+          <FileState provider={provider} saved={saved} auto={autosave} name={`${doc.name}${doc.sourceExt ? `.${doc.sourceExt}` : ''}`} />
           <span className="grow" />
           <div className="docapp-peers" aria-label="Personas en el documento">
             {peers.slice(0, 6).map((p) => <span key={p.id} title={p.name} className="peer-av" style={{ ['--pc' as string]: p.color }}><Avatar name={p.name} /></span>)}
@@ -319,7 +360,7 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
           <Menu label="Descargar" items={downloadItems()} trigger={<span className="btn sm"><Download size={15} /> Descargar <ChevronDown size={14} /></span>} />
           {editable && (
             <>
-              <button className="btn sm primary" onClick={() => void saveToFile()} disabled={!!busy} title="Guardar en el archivo de la sala (Ctrl+S)">
+              <button className="btn sm primary" onClick={() => void saveToFile('manual')} disabled={!!busy} title="Guardar en el archivo de la sala (Ctrl+S)">
                 {busy === 'Guardando…' ? <Loader2 size={15} className="spin-icon" /> : <Save size={15} />} Guardar
               </button>
               <Menu label="Más opciones de guardado" items={moreItems()} />
@@ -367,7 +408,7 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
               <strong>Hay cambios que todavía no están en el archivo</strong>
               <span className="small muted">«{doc.name}{doc.sourceExt ? `.${doc.sourceExt}` : ''}» no incluye lo último que se escribió. Si cierras sin guardar, el documento compartido conserva los cambios, pero el archivo de Archivos seguirá como estaba.</span>
               <div className="row">
-                <button className="btn primary" autoFocus onClick={async () => { setClosing(false); if (await saveToFile()) closeNow() }}>Guardar y cerrar</button>
+                <button className="btn primary" autoFocus onClick={async () => { setClosing(false); if (await saveToFile('close')) closeNow() }}>Guardar y cerrar</button>
                 <button className="btn" onClick={closeNow}>Cerrar sin guardar</button>
                 <button className="btn ghost" onClick={() => setClosing(false)}>Seguir editando</button>
               </div>
@@ -382,7 +423,7 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
 }
 
 /** Estado del archivo de la sala respecto al documento: guardado (y cuándo) o con cambios pendientes. */
-function FileState({ provider, saved, name }: { provider: CollabProvider; saved: { seq: number; at: string | null; by: string | null }; name: string }) {
+function FileState({ provider, saved, name, auto }: { provider: CollabProvider; saved: { seq: number; at: string | null; by: string | null }; name: string; auto?: boolean }) {
   const seq = useSyncExternalStore(useCallback((l) => provider.subscribe(l), [provider]), () => provider.seq)
   const [, tick] = useState(0)
   useEffect(() => {
@@ -390,7 +431,9 @@ function FileState({ provider, saved, name }: { provider: CollabProvider; saved:
     return () => clearInterval(t)
   }, [])
   const dirty = seq > saved.seq
-  return dirty ? (
+  return dirty && auto ? (
+    <span className="filestate" title={`«${name}» se guarda solo en cuanto haces una pausa`}><Loader2 size={12} className="spin-icon" /> Guardando en el archivo…</span>
+  ) : dirty ? (
     <span className="filestate dirty" title={`Los cambios están compartidos, pero «${name}» en Archivos aún no los incluye. Pulsa Guardar.`}>● Sin guardar en el archivo</span>
   ) : (
     <span className="filestate" title={`«${name}» en Archivos está al día`}><Check size={13} /> Archivo guardado{saved.at ? ` ${ago(saved.at)}` : ''}{saved.by ? ` · ${saved.by}` : ''}</span>

@@ -318,7 +318,8 @@ export class CollabProvider {
   }
 
   // ---- compactación y versiones ----
-  private isLeader() {
+  /** Quien tiene el menor clientID entre los presentes: es la persona «líder» que hace las tareas de mantenimiento (compactar, versiones, autoguardado). */
+  isLeader() {
     let min = Infinity
     this.awareness.getStates().forEach((_s, id) => (min = Math.min(min, id)))
     return min === this.doc.clientID
