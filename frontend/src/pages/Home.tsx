@@ -131,14 +131,14 @@ export default function Home() {
           <div className="section-title"><h2>Tu cuenta</h2></div>
           <div className="stat-grid stagger">
             <div className="stat" style={{ ['--i' as string]: 0 }}>
-              <span className="ico"><HardDrive size={22} /></span>
+              <span className="ico tinted tn-blue"><HardDrive size={22} /></span>
               <b>{formatBytes(used)} <small>/ {formatBytes(quota)}</small></b>
               <span className="muted small">Almacenamiento</span>
               {quota !== null && <div className="meter"><i style={{ width: `${pct}%` }} /></div>}
             </div>
-            <div className="stat" style={{ ['--i' as string]: 1 }}><span className="ico"><FileUp size={22} /></span><b>{formatBytes(limits.maxFileSizeBytes)}</b><span className="muted small">Archivo máximo</span></div>
-            <div className="stat" style={{ ['--i' as string]: 2 }}><span className="ico"><DoorOpen size={22} /></span><b>{limits.maxActiveRooms ?? '∞'}</b><span className="muted small">Salas activas</span></div>
-            <div className="stat" style={{ ['--i' as string]: 3 }}><span className="ico"><Timer size={22} /></span><b>{limits.maxRoomMinutes == null ? '∞' : `${limits.maxRoomMinutes} min`}</b><span className="muted small">Duración máxima</span></div>
+            <div className="stat" style={{ ['--i' as string]: 1 }}><span className="ico tinted tn-amber"><FileUp size={22} /></span><b>{formatBytes(limits.maxFileSizeBytes)}</b><span className="muted small">Archivo máximo</span></div>
+            <div className="stat" style={{ ['--i' as string]: 2 }}><span className="ico tinted tn-violet"><DoorOpen size={22} /></span><b>{limits.maxActiveRooms ?? '∞'}</b><span className="muted small">Salas activas</span></div>
+            <div className="stat" style={{ ['--i' as string]: 3 }}><span className="ico tinted tn-rose"><Timer size={22} /></span><b>{limits.maxRoomMinutes == null ? '∞' : `${limits.maxRoomMinutes} min`}</b><span className="muted small">Duración máxima</span></div>
           </div>
         </section>
       )}

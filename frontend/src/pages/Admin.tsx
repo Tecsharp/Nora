@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, Search, Shield } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, Search, Shield } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { api, ApiError, formatBytes, type Limits, type User } from '../api'
 import { useAuth } from '../auth'
 import Avatar from '../components/Avatar'
@@ -151,6 +152,9 @@ export default function Admin() {
 
   return (
     <div className="stack" style={{ gap: 18 }}>
+      <div>
+        <Link to="/" className="btn ghost sm"><ArrowLeft size={15} /> Volver al inicio</Link>
+      </div>
       <div className="hero">
         <h1 className="row"><Shield size={26} /> Usuarios</h1>
         <p>{data.total} {data.total === 1 ? 'cuenta' : 'cuentas'} · toca una fila para editar sus límites.</p>

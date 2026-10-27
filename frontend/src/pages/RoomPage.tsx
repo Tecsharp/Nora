@@ -23,13 +23,14 @@ interface Tool {
   label: string
   icon: Icon
   ready: boolean
+  tone?: string
 }
 
 const TOOLS: Tool[] = [
-  { id: 'files', label: 'Archivos', icon: FolderOpen, ready: true },
+  { id: 'files', label: 'Archivos', icon: FolderOpen, ready: true, tone: 'blue' },
   { id: 'board', label: 'Pizarra', icon: PenTool, ready: false },
-  { id: 'clipboard', label: 'Portapapeles', icon: Clipboard, ready: true },
-  { id: 'notes', label: 'Notas', icon: ClipboardList, ready: true },
+  { id: 'clipboard', label: 'Portapapeles', icon: Clipboard, ready: true, tone: 'amber' },
+  { id: 'notes', label: 'Notas', icon: ClipboardList, ready: true, tone: 'rose' },
   { id: 'media', label: 'Media Review', icon: Clapperboard, ready: false },
   { id: 'attendance', label: 'Asistencia', icon: Monitor, ready: false },
   { id: 'polls', label: 'Votaciones', icon: SquareCheckBig, ready: false },
@@ -159,7 +160,7 @@ export default function RoomPage() {
       </header>
 
       <div className="room-hero stagger">
-        <section className="card" style={{ ['--i' as string]: 0 }} aria-label="Sala">
+        <section style={{ ['--i' as string]: 0 }} aria-label="Sala">
           <span className="eyebrow">Sala</span>
           <h2 className="room-title">{room.name}</h2>
           <div className="meta-row">
@@ -173,7 +174,7 @@ export default function RoomPage() {
           </div>
         </section>
 
-        <section className="card" style={{ ['--i' as string]: 1 }} aria-label="Participantes">
+        <section style={{ ['--i' as string]: 1 }} aria-label="Participantes">
           <div className="people-head">
             <span className="eyebrow">Participantes</span>
             <span className="badge green"><i /> {onlineCount} {onlineCount === 1 ? 'conectado' : 'conectados'}</span>
@@ -196,7 +197,7 @@ export default function RoomPage() {
         <div className="tools stagger">
           {TOOLS.map((t, i) => (
             <button key={t.id} className={`tool t-${t.id} ${t.ready ? '' : 'soon'}`} style={{ ['--i' as string]: i + 2 }} onClick={() => setActive(t.id)}>
-              <span className="ico"><t.icon size={22} /></span>
+              <span className={`ico ${t.tone ? `tinted tn-${t.tone}` : ''}`}><t.icon size={22} /></span>
               <span className="tl">
                 <span>{t.label}</span>
                 {!t.ready && <small>Próximamente</small>}

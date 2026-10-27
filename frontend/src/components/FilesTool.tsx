@@ -61,6 +61,9 @@ const EXT: Record<string, typeof File> = {
   js: FileCode, ts: FileCode, tsx: FileCode, json: FileCode, html: FileCode, css: FileCode, py: FileCode, java: FileCode, sh: FileCode, yml: FileCode, xml: FileCode,
 }
 const iconFor = (name: string) => EXT[name.split('.').pop()?.toLowerCase() ?? ''] ?? File
+const TONES = new Map<typeof File, string>([
+  [FileImage, 'rose'], [FileVideo, 'violet'], [FileAudio, 'teal'], [FileText, 'blue'], [FileArchive, 'amber'], [FileCode, 'orange'],
+])
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -334,7 +337,7 @@ export default function FilesTool({ room }: { room: Room }) {
         draggable={canTouch(f.uploaderId)}
         onDragStart={(e) => { e.dataTransfer.setData(NORA_MIME, f.id); e.dataTransfer.effectAllowed = 'move' }}
         onClick={() => void downloadFile(f)} onKeyDown={activate(() => void downloadFile(f))}>
-        <span className="ficon"><Icon size={22} /></span>
+        <span className={`ficon tn-${TONES.get(Icon) ?? 'gray'}`}><Icon size={22} /></span>
         <span className="fbody">
           <span className="fname truncate">{f.name}</span>
           <span className="fmeta truncate">
