@@ -50,6 +50,10 @@ Una única conexión `/ws` por pestaña, autenticada con un **ticket de un solo 
 
 Eventos de sala: quién está conectado (`presence`, `joined`), nuevos miembros (`member.joined`), archivos (`file.added`, `file.deleted`), notas y portapapeles (`note.added`, `note.deleted`), progreso de subidas ajenas (`upload.progress`, `upload.done`, `upload.aborted`), avisos de expiración a 5 y 1 minuto (`room.expiring`) y cierre de sala (`room.closed`). Eventos de cuenta: `account.updated` (el admin cambió tus límites) y `account.disabled`. Los eventos se emiten **después de confirmar la transacción** de base de datos, así que nadie recibe un aviso de algo que luego se revierte. Si se pierde la conexión, al reconectar la interfaz recarga lo que se perdió.
 
+### Edición colaborativa (documentos, hojas y presentaciones)
+
+Desde **Archivos → Editar** (o **Documentos → Nuevo**) se abren DOCX/ODT, XLSX/ODS/CSV y PPTX/ODP en un editor a pantalla completa donde varias personas escriben a la vez, con cursores y selección de cada una, historial de versiones y exportación a formatos de oficina o PDF. Usa **Yjs (CRDT)** sobre el WebSocket de Nora; el servidor solo ordena, guarda y reparte los cambios y respeta los permisos de la sala (el espectador ve pero no edita). La conversión la hace el servicio interno `converter` (LibreOffice headless, sin acceso a Internet). Diseño, protocolo, fidelidad de conversión, fases y **limitaciones conocidas** en [docs/COLABORACION.md](docs/COLABORACION.md).
+
 ### Subidas reanudables
 
 Los archivos se suben por trozos de 8 MiB con multipart de S3 (`POST /api/rooms/{code}/uploads`, `PUT …/parts/{n}`, `POST …/complete`). El servidor guarda qué trozos llegaron: si se corta internet, se cierra la pestaña o se reinicia el navegador, al volver a elegir el mismo archivo solo se envían los que faltan. El cliente sube 3 trozos en paralelo, reintenta con espera, se pausa sin conexión y detecta conexiones colgadas (20 s sin avance). Muestra porcentaje, velocidad y tiempo restante; el resto de la sala ve el avance en vivo. Las subidas abandonadas se limpian a las 24 h.
@@ -123,4 +127,4 @@ cd frontend && npm install && npm run dev
 
 ## Estado
 
-Herramientas operativas: **Archivos**, **Notas**, **Portapapeles**. Pizarra, Media Review, Asistencia, Votaciones y Acciones aparecen como «Próximamente». La presencia y los eventos de la sala van por WebSocket.
+Herramientas operativas: **Archivos**, **Notas**, **Portapapeles** y **Documentos** (edición colaborativa). Pizarra, Media Review, Asistencia, Votaciones y Acciones aparecen como «Próximamente». La presencia y los eventos de la sala van por WebSocket.

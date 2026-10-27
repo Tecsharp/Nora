@@ -53,7 +53,7 @@ export default function TextEditor({ provider, editable, onEditor }: Props) {
       Table.configure({ resizable: false }), TableRow, TableHeader, TableCell,
       Placeholder.configure({ placeholder: 'Empieza a escribir…' }),
       Collaboration.configure({ document: provider.doc }),
-      CollaborationCursor.configure({ provider: { awareness: provider.awareness }, user: { name: self.name, color: self.color }, render: renderCursor }),
+      CollaborationCursor.configure({ provider: { awareness: provider.awareness }, user: { id: self.id, name: self.name, color: self.color }, render: renderCursor }),
     ],
     [provider, self.name, self.color],
   )

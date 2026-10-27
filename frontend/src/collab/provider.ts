@@ -68,6 +68,7 @@ export class CollabProvider {
   private pending: Uint8Array[] = []
   private inflight: { ref: string; data: Uint8Array; sentAt: number } | null = null
   private flushTimer: ReturnType<typeof setTimeout> | null = null
+  private ackTimer: ReturnType<typeof setTimeout> | null = null
   private awTimer: ReturnType<typeof setTimeout> | null = null
   private maint: ReturnType<typeof setInterval> | null = null
   private joined = false
@@ -78,6 +79,7 @@ export class CollabProvider {
   private dirtySinceVersion = false
   private destroyed = false
   private refSeq = 0
+  private resyncTimer: ReturnType<typeof setTimeout> | null = null
   /** Se avisa cuando el servidor dice que el documento está sembrado por otra persona. */
   onSeeded: (() => void) | null = null
   onDeleted: (() => void) | null = null
@@ -161,7 +163,7 @@ export class CollabProvider {
   async loadState() {
     if (this.loading || this.destroyed) return
     this.loading = true
-    this.setState('syncing')
+    if (this.state !== 'ready') this.setState('syncing') // una recarga en segundo plano no debe desmontar el editor
     try {
       const s = await api<{ seq: number; snapshot: string | null; snapshotSeq: number; updates: { seq: number; data: string }[]; seedState: 'PENDING' | 'CLAIMED' | 'DONE' }>(
         `/rooms/${this.code}/docs/${this.docId}/state`,
@@ -201,7 +203,10 @@ export class CollabProvider {
   }
 
   private scheduleFlush(ms: number) {
-    if (this.flushTimer) return
+    if (this.flushTimer) {
+      if (ms > 0) return // ya hay un envío programado
+      clearTimeout(this.flushTimer) // «ahora» adelanta al que estuviera esperando
+    }
     this.flushTimer = setTimeout(() => {
       this.flushTimer = null
       this.flush()
@@ -225,13 +230,19 @@ export class CollabProvider {
   private send(data: Uint8Array, ref: string) {
     this.inflight = { ref, data, sentAt: Date.now() }
     rt.notify({ type: 'doc.update', docId: this.docId, update: b64(data), ref })
-    this.scheduleFlush(ACK_TIMEOUT_MS + 500)
+    if (this.ackTimer) clearTimeout(this.ackTimer)
+    this.ackTimer = setTimeout(() => { // sin confirmación a tiempo: flush() reenvía el mismo cambio
+      this.ackTimer = null
+      this.flush()
+    }, ACK_TIMEOUT_MS + 200)
   }
 
   private onAck(d: { seq: number; ref: string }) {
     this.tracker.observe(d.seq)
     if (this.inflight?.ref === d.ref) {
       this.inflight = null
+      if (this.ackTimer) clearTimeout(this.ackTimer)
+      this.ackTimer = null
       this.listeners.forEach((l) => l())
       if (this.pending.length) this.scheduleFlush(0)
     }
@@ -242,6 +253,13 @@ export class CollabProvider {
     this.tracker.observe(d.seq)
     if (this.tracker.hasGap && !this.gapSince) this.gapSince = Date.now()
     if (!this.tracker.hasGap) this.gapSince = 0
+    // Un cambio que depende de otro aún no recibido queda pendiente en Yjs: se pide el estado completo enseguida
+    if ((this.doc.store.pendingStructs || this.doc.store.pendingDs) && !this.resyncTimer) {
+      this.resyncTimer = setTimeout(() => {
+        this.resyncTimer = null
+        if (this.doc.store.pendingStructs || this.doc.store.pendingDs) void this.loadState()
+      }, 1500)
+    }
   }
 
   // ---- presencia ----
@@ -342,6 +360,8 @@ export class CollabProvider {
     this.offs.forEach((o) => o())
     if (this.maint) clearInterval(this.maint)
     if (this.flushTimer) clearTimeout(this.flushTimer)
+    if (this.ackTimer) clearTimeout(this.ackTimer)
+    if (this.resyncTimer) clearTimeout(this.resyncTimer)
     this.setState('closed')
     this.awareness.destroy()
     this.doc.destroy()

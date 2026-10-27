@@ -19,7 +19,10 @@ export class Evaluator {
   constructor(private store: SheetStore) {
     const byName = () => new Map(store.ids().map((id) => [store.meta(id).name.toLowerCase(), id]))
     this.parser = new FormulaParser({
-      onCell: ({ sheet, row, col }: { sheet: string; row: number; col: number }) => this.valueOf(this.sheetId(sheet, byName()), row - 1, col - 1),
+      onCell: ({ sheet, row, col }: { sheet: string; row: number; col: number }) => {
+        const v = this.valueOf(this.sheetId(sheet, byName()), row - 1, col - 1)
+        return isError(v) ? new FormulaError(v.error) : v // los errores viajan como errores de fórmula, no como objetos
+      },
       onRange: ({ sheet, from, to }: { sheet: string; from: { row: number; col: number }; to: { row: number; col: number } }) => {
         const id = this.sheetId(sheet, byName())
         const out: (CellValue | null)[][] = []

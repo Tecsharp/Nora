@@ -44,16 +44,18 @@ interface Version { id: string; createdAt: string; createdByName: string; label:
 /** Editor colaborativo a pantalla completa: documento de texto, hoja de cálculo o presentación. */
 export default function DocEditor(props: Props) {
   const { user } = useAuth()
+  const uid = user!.id
+  const uname = user!.displayName
   const [provider, setProvider] = useState<CollabProvider | null>(null)
   // El proveedor se crea y se destruye en un efecto (así sobrevive al doble montaje de React en desarrollo)
   useEffect(() => {
-    const p = new CollabProvider(props.code, props.doc.id, { id: user!.id, name: user!.displayName, color: colorFor(user!.id) })
+    const p = new CollabProvider(props.code, props.doc.id, { id: uid, name: uname, color: colorFor(uid) })
     setProvider(p)
     return () => {
       p.destroy()
       setProvider(null)
     }
-  }, [props.code, props.doc.id, user])
+  }, [props.code, props.doc.id, uid, uname])
   return provider ? <EditorShell {...props} provider={provider} /> : null
 }
 
@@ -71,6 +73,11 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
   const [busy, setBusy] = useState('')
   const [history, setHistory] = useState(false)
   const [deleted, setDeleted] = useState(false)
+  // Una vez abierto, el editor no se desmonta por reconexiones o recargas del estado
+  const [everReady, setEverReady] = useState(false)
+  useEffect(() => {
+    if (state === 'ready') setEverReady(true)
+  }, [state])
   const [peers, setPeers] = useState<{ id: string; name: string; color: string }[]>([])
   const { user: me } = useAuth()
   // Si el propietario cambia mi rol, se vuelve a comprobar el permiso sin cerrar el documento
@@ -202,18 +209,18 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
           <div className="docapp-main">
             {deleted ? (
               <div className="empty"><strong>El documento se ha eliminado</strong><button className="btn" onClick={onClose}>Cerrar</button></div>
-            ) : state !== 'ready' && !provider.canEdit && state !== 'syncing' && error ? (
+            ) : !everReady && state === 'offline' && error ? (
               <div className="empty"><strong>No se pudo abrir</strong><span className="small">{error}</span><button className="btn" onClick={onClose}>Cerrar</button></div>
             ) : (
               <Suspense fallback={<div className="empty"><Loader2 className="spin-icon" /></div>}>
-                {(state === 'ready' || state === 'offline') && (
+                {everReady && (
                   doc.kind === 'DOC' ? <TextEditor provider={provider} editable={editable} onEditor={setEditor} />
                   : doc.kind === 'SHEET' ? <SheetEditor provider={provider} editable={editable} />
                   : <SlidesEditor provider={provider} editable={editable} />
                 )}
               </Suspense>
             )}
-            {state === 'ready' && seedState !== 'DONE' && (
+            {everReady && seedState !== 'DONE' && (
               <div className="seed-overlay"><Loader2 className="spin-icon" size={28} /><strong>Preparando el documento…</strong><span className="small muted">Se está importando el contenido del archivo.</span></div>
             )}
             {busy && <div className="seed-overlay"><Loader2 className="spin-icon" size={28} /><strong>{busy}</strong></div>}
