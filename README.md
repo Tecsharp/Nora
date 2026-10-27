@@ -56,6 +56,10 @@ Todo documento es un **archivo de la sala**. En **Archivos** el botón **Nuevo**
 
 Cada editor tiene una cinta de opciones al estilo Office: **texto** (fuentes, tamaños, colores, listas, tablas, gráficos, buscar y reemplazar), **hojas** (formato, bordes, fórmulas con nombres en español, insertar/eliminar filas y columnas, ordenar, gráficos, estadísticas) y **diapositivas** (texto enriquecido, formas, tablas, gráficos, notas, modo presentación). Usa **Yjs (CRDT)** sobre el WebSocket de Nora; el servidor solo ordena, guarda y reparte los cambios. La conversión la hace el servicio interno `converter` (LibreOffice headless, sin acceso a Internet). Diseño, protocolo, fidelidad de conversión, fases y **limitaciones conocidas** en [docs/COLABORACION.md](docs/COLABORACION.md).
 
+### Pizarra colaborativa
+
+La herramienta **Pizarra** de cada sala es un lienzo infinito con el editor de **Excalidraw** (todas sus herramientas: formas, flechas ligadas, texto, dibujo libre, imágenes, marcos, láser, biblioteca…) sincronizado en tiempo real por el WebSocket de Nora, con cursores con nombre, selecciones, seguimiento de otra persona y permisos de la sala. Se guarda sola; **Guardar** escribe el archivo `.excalidraw` en Archivos; se puede **descargar** (`.excalidraw`, PNG y SVG con la escena incrustada, PDF), guardar copias en la sala e **importar** `.excalidraw`, PNG/SVG con escena e imágenes. Funciona sin Internet. Detalles en [docs/PIZARRA.md](docs/PIZARRA.md).
+
 ### Subidas reanudables
 
 Los archivos se suben por trozos de 8 MiB con multipart de S3 (`POST /api/rooms/{code}/uploads`, `PUT …/parts/{n}`, `POST …/complete`). El servidor guarda qué trozos llegaron: si se corta internet, se cierra la pestaña o se reinicia el navegador, al volver a elegir el mismo archivo solo se envían los que faltan. El cliente sube 3 trozos en paralelo, reintenta con espera, se pausa sin conexión y detecta conexiones colgadas (20 s sin avance). Muestra porcentaje, velocidad y tiempo restante; el resto de la sala ve el avance en vivo. Las subidas abandonadas se limpian a las 24 h.
@@ -129,4 +133,4 @@ cd frontend && npm install && npm run dev
 
 ## Estado
 
-Herramientas operativas: **Archivos**, **Notas**, **Portapapeles**; la edición colaborativa de documentos vive dentro de **Archivos**. Pizarra, Media Review, Asistencia, Votaciones y Acciones aparecen como «Próximamente». La presencia y los eventos de la sala van por WebSocket.
+Herramientas operativas: **Archivos**, **Notas**, **Portapapeles** y **Pizarra** (colaborativa, estilo Excalidraw); la edición colaborativa de documentos vive dentro de **Archivos**. Votaciones, Media Review, Asistencia y Acciones aparecen como «Próximamente». La presencia y los eventos de la sala van por WebSocket.

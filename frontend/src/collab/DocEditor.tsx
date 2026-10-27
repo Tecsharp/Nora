@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import type { Editor } from '@tiptap/react'
-import { Check, ChevronDown, Copy, Download, FileText, History, Loader2, Presentation, Save, Sheet, X } from 'lucide-react'
+import { Check, ChevronDown, Copy, Download, FileText, History, Loader2, PenTool, Presentation, Save, Sheet, Upload, X } from 'lucide-react'
 import { ApiError, api, getAccessToken } from '../api'
 import { useAuth } from '../auth'
 import Avatar from '../components/Avatar'
@@ -9,11 +9,13 @@ import Menu, { type MenuItem } from '../components/Menu'
 import { useRealtime } from '../realtime'
 import { useToast } from '../toast'
 import { CollabProvider, colorFor } from './provider'
+import type { BoardHandle } from './boardIO'
 import { readNativeForExport, restoreNonText, restoreText, seedNonText, type Kind, type Native } from './native'
 
 const TextEditor = lazy(() => import('./TextEditor'))
 const SheetEditor = lazy(() => import('./SheetEditor'))
 const SlidesEditor = lazy(() => import('./SlidesEditor'))
+const BoardEditor = lazy(() => import('./BoardEditor'))
 
 export interface DocInfo {
   id: string
@@ -25,6 +27,7 @@ export interface DocInfo {
   savedSeq?: number
   savedAt?: string | null
   savedByName?: string | null
+  thumbAt?: string | null
 }
 
 interface Props {
@@ -39,8 +42,9 @@ const FORMATS: Record<Kind, { id: string; label: string }[]> = {
   DOC: [{ id: 'docx', label: 'Word (.docx)' }, { id: 'odt', label: 'OpenDocument (.odt)' }, { id: 'pdf', label: 'PDF (.pdf)' }],
   SHEET: [{ id: 'xlsx', label: 'Excel (.xlsx)' }, { id: 'ods', label: 'OpenDocument (.ods)' }, { id: 'csv', label: 'CSV (primera hoja)' }, { id: 'pdf', label: 'PDF (.pdf)' }],
   SLIDES: [{ id: 'pptx', label: 'PowerPoint (.pptx)' }, { id: 'odp', label: 'OpenDocument (.odp)' }, { id: 'pdf', label: 'PDF (.pdf)' }],
+  BOARD: [{ id: 'excalidraw', label: 'Pizarra (.excalidraw)' }, { id: 'png', label: 'Imagen PNG (.png)' }, { id: 'svg', label: 'Imagen vectorial (.svg)' }, { id: 'pdf', label: 'PDF (.pdf)' }],
 }
-const ICON = { DOC: FileText, SHEET: Sheet, SLIDES: Presentation }
+const ICON = { DOC: FileText, SHEET: Sheet, SLIDES: Presentation, BOARD: PenTool }
 
 interface Version { id: string; createdAt: string; createdByName: string; label: string | null; seq: number }
 
@@ -90,6 +94,9 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
     if (state === 'ready') setEverReady(true)
   }, [state])
   const [peers, setPeers] = useState<{ id: string; name: string; color: string }[]>([])
+  const [board, setBoard] = useState<BoardHandle | null>(null)
+  const [importing, setImporting] = useState<File | null>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
   const { user: me } = useAuth()
   // Si el propietario cambia mi rol, se vuelve a comprobar el permiso sin cerrar el documento
   useRealtime('member.updated', (d: { userId: string }) => d.userId === me?.id && provider.refreshAccess())
@@ -99,7 +106,8 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
     const read = () => {
       const seen = new Map<string, { id: string; name: string; color: string }>()
       provider.peers().forEach((p) => seen.set(p.user.id, p.user))
-      setPeers([...seen.values()])
+      const next = [...seen.values()]
+      setPeers((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next)) // los cursores de la pizarra cambian la presencia muy a menudo
     }
     provider.awareness.on('change', read)
     read()
@@ -173,6 +181,7 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
       const f = (await res.json()) as { name: string }
       toast(`Guardado en «${f.name}»`, 'success')
       onSaved?.()
+      uploadThumb()
       void provider.saveVersion('Guardado en el archivo').catch(() => {})
       return true
     } catch (e) {
@@ -183,20 +192,56 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
     }
   }
 
+  /** Miniatura de la pizarra para la galería: se sube al guardar y al cerrar (empieza a dibujarse antes de que el editor desaparezca). */
+  function uploadThumb() {
+    if (doc.kind !== 'BOARD' || !board || !editable) return
+    void board.thumbnail().then((blob) => blob && fetch(`/api/rooms/${code}/docs/${doc.id}/thumbnail`, {
+      method: 'PUT', headers: { Authorization: `Bearer ${getAccessToken() ?? ''}`, 'Content-Type': blob.type || 'image/jpeg' }, body: blob,
+    })).catch(() => {})
+  }
+  const closeNow = () => {
+    uploadThumb()
+    onClose()
+  }
+
+  function download(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 10_000)
+  }
+
+  async function uploadToRoom(blob: Blob, filename: string) {
+    const fd = new FormData()
+    fd.append('file', new File([blob], filename, { type: blob.type }))
+    const r = await fetch(`/api/rooms/${code}/files`, { method: 'POST', headers: { Authorization: `Bearer ${getAccessToken() ?? ''}` }, body: fd })
+    if (!r.ok) throw new ApiError(r.status, (await r.json().catch(() => null))?.message ?? `Error ${r.status}`)
+    return (await r.json()) as { name: string }
+  }
+
   async function exportAs(format: string, save: 'none' | 'new') {
     setBusy(save === 'none' ? 'Preparando descarga…' : 'Guardando copia…')
     try {
+      if (doc.kind === 'BOARD' && format !== 'excalidraw') {
+        // las imágenes de la pizarra se dibujan en el navegador (con su escena incrustada en PNG y SVG para poder volver a importarlas)
+        if (!board) throw new Error('La pizarra aún se está cargando')
+        const blob = await board.exportBlob(format as 'png' | 'svg' | 'pdf')
+        if (save === 'none') download(blob, `${doc.name}.${format}`)
+        else {
+          const f = await uploadToRoom(blob, `${doc.name}.${format}`)
+          toast(`Copia guardada como «${f.name}» en Archivos`, 'success')
+          onSaved?.()
+        }
+        return
+      }
       const { res } = await post(format, save)
       if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => null))?.message ?? `Error ${res.status}`)
       if (save === 'none') {
-        const url = URL.createObjectURL(await res.blob())
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `${doc.name}.${format}`
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-        setTimeout(() => URL.revokeObjectURL(url), 10_000)
+        download(await res.blob(), `${doc.name}.${format}`)
       } else {
         const f = (await res.json()) as { name: string }
         toast(`Copia guardada como «${f.name}» en Archivos`, 'success')
@@ -209,8 +254,24 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
     }
   }
 
+  async function runImport(mode: 'merge' | 'replace') {
+    const f = importing
+    setImporting(null)
+    if (!f || !board) return
+    setBusy('Importando…')
+    try {
+      const n = await board.importFile(f, mode)
+      toast(n ? `Importado: ${n} elemento${n === 1 ? '' : 's'}` : 'Importado', 'success')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'No se pudo importar', 'error')
+    } finally {
+      setBusy('')
+    }
+  }
+
   const downloadItems = (): MenuItem[] => [{ heading: 'Descargar al equipo como…' }, ...FORMATS[doc.kind].map((f) => ({ label: f.label, icon: <Download size={16} />, onClick: () => void exportAs(f.id, 'none') }))]
   const moreItems = (): MenuItem[] => [
+    ...(doc.kind === 'BOARD' ? [{ heading: 'Importar' } as MenuItem, { label: 'Importar archivo (.excalidraw, imagen)…', icon: <Upload size={16} />, onClick: () => fileInput.current?.click() } as MenuItem, 'separator' as MenuItem] : []),
     { heading: 'Guardar una copia en la sala como…' },
     ...FORMATS[doc.kind].map((f) => ({ label: f.label, icon: <Copy size={16} />, onClick: () => void exportAs(f.id, 'new') })),
   ]
@@ -233,7 +294,7 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
   function requestClose() {
     const dirty = provider.seq > saved.seq
     if (editable && dirty && peers.length <= 1 && !deleted) setClosing(true)
-    else onClose()
+    else closeNow()
   }
 
   const Icon = ICON[doc.kind]
@@ -264,6 +325,8 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
               <Menu label="Más opciones de guardado" items={moreItems()} />
             </>
           )}
+          <input ref={fileInput} type="file" hidden accept=".excalidraw,.json,application/json,image/png,image/jpeg,image/webp,image/gif,image/svg+xml" aria-label="Importar archivo"
+            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setImporting(f) }} />
           <button className="icon-btn" aria-label="Cerrar el editor" onClick={requestClose}><X size={20} /></button>
         </header>
 
@@ -278,6 +341,7 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
                 {everReady && (
                   doc.kind === 'DOC' ? <TextEditor provider={provider} editable={editable} onEditor={setEditor} />
                   : doc.kind === 'SHEET' ? <SheetEditor provider={provider} editable={editable} />
+                  : doc.kind === 'BOARD' ? <BoardEditor provider={provider} editable={editable} onHandle={setBoard} onImportRequest={() => fileInput.current?.click()} onSaveCopy={() => void exportAs('excalidraw', 'new')} />
                   : <SlidesEditor provider={provider} editable={editable} />
                 )}
               </Suspense>
@@ -287,13 +351,24 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
             )}
             {busy && <div className="seed-overlay"><Loader2 className="spin-icon" size={28} /><strong>{busy}</strong></div>}
           </div>
+          {importing && board && (
+            <div className="seed-overlay" role="alertdialog" aria-label="Importar archivo">
+              <strong>Importar «{importing.name}»</strong>
+              <span className="small muted">¿Añadirlo a lo que ya hay en la pizarra o sustituir todo? Podrás deshacerlo.</span>
+              <div className="row">
+                <button className="btn primary" autoFocus onClick={() => void runImport('merge')}>Añadir a la pizarra</button>
+                <button className="btn" onClick={() => void runImport('replace')}>Reemplazar todo</button>
+                <button className="btn ghost" onClick={() => setImporting(null)}>Cancelar</button>
+              </div>
+            </div>
+          )}
           {closing && (
             <div className="seed-overlay" role="alertdialog" aria-label="Cambios sin guardar">
               <strong>Hay cambios que todavía no están en el archivo</strong>
               <span className="small muted">«{doc.name}{doc.sourceExt ? `.${doc.sourceExt}` : ''}» no incluye lo último que se escribió. Si cierras sin guardar, el documento compartido conserva los cambios, pero el archivo de Archivos seguirá como estaba.</span>
               <div className="row">
-                <button className="btn primary" autoFocus onClick={async () => { setClosing(false); if (await saveToFile()) onClose() }}>Guardar y cerrar</button>
-                <button className="btn" onClick={onClose}>Cerrar sin guardar</button>
+                <button className="btn primary" autoFocus onClick={async () => { setClosing(false); if (await saveToFile()) closeNow() }}>Guardar y cerrar</button>
+                <button className="btn" onClick={closeNow}>Cerrar sin guardar</button>
                 <button className="btn ghost" onClick={() => setClosing(false)}>Seguir editando</button>
               </div>
             </div>

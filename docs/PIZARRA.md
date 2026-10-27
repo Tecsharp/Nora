@@ -1,0 +1,53 @@
+# Pizarra colaborativa (NORAINST-13)
+
+La herramienta **Pizarra** de cada sala es un lienzo infinito para dibujar, esquematizar y pensar entre todos en tiempo real. Usa **Excalidraw** (el componente oficial, licencia MIT) como editor y la infraestructura colaborativa que Nora ya tenía para documentos (WebSocket + Yjs), de modo que la experiencia es la de Excalidraw con las personas de la sala dentro.
+
+## Qué incluye
+
+**Herramientas de dibujo (las de Excalidraw):** selección, mano, rectángulo, rombo, elipse, flecha (recta, curva y en ángulo, ligada a las formas), línea, dibujo libre, texto, imágenes, borrador, marcos, láser y generador de diagramas desde texto (Mermaid, funciona sin Internet); propiedades de cada elemento (trazo, relleno, estilo de trazo y de bordes, grosor, opacidad, tipo y tamaño de fuente, puntas de flecha, capas), agrupar, alinear y distribuir, duplicar, bloquear, copiar y pegar, deshacer/rehacer, zoom y desplazamiento, cuadrícula, ajuste a objetos, buscar en el lienzo, atajos de teclado, modo zen, biblioteca de elementos (se conserva en el navegador y admite `.excalidrawlib`), fondo del lienzo y tema claro/oscuro (va junto al tema de Nora).
+
+**Colaboración:**
+- Los cambios de cada persona llegan a las demás en décimas de segundo, también el borrado y el deshacer.
+- **Cursores con nombre y color**, selecciones ajenas, puntero láser y lista de personas en la pizarra.
+- **Seguir a otra persona**: al pulsar su avatar tu vista reproduce la suya (desplazamiento y zoom).
+- Permisos de la sala: el lector ve la pizarra en directo, pero no puede dibujar.
+- Deshacer es **personal**: cada uno deshace solo lo suyo.
+- Funciona con varias pestañas y con cortes de conexión (los cambios se reenvían al reconectar).
+
+**Guardar, exportar e importar:**
+| Acción | Dónde | Qué hace |
+|---|---|---|
+| Autoguardado | siempre | Todo cambio se guarda al instante en el documento compartido (como Miro): no hay que «guardar para no perder». |
+| **Guardar** (Ctrl+S) | cabecera | Escribe la pizarra en su archivo **`.excalidraw`** en Archivos. El indicador dice si el archivo está al día. |
+| **Descargar** | cabecera | `.excalidraw` (pizarra editable), **PNG** (con la escena incrustada: se puede volver a importar), **SVG** (vectorial, también con la escena) y **PDF**. |
+| **Guardar una copia en la sala** | menú «⋯» | Guarda un `.excalidraw`, PNG o SVG nuevo en Archivos. |
+| **Exportar imagen…** | menú de Excalidraw | El diálogo de Excalidraw (solo selección, fondo, tema oscuro, escala 1×/2×/3×, copiar al portapapeles). |
+| **Importar** | galería o menú «⋯» | Lee un `.excalidraw`/`.json`, un PNG o SVG con la escena incrustada o una imagen suelta. Dentro de una pizarra se elige **añadir** (aparece donde estás mirando, ya seleccionado) o **reemplazar todo**; ambas se pueden deshacer. |
+| **Historial** | cabecera | Versiones automáticas (cada 10 min) y manuales; restaurar una versión es un cambio más (todos la reciben y se puede deshacer). |
+| Abrir desde Archivos | un clic | Cualquier `.excalidraw` de la sala se abre como pizarra colaborativa. |
+| Galería | herramienta **Pizarra** | Miniaturas, nueva pizarra, importar, renombrar y borrar. |
+
+Una pizarra, como cualquier otro documento de Nora, **es un archivo de la sala**: «Nueva pizarra» crea `Pizarra sin título.excalidraw` en Archivos; borrar el archivo borra la pizarra y renombrar una renombra la otra.
+
+## Cómo funciona
+
+```
+ Excalidraw (navegador A) ──onChange──▶ Y.Map «b:el» (id → elemento) ──▶ WebSocket /ws (doc.update) ──▶ servidor (bytes opacos, orden, permisos)
+        ▲                                        ▲                                                            │
+        └──reconcileElements◀─────Y.Map observe──┴──────────────────── doc.update de B, C… ◀────────────────┘
+```
+- **Modelo (`boardModel.ts`)**: un `Y.Map` con un valor por elemento (el JSON del elemento de Excalidraw, entero), otro con las imágenes (`id → dataURL`) y otro con el fondo/cuadrícula. El orden de apilado es el `index` fraccionario que Excalidraw asigna a cada elemento.
+- **Escena → Yjs**: cada cambio local se compara con la última versión (`version` + `versionNonce`) ya enviada de cada elemento; solo se escribe lo que cambió, agrupado cada 60 ms. Se clona el elemento antes de guardarlo (Excalidraw lo muta en sitio).
+- **Yjs → escena**: lo remoto se reconcilia con `reconcileElements` de Excalidraw, la **misma lógica de su colaboración oficial** (gana la versión mayor y se respeta lo que estás editando en ese momento). No pasa por el historial local.
+- **Borrado**: los elementos borrados se quedan como lápidas (`isDeleted`) para que el borrado se propague y se pueda restaurar; las de más de una semana se limpian al abrir.
+- **Presencia**: cursor, botón, selección y centro/zoom de la vista viajan por el *awareness* del documento (limitado a ~25 mensajes/s por persona).
+- **Imágenes**: se sincronizan como `dataURL` en un mensaje; si pesan más de ~1,1 M caracteres se reducen (WebP) para la copia compartida (quien la insertó conserva la original).
+- **Servidor**: la pizarra es el cuarto tipo de documento (`BOARD`). Valida el `.excalidraw` que entra o sale (JSON con lista de `elementos`, máximo 50 000, y solo conserva elementos, imágenes y fondo/cuadrícula; descarta el estado de la vista de quien lo guardó). No necesita el conversor de oficina. Miniaturas: `PUT/GET /docs/{id}/thumbnail` (JPEG/PNG/WebP ≤ 200 KB, solo quien puede escribir la sube).
+- **Sin Internet**: las fuentes de Excalidraw se copian junto a la aplicación (`/excalidraw-assets/`) y se descarta su copia de respaldo en `esm.sh`; la CSP del gateway no se ha relajado.
+
+## Limitaciones conocidas
+- **Sin edición simultánea carácter a carácter dentro de un mismo texto**: como en Excalidraw, cada elemento se sincroniza entero; si dos personas editan **el mismo texto a la vez**, gana la última versión (el resto de elementos no tienen conflictos).
+- **Fuentes subconjuntadas en SVG**: el navegador bloquea `eval` (CSP), así que el SVG exportado incrusta las fuentes completas en vez de solo los glifos usados (el archivo pesa más, pero se ve igual).
+- **Funciones de Excalidraw+ o de servicios externos** no están: compartir por enlace de excalidraw.com, la biblioteca pública (se abre en otra pestaña), el diagrama por IA y las páginas web incrustadas (la opción «Incrustar web» aparece en el menú de herramientas, pero la política de seguridad de Nora no deja cargar sitios externos).
+- **Rendimiento**: probado con cientos de elementos; las pizarras con decenas de miles de elementos o muchas imágenes grandes serán más lentas (el documento completo vive en el navegador).
+- El deshacer de Excalidraw es por sesión: después de cerrar y abrir la pizarra no se puede deshacer lo anterior (sí restaurar una versión del historial).
