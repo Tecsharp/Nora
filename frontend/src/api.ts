@@ -149,14 +149,19 @@ export interface DownloadHandle {
   promise: Promise<void>
 }
 
+export interface BlobHandle {
+  cancel: () => void
+  promise: Promise<Blob>
+}
+
 /** Sin recibir ni un byte durante este tiempo se considera que la descarga se perdió. */
 const DOWNLOAD_STALL_MS = 45_000
 
 /**
- * Descarga con progreso: lee la respuesta en flujo y avisa de los bytes recibidos (total = 0 si el servidor no lo
- * indica). Si la conexión se queda colgada la aborta con un error claro, en lugar de quedarse esperando para siempre.
+ * Descarga un recurso autenticado leyéndolo en flujo y avisando de los bytes recibidos (total = 0 si el servidor no
+ * lo indica). Si la conexión se queda colgada la aborta con un error claro, en lugar de esperar para siempre.
  */
-export function downloadWithProgress(path: string, filename: string, onProgress: (loaded: number, total: number) => void): DownloadHandle {
+export function fetchBlob(path: string, onProgress: (loaded: number, total: number) => void, mime?: string): BlobHandle {
   const ctrl = new AbortController()
   let reason: 'user' | 'stall' | null = null
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -167,7 +172,7 @@ export function downloadWithProgress(path: string, filename: string, onProgress:
       ctrl.abort()
     }, DOWNLOAD_STALL_MS)
   }
-  const run = async () => {
+  const run = async (): Promise<Blob> => {
     arm()
     try {
       const res = await raw(path, { signal: ctrl.signal })
@@ -189,14 +194,7 @@ export function downloadWithProgress(path: string, filename: string, onProgress:
       } else {
         chunks.push(await res.blob())
       }
-      const url = URL.createObjectURL(new Blob(chunks))
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+      return new Blob(chunks, mime ? { type: mime } : undefined)
     } catch (e) {
       if (ctrl.signal.aborted) {
         if (reason === 'stall') throw new Error('La descarga se detuvo. Inténtalo de nuevo.')
@@ -213,6 +211,24 @@ export function downloadWithProgress(path: string, filename: string, onProgress:
       ctrl.abort()
     },
     promise: run(),
+  }
+}
+
+/** Descarga con progreso y guarda el archivo en el equipo. */
+export function downloadWithProgress(path: string, filename: string, onProgress: (loaded: number, total: number) => void): DownloadHandle {
+  const h = fetchBlob(path, onProgress)
+  return {
+    cancel: h.cancel,
+    promise: h.promise.then((blob) => {
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+    }),
   }
 }
 

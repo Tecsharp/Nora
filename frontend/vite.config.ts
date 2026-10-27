@@ -1,9 +1,39 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { cpSync, createReadStream, existsSync, statSync } from 'node:fs'
+import { resolve } from 'node:path'
+import type { Plugin } from 'vite'
+
+/** Fuentes estándar y mapas de caracteres de pdf.js: se sirven desde /pdfjs/ (en dev) y se copian a dist/pdfjs (en build). */
+function pdfjsAssets(): Plugin {
+  const base = resolve('node_modules/pdfjs-dist')
+  const dirs = ['standard_fonts', 'cmaps']
+  return {
+    name: 'pdfjs-assets',
+    configureServer(server) {
+      server.middlewares.use('/pdfjs', (req, res, next) => {
+        const file = resolve(base, '.' + decodeURIComponent((req.url ?? '').split('?')[0]!))
+        if (!dirs.some((d) => file.startsWith(resolve(base, d))) || !existsSync(file) || !statSync(file).isFile()) return next()
+        createReadStream(file).pipe(res)
+      })
+    },
+    closeBundle() {
+      for (const d of dirs) cpSync(resolve(base, d), resolve('dist/pdfjs', d), { recursive: true })
+    },
+  }
+}
 
 // En desarrollo (npm run dev) el proxy imita al gateway de Docker.
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), pdfjsAssets()],
+  build: {
+    rollupOptions: {
+      output: {
+        // nginx no conoce la extensión .mjs y serviría el worker de pdf.js como binario: se emite como .js
+        assetFileNames: (info) => (info.names?.some((n) => n.endsWith('.mjs')) ? 'assets/[name]-[hash].js' : 'assets/[name]-[hash][extname]'),
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

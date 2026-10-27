@@ -79,6 +79,10 @@ El creador de la sala asigna a cada participante uno de estos roles desde la lis
 
 Los permisos se comprueban en el servidor (un lector recibe 403 al intentar subir o modificar) y el cambio de rol llega en vivo a la persona afectada. Un administrador del sistema conserva control sobre cualquier sala en la que participe.
 
+### Visor de documentos
+
+Al hacer clic en un archivo (o con el botón del ojo) se abre un visor con navegación entre los documentos de la carpeta (flechas del teclado o en pantalla): **imágenes** (JPG, PNG, GIF, WebP, AVIF, SVG…), **PDF** (con zoom, dibujado con pdf.js en el navegador) y **texto/código** (se muestra como texto plano, nunca se ejecuta). Todo se lee por la API autenticada y se muestra con URLs `blob:` locales; la CSP del gateway solo añade `blob:` para imágenes y workers. Los **vídeos no se previsualizan, solo se descargan**: reproducirlos exigiría transcodificarlos en el servidor (ffmpeg), algo que Nora no incluye por ahora.
+
 ### Acceso desde otros equipos y Cloudflare Tunnel
 
 Por defecto el gateway escucha en todas las interfaces (`NORA_BIND=0.0.0.0`), así que Nora es accesible por `http://IP-DEL-SERVIDOR:29817` desde tu red. Si solo quieres usarlo desde la propia máquina, pon `NORA_BIND=127.0.0.1` en `.env` y ejecuta `docker compose up -d`.
