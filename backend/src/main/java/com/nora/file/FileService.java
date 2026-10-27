@@ -28,10 +28,12 @@ public class FileService {
 
     private final RoomFileRepository files;
     private final ObjectStorage storage;
+    private final StorageCleaner cleaner;
     private final UserRepository users;
     private final ApplicationEventPublisher events;
 
-    public FileService(RoomFileRepository files, ObjectStorage storage, UserRepository users, ApplicationEventPublisher events) {
+    public FileService(RoomFileRepository files, ObjectStorage storage, StorageCleaner cleaner, UserRepository users, ApplicationEventPublisher events) {
+        this.cleaner = cleaner;
         this.files = files;
         this.storage = storage;
         this.users = users;
@@ -93,7 +95,7 @@ public class FileService {
             throw ApiException.forbidden("No puedes borrar este archivo");
         }
         files.delete(f);
-        storage.delete(f.getObjectKey());
+        cleaner.schedule(f.getObjectKey()); // el objeto se borra tras confirmar; si Garage falla, queda anotado
         events.publishEvent(new RoomEvent(roomId, "file.deleted", Map.of("id", f.getId())));
     }
 
@@ -115,7 +117,7 @@ public class FileService {
     @Transactional
     public List<UUID> deleteInFolders(UUID roomId, java.util.Collection<UUID> folderIds) {
         List<RoomFile> doomed = files.findByRoomIdAndFolderIdIn(roomId, folderIds);
-        for (RoomFile f : doomed) storage.delete(f.getObjectKey());
+        for (RoomFile f : doomed) cleaner.schedule(f.getObjectKey());
         files.deleteAll(doomed);
         return doomed.stream().map(RoomFile::getId).toList();
     }
@@ -135,7 +137,7 @@ public class FileService {
     @Transactional
     public void deleteAllForRoom(UUID roomId) {
         for (RoomFile f : files.findByRoomIdOrderByCreatedAtDesc(roomId)) {
-            storage.delete(f.getObjectKey());
+            cleaner.schedule(f.getObjectKey());
         }
     }
 

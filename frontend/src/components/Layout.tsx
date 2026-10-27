@@ -1,6 +1,8 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { LogOut, Shield } from 'lucide-react'
 import { useAuth } from '../auth'
+import { useRealtime } from '../realtime'
+import { useToast } from '../toast'
 import { ThemeToggle } from '../theme'
 import { uploads } from '../uploadManager'
 import Avatar from './Avatar'
@@ -12,6 +14,13 @@ export default function Layout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  const toast = useToast()
+  useRealtime('join.requested', (d: { roomName: string; displayName: string }) => toast(`${d.displayName} quiere entrar a «${d.roomName}»`, 'info'))
+  useRealtime('join.approved', (d: { code: string; roomName: string }) => {
+    toast(`Te han aceptado en «${d.roomName}»`, 'success')
+    navigate(`/room/${d.code}`)
+  })
+  useRealtime('join.denied', (d: { roomName: string }) => toast(`No te han aceptado en «${d.roomName}»`, 'warning'))
   return (
     <>
       <TopBar>

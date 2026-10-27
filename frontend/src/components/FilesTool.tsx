@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import {
-  ChevronRight, Download, X, File, FileArchive, FileAudio, FileCode, FileImage, FileText, FileVideo, Folder, FolderInput, FolderPlus, FolderUp,
+  ChevronRight, Download, X, File, FileArchive, FileAudio, FileCode, FileImage, FileText, FileVideo, Folder, FolderInput, FolderPlus, FolderUp, Eye,
   House, LayoutGrid, List, Pencil, Search, Trash2, Upload,
 } from 'lucide-react'
 import { api, ApiError, downloadWithProgress, formatBytes, type DownloadHandle, type Room } from '../api'
@@ -11,8 +11,10 @@ import { collectFromEntries, collectFromFiles, entriesFromDrop, type Collected }
 import { useRealtime } from '../realtime'
 import { useToast } from '../toast'
 import { fingerprintOf } from '../uploader'
+import { previewKind } from '../preview'
 import { fileFromHandle, isActive, loadInterrupted, pruneStaleHandles, uploads, useUploads, type PendingUpload } from '../uploadManager'
 import ProgressRing from './ProgressRing'
+import FileViewer from './FileViewer'
 import Menu, { type MenuItem } from './Menu'
 import Modal from './Modal'
 import Tabs from './Tabs'
@@ -91,6 +93,7 @@ export default function FilesTool({ room }: { room: Room }) {
   const [moving, setMoving] = useState<FileItem | null>(null)
   const [dropTarget, setDropTarget] = useState<string | 'root' | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [viewing, setViewing] = useState<string | null>(null)
   const [dl, setDl] = useState<Record<string, { loaded: number; total: number }>>({})
   const dlHandles = useRef(new Map<string, DownloadHandle>())
   const foldersRef = useRef<FolderItem[]>([])
@@ -180,6 +183,10 @@ export default function FilesTool({ room }: { room: Room }) {
     return list.sort((a, b) =>
       sort === 'name' ? a.name.localeCompare(b.name) : sort === 'size' ? b.sizeBytes - a.sizeBytes : b.createdAt.localeCompare(a.createdAt))
   }, [files, searching, q, current, sort])
+
+  // Documentos que se pueden ver (imágenes, PDF y texto), en el orden en que se muestran
+  const viewable = useMemo(() => shownFiles.filter((f) => previewKind(f.name)), [shownFiles])
+  const viewIndex = viewing ? viewable.findIndex((f) => f.id === viewing) : -1
 
   const countIn = (id: string) => files.filter((f) => f.folderId === id).length + folders.filter((f) => f.parentId === id).length
   const where = (folderId: string | null) =>
@@ -387,7 +394,10 @@ export default function FilesTool({ room }: { room: Room }) {
   }
 
   function fileMenu(f: FileItem): MenuItem[] {
-    const items: MenuItem[] = [{ label: 'Descargar', icon: <Download size={16} />, onClick: () => void downloadFile(f) }]
+    const items: MenuItem[] = [
+      ...(previewKind(f.name) ? [{ label: 'Ver', icon: <Eye size={16} />, onClick: () => setViewing(f.id) }] : []),
+      { label: 'Descargar', icon: <Download size={16} />, onClick: () => void downloadFile(f) },
+    ]
     if (canTouch(f.uploaderId)) {
       items.push(
         { label: 'Cambiar nombre', icon: <Pencil size={16} />, onClick: () => setRenaming({ kind: 'file', id: f.id, name: f.name }) },
@@ -431,9 +441,11 @@ export default function FilesTool({ room }: { room: Room }) {
   for (const f of shownFiles) {
     const Icon = iconFor(f.name)
     const d = dl[f.id]
+    const canView = !!previewKind(f.name)
     const pct = d && d.total > 0 ? Math.min(100, Math.round((d.loaded / d.total) * 100)) : 0
     rows.push(
-      <div key={`f-${f.id}`} className={`fitem ${d ? 'busy' : ''}`}
+      <div key={`f-${f.id}`} className={`fitem ${d ? 'busy' : ''} ${canView ? 'viewable' : ''}`}
+        {...(canView ? { role: 'button', tabIndex: 0, 'aria-label': `Ver ${f.name}`, onClick: () => setViewing(f.id), onKeyDown: activate(() => setViewing(f.id)) } : {})}
         draggable={canTouch(f.uploaderId)}
         onDragStart={(e) => { e.dataTransfer.setData(NORA_MIME, f.id); e.dataTransfer.effectAllowed = 'move' }}>
         <span className={`ficon tn-${TONES.get(Icon) ?? 'gray'}`}>
@@ -454,12 +466,17 @@ export default function FilesTool({ room }: { room: Room }) {
           </span>
         </span>
         <span className="factions">
+          {canView && !d && (
+            <button className="icon-btn sm" title="Ver" aria-label={`Ver ${f.name}`} onClick={(e) => { e.stopPropagation(); setViewing(f.id) }}>
+              <Eye size={16} />
+            </button>
+          )}
           {d ? (
-            <button className="icon-btn sm" title="Cancelar descarga" aria-label={`Cancelar descarga de ${f.name}`} onClick={() => cancelDownload(f.id)}>
+            <button className="icon-btn sm" title="Cancelar descarga" aria-label={`Cancelar descarga de ${f.name}`} onClick={(e) => { e.stopPropagation(); cancelDownload(f.id) }}>
               <X size={16} />
             </button>
           ) : (
-            <button className="icon-btn sm" title="Descargar" aria-label={`Descargar ${f.name}`} onClick={() => downloadFile(f)}>
+            <button className="icon-btn sm" title="Descargar" aria-label={`Descargar ${f.name}`} onClick={(e) => { e.stopPropagation(); downloadFile(f) }}>
               <Download size={16} />
             </button>
           )}
@@ -598,6 +615,11 @@ export default function FilesTool({ room }: { room: Room }) {
         <span>{shownFolders.length} carpeta{shownFolders.length === 1 ? '' : 's'} · {shownFiles.length} archivo{shownFiles.length === 1 ? '' : 's'}</span>
         <span className="hide-sm">Subida reanudable · arrastra un archivo a una carpeta para moverlo</span>
       </div>
+
+      {viewIndex >= 0 && (
+        <FileViewer code={room.code} files={viewable} index={viewIndex} onIndex={(i) => setViewing(viewable[i]!.id)}
+          onClose={() => setViewing(null)} onDownload={(f) => { const item = files.find((x) => x.id === f.id); if (item) downloadFile(item) }} />
+      )}
 
       {moving && (
         <Modal title={`Mover «${moving.name}»`} onClose={() => setMoving(null)}>

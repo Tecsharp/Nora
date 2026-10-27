@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useState, type ComponentType } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowLeft, Check, Pencil, Clapperboard, Clipboard, ClipboardList, Clock, Copy, FolderOpen, Hash, Monitor, PenTool, Plus, ShieldCheck,
+  ArrowLeft, Check, Pencil, Settings, UserCheck, X, Clapperboard, Clipboard, ClipboardList, Clock, Copy, FolderOpen, Hash, Monitor, PenTool, Plus, ShieldCheck,
   SquareCheckBig, Trash2, Zap, type LucideProps,
 } from 'lucide-react'
-import { api, ApiError, type Room } from '../api'
+import { api, ApiError, type JoinRequest, type Room } from '../api'
 import { useAuth } from '../auth'
 import { rt, useRealtime, useRtStatus } from '../realtime'
 import { useToast } from '../toast'
 import Avatar from '../components/Avatar'
 import ExpiryDialog from '../components/ExpiryDialog'
+import RoomSettingsDialog from '../components/RoomSettingsDialog'
 import Menu from '../components/Menu'
 import Modal from '../components/Modal'
 import FilesTool from '../components/FilesTool'
@@ -50,6 +51,8 @@ export default function RoomPage() {
   const [active, setActive] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [adjusting, setAdjusting] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [requests, setRequests] = useState<JoinRequest[]>([])
   const [online, setOnline] = useState<Set<string>>(new Set())
   const toast = useToast()
   const status = useRtStatus()
@@ -100,7 +103,10 @@ export default function RoomPage() {
 
   useRealtime('joined', (d: { online: string[] }) => setOnline(new Set(d.online)))
   useRealtime('reconnected', load)
-  useRealtime('room.updated', (d: { expiresAt: string | null }) => setRoom((r) => (r ? { ...r, expiresAt: d.expiresAt } : r)))
+  useRealtime('room.updated', (d: { expiresAt: string | null; settings?: Room['settings'] }) =>
+    setRoom((r) => (r ? { ...r, expiresAt: d.expiresAt, settings: d.settings ?? r.settings } : r)))
+  useRealtime('join.requested', (d: { code: string }) => d.code === code && loadRequests())
+  useRealtime('join.cancelled', (d: { code: string }) => d.code === code && loadRequests())
   useRealtime('presence', (d: { userId: string; displayName: string; online: boolean }) => {
     setOnline((s) => {
       const next = new Set(s)
@@ -136,6 +142,25 @@ export default function RoomPage() {
     await navigator.clipboard?.writeText(code).catch(() => {})
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
+  }
+
+  const isOwnerLike = !!room && (room.isOwner || user?.role === 'ADMIN')
+  const loadRequests = useCallback(() => {
+    api<JoinRequest[]>(`/rooms/${code}/join-requests`).then(setRequests).catch(() => setRequests([]))
+  }, [code])
+  useEffect(() => {
+    if (isOwnerLike) loadRequests()
+  }, [isOwnerLike, loadRequests])
+
+  async function decide(userId: string, approve: boolean) {
+    try {
+      await api(`/rooms/${code}/join-requests/${userId}`, 'POST', { approve })
+      setRequests((all) => all.filter((r) => r.userId !== userId))
+      if (approve) load()
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : 'No se pudo responder', 'error')
+      loadRequests()
+    }
   }
 
   async function assignRole(userId: string, role: RoomRole) {
@@ -174,6 +199,11 @@ export default function RoomPage() {
         <Link to="/" className="btn ghost sm"><ArrowLeft size={15} /> Mis salas</Link>
         <div className="row">
           <span className={`badge ${expired ? 'red' : 'green'}`}><i /> {expired ? 'Sala expirada' : 'Sala activa'}</span>
+          {canAssign && (
+            <button className="icon-btn" onClick={() => setSettingsOpen(true)} aria-label="Opciones de la sala" title="Opciones de la sala">
+              <Settings size={18} />
+            </button>
+          )}
           {(room.isOwner || user?.role === 'ADMIN') && (
             <button className="icon-btn danger" onClick={closeRoom} aria-label="Cerrar sala" title="Cerrar sala">
               <Trash2 size={18} />
@@ -235,6 +265,24 @@ export default function RoomPage() {
         </section>
       </div>
 
+      {requests.length > 0 && (
+        <section className="card stack tight swap" style={{ marginTop: 16 }} aria-label="Solicitudes de entrada">
+          <div className="people-head">
+            <span className="eyebrow">Solicitudes de entrada</span>
+            <span className="badge blue">{requests.length}</span>
+          </div>
+          {requests.map((r) => (
+            <div key={r.userId} className="join-req">
+              <span className="row nowrap"><Avatar name={r.displayName} /><span className="truncate">{r.displayName}</span></span>
+              <span className="row nowrap">
+                <button className="btn primary sm" onClick={() => void decide(r.userId, true)}><UserCheck size={15} /> Aceptar</button>
+                <button className="btn ghost sm" onClick={() => void decide(r.userId, false)}><X size={15} /> Rechazar</button>
+              </span>
+            </div>
+          ))}
+        </section>
+      )}
+
       <div className="tools-wrap">
         <div className="section-title"><h3>Herramientas</h3></div>
         <div className="tools stagger">
@@ -258,6 +306,8 @@ export default function RoomPage() {
           <i className={`live ${status}`} /> {status === 'open' ? 'En vivo' : status === 'connecting' ? 'Conectando…' : 'Sin conexión en vivo'} · {room.participants.length} en la sala
         </span>
       </footer>
+
+      {settingsOpen && <RoomSettingsDialog room={room} onClose={() => setSettingsOpen(false)} onSaved={(r) => setRoom(r)} />}
 
       {adjusting && (
         <ExpiryDialog code={room.code} name={room.name} expiresAt={room.expiresAt} onClose={() => setAdjusting(false)}

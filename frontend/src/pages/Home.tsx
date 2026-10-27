@@ -1,6 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowRight, Clock, Pencil, DoorOpen, FileUp, Hash, HardDrive, Plus, Timer, Users } from 'lucide-react'
+import { RoomOptions } from '../components/RoomSettingsDialog'
+import Modal from '../components/Modal'
+import { useRealtime } from '../realtime'
+import { ArrowRight, ChevronDown, Hourglass, Clock, Pencil, DoorOpen, FileUp, Hash, HardDrive, Plus, Timer, Users } from 'lucide-react'
 import { api, ApiError, formatBytes, type Room, type RoomSummary, type User } from '../api'
 import { useAuth } from '../auth'
 import ExpiryDialog from '../components/ExpiryDialog'
@@ -21,6 +24,27 @@ export default function Home() {
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [adjust, setAdjust] = useState<RoomSummary | null>(null)
+  const [opts, setOpts] = useState(false)
+  const [approval, setApproval] = useState(false)
+  const [defRole, setDefRole] = useState<'MEMBER' | 'VIEWER'>('MEMBER')
+  const [maxP, setMaxP] = useState('')
+  const [waiting, setWaiting] = useState<{ code: string; roomName: string } | null>(null)
+
+  // El resultado llega en vivo; si se pierde el aviso, se consulta cada 6 s
+  useRealtime('join.approved', () => setWaiting(null))
+  useRealtime('join.denied', () => setWaiting(null))
+  useEffect(() => {
+    if (!waiting) return
+    const t = setInterval(async () => {
+      const r = await api<{ status: string }>(`/rooms/${waiting.code}/join-status`).catch(() => null)
+      if (r?.status === 'MEMBER') navigate(`/room/${waiting.code}`)
+      else if (r?.status === 'NONE') {
+        setWaiting(null)
+        setError('No te han aceptado en esa sala.')
+      }
+    }, 6000)
+    return () => clearInterval(t)
+  }, [waiting, navigate])
 
   useEffect(() => {
     api<RoomSummary[]>('/rooms').then(setRooms).catch(() => setRooms([]))
@@ -38,7 +62,9 @@ export default function Home() {
     e.preventDefault()
     setError('')
     try {
-      const room = await api<Room>('/rooms', 'POST', { name, minutes })
+      const room = await api<Room>('/rooms', 'POST', {
+        name, minutes, requireApproval: approval, defaultRole: defRole, maxParticipants: maxP.trim() ? Number(maxP) : undefined,
+      })
       navigate(`/room/${room.code}`)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error al crear la sala')
@@ -49,8 +75,9 @@ export default function Home() {
     e.preventDefault()
     setError('')
     try {
-      const room = await api<Room>('/rooms/join', 'POST', { code: code.trim() })
-      navigate(`/room/${room.code}`)
+      const res = await api<Room | { pending: true; roomName: string; code: string }>('/rooms/join', 'POST', { code: code.trim() })
+      if ('pending' in res) setWaiting({ code: res.code, roomName: res.roomName })
+      else navigate(`/room/${res.code}`)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error al unirse a la sala')
     }
@@ -82,6 +109,14 @@ export default function Home() {
               {unlimitedTime && <option value={0}>Sin expiración</option>}
             </select>
           </label>
+          <button type="button" className="btn ghost sm" style={{ alignSelf: 'flex-start' }} aria-expanded={opts} onClick={() => setOpts((o) => !o)}>
+            <ChevronDown size={15} style={{ transform: opts ? 'rotate(180deg)' : undefined, transition: 'transform .25s' }} /> Opciones de la sala
+          </button>
+          {opts && (
+            <div className="swap">
+              <RoomOptions approval={approval} setApproval={setApproval} role={defRole} setRole={setDefRole} max={maxP} setMax={setMaxP} cap={limits?.maxParticipants} />
+            </div>
+          )}
           <button className="btn primary">Crear sala</button>
         </form>
         <form className="card stack" onSubmit={join}>
@@ -131,6 +166,17 @@ export default function Home() {
           ))}
         </ul>
       </section>
+
+      {waiting && (
+        <Modal title="Esperando confirmación" icon={<Hourglass size={20} />} onClose={() => setWaiting(null)}
+          footer={<button className="btn" onClick={async () => { await api(`/rooms/${waiting.code}/join-request`, 'DELETE').catch(() => {}); setWaiting(null) }}>Cancelar solicitud</button>}>
+          <div className="empty">
+            <Hourglass size={36} />
+            <strong>«{waiting.roomName}» pide aprobación</strong>
+            <span className="small">Avisamos al propietario. Entrarás en cuanto te acepte; puedes dejar esta ventana abierta.</span>
+          </div>
+        </Modal>
+      )}
 
       {adjust && (
         <ExpiryDialog code={adjust.code} name={adjust.name} expiresAt={adjust.expiresAt} onClose={() => setAdjust(null)}
