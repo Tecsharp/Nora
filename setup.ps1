@@ -36,4 +36,6 @@ if ($LASTEXITCODE -ne 0) {
   Write-Host "Error al levantar Nora (revisa los mensajes de arriba)." -ForegroundColor Red
   exit $LASTEXITCODE
 }
-Write-Host "Nora en http://localhost:8080"
+$port = (Select-String -Path .env -Pattern '^NORA_PORT=(\d+)').Matches.Groups[1].Value
+if (-not $port) { $port = '29817' }
+Write-Host "Nora en http://localhost:$port"

@@ -13,7 +13,7 @@ git clone https://github.com/tecsharp/nora.git && cd nora
 ./setup.sh          # Windows: ./setup.ps1
 ```
 
-El script crea `.env` con secretos aleatorios (BD, JWT, Garage y contraseña del administrador, que muestra por pantalla) y ejecuta `docker compose up -d --build`. Después abre <http://localhost:8080>.
+El script crea `.env` con secretos aleatorios (BD, JWT, Garage y contraseña del administrador, que muestra por pantalla) y ejecuta `docker compose up -d --build`. Después abre <http://localhost:29817> (el puerto se cambia con `NORA_PORT` en `.env`).
 
 También puedes hacerlo a mano: `cp .env.example .env`, editar los secretos y `docker compose up -d --build`.
 

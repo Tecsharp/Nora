@@ -32,4 +32,4 @@ ensure NORA_GARAGE_ADMIN_TOKEN "$(rand 48)"
 
 docker compose up -d --build
 PORT="$(grep -E '^NORA_PORT=' .env | cut -d= -f2 | cut -d' ' -f1)"
-echo "Nora en http://localhost:${PORT:-8080}"
+echo "Nora en http://localhost:${PORT:-29817}"
