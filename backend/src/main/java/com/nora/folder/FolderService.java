@@ -64,8 +64,9 @@ public class FolderService {
     }
 
     @Transactional
-    public FolderDto rename(UUID roomId, UUID folderId, String rawName) {
+    public FolderDto rename(UUID roomId, UUID folderId, UUID userId, boolean staff, String rawName) {
         RoomFolder f = find(roomId, folderId);
+        if (!f.getCreatedBy().equals(userId) && !staff) throw ApiException.forbidden("No puedes renombrar esta carpeta");
         String name = cleanName(rawName);
         requireUnique(folders.findByRoomIdAndKindOrderByNameAsc(roomId, f.getKind()), f.getParentId(), name, f.getId());
         f.setName(name);
@@ -76,9 +77,9 @@ public class FolderService {
 
     /** Borra la carpeta con todo su contenido (subcarpetas, archivos del almacén y notas). */
     @Transactional
-    public void delete(UUID roomId, UUID folderId, UUID userId, Role role, UUID roomOwnerId) {
+    public void delete(UUID roomId, UUID folderId, UUID userId, boolean staff) {
         RoomFolder f = find(roomId, folderId);
-        if (!f.getCreatedBy().equals(userId) && !roomOwnerId.equals(userId) && role != Role.ADMIN) {
+        if (!f.getCreatedBy().equals(userId) && !staff) {
             throw ApiException.forbidden("No puedes borrar esta carpeta");
         }
         List<RoomFolder> all = folders.findByRoomIdAndKindOrderByNameAsc(roomId, f.getKind());

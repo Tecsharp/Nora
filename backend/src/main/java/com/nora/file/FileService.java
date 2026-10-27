@@ -87,9 +87,9 @@ public class FileService {
     }
 
     @Transactional
-    public void delete(UUID roomId, UUID fileId, UUID userId, Role role, UUID roomOwnerId) {
+    public void delete(UUID roomId, UUID fileId, UUID userId, boolean staff) {
         RoomFile f = find(roomId, fileId);
-        if (!f.getUploaderId().equals(userId) && !roomOwnerId.equals(userId) && role != Role.ADMIN) {
+        if (!f.getUploaderId().equals(userId) && !staff) {
             throw ApiException.forbidden("No puedes borrar este archivo");
         }
         files.delete(f);
@@ -99,9 +99,9 @@ public class FileService {
 
     /** Mueve a otra carpeta (null = raíz) y/o renombra. Solo quien lo subió, el dueño de la sala o un admin. */
     @Transactional
-    public FileDto update(UUID roomId, UUID fileId, UUID userId, Role role, UUID roomOwnerId, boolean moveRequested, UUID folderId, String name) {
+    public FileDto update(UUID roomId, UUID fileId, UUID userId, boolean staff, boolean moveRequested, UUID folderId, String name) {
         RoomFile f = find(roomId, fileId);
-        if (!f.getUploaderId().equals(userId) && !roomOwnerId.equals(userId) && role != Role.ADMIN) {
+        if (!f.getUploaderId().equals(userId) && !staff) {
             throw ApiException.forbidden("No puedes modificar este archivo");
         }
         if (moveRequested) f.setFolderId(folderId);

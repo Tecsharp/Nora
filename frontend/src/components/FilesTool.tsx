@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { api, ApiError, downloadWithProgress, formatBytes, type DownloadHandle, type Room } from '../api'
 import { useAuth } from '../auth'
+import { canWrite as canWriteIn, isStaff as isStaffIn } from '../roles'
 import { pickFiles, pickFolder } from '../fileHandles'
 import { collectFromEntries, collectFromFiles, entriesFromDrop, type Collected } from '../folderUpload'
 import { useRealtime } from '../realtime'
@@ -105,8 +106,9 @@ export default function FilesTool({ room }: { room: Room }) {
   }
 
   const who = useCallback((id: string) => room.participants.find((p) => p.userId === id)?.displayName ?? '—', [room.participants])
-  const isStaff = room.isOwner || user?.role === 'ADMIN'
-  const canTouch = (ownerId: string) => ownerId === user?.id || isStaff
+  const isStaff = isStaffIn(room, user)
+  const canWrite = canWriteIn(room, user)
+  const canTouch = (ownerId: string) => canWrite && (ownerId === user?.id || isStaff)
 
   const load = useCallback(() => {
     api<FileItem[]>(`/rooms/${room.code}/files`).then(setFiles).catch(() => {})
@@ -353,6 +355,7 @@ export default function FilesTool({ room }: { room: Room }) {
     e.stopPropagation()
     setDropTarget(null)
     setDragOver(false)
+    if (!canWrite) return
     const id = e.dataTransfer.getData(NORA_MIME)
     if (id) {
       const f = files.find((x) => x.id === id)
@@ -474,9 +477,13 @@ export default function FilesTool({ room }: { room: Room }) {
       onDrop={(e) => dropOn(e, current)}
     >
       <div className="ex-toolbar">
-        <button className="btn primary sm" onClick={onPick}><Upload size={15} /> Subir</button>
-        <button className="btn sm" onClick={onPickFolder}><FolderUp size={15} /> Subir carpeta</button>
-        <button className="btn sm" onClick={() => { setCreating((c) => !c); setFolderName('') }}><FolderPlus size={15} /> Nueva carpeta</button>
+        {canWrite && (
+          <>
+            <button className="btn primary sm" onClick={onPick}><Upload size={15} /> Subir</button>
+            <button className="btn sm" onClick={onPickFolder}><FolderUp size={15} /> Subir carpeta</button>
+            <button className="btn sm" onClick={() => { setCreating((c) => !c); setFolderName('') }}><FolderPlus size={15} /> Nueva carpeta</button>
+          </>
+        )}
         <span className="grow" />
         <div className="input-icon">
           <Search size={15} />
@@ -525,6 +532,7 @@ export default function FilesTool({ room }: { room: Room }) {
       </nav>
 
       <div className={`ex-body ${dragOver ? 'dragging' : ''}`}>
+        {!canWrite && <p className="callout small" style={{ marginBottom: 10 }}>Tu rol en esta sala es de <strong>lector</strong>: puedes ver y descargar, pero no subir ni modificar.</p>}
         {error && <p className="error small" role="alert">{error}</p>}
 
         {mine.map((i) => (
@@ -574,8 +582,8 @@ export default function FilesTool({ room }: { room: Room }) {
             {searching ? <Search size={36} /> : <Folder size={36} />}
             <strong>{searching ? 'Sin resultados' : current ? 'Esta carpeta está vacía' : 'No hay archivos en esta sala'}</strong>
             <span className="small">
-              {searching ? 'Prueba con otro nombre.' : 'Pulsa «Subir» o arrastra archivos y carpetas aquí.'}
-              {!searching && ` Máx. por archivo: ${formatBytes(user?.limits.maxFileSizeBytes)}.`}
+              {searching ? 'Prueba con otro nombre.' : canWrite ? 'Pulsa «Subir» o arrastra archivos y carpetas aquí.' : 'Todavía no hay nada que ver.'}
+              {!searching && canWrite && ` Máx. por archivo: ${formatBytes(user?.limits.maxFileSizeBytes)}.`}
             </span>
           </div>
         ) : (

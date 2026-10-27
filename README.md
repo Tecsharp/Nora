@@ -66,6 +66,19 @@ Las subidas corren en segundo plano: un panel flotante las muestra cuando cierra
 
 - **Duración de la sala**: el propietario (o un admin) puede extenderla o reducirla desde la sala o desde la lista de salas (`PATCH /api/rooms/{code}/expiry`, `{deltaMinutes}` o `{unlimited:true}`). Debe quedar al menos 1 minuto y la duración total respeta el límite de la cuenta.
 
+### Roles en la sala
+
+El creador de la sala asigna a cada participante uno de estos roles desde la lista de participantes (menú «⋯»; `PATCH /api/rooms/{code}/members/{userId}` con `{role}`):
+
+| Rol | Puede |
+|---|---|
+| **Propietario** (el creador) | Todo: asignar roles, cambiar la duración y cerrar la sala |
+| **Moderador** | Subir, crear y además editar, mover y borrar el contenido de cualquiera |
+| **Colaborador** (por defecto) | Subir, crear carpetas, notas y portapapeles, y gestionar lo suyo |
+| **Lector** | Solo ver, descargar y copiar |
+
+Los permisos se comprueban en el servidor (un lector recibe 403 al intentar subir o modificar) y el cambio de rol llega en vivo a la persona afectada. Un administrador del sistema conserva control sobre cualquier sala en la que participe.
+
 ### Acceso desde otros equipos y Cloudflare Tunnel
 
 Por defecto el gateway escucha en todas las interfaces (`NORA_BIND=0.0.0.0`), así que Nora es accesible por `http://IP-DEL-SERVIDOR:29817` desde tu red. Si solo quieres usarlo desde la propia máquina, pon `NORA_BIND=127.0.0.1` en `.env` y ejecuta `docker compose up -d`.

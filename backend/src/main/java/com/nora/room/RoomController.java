@@ -45,6 +45,13 @@ public class RoomController {
         return rooms.adjustExpiry(p.userId(), p.role(), code, req);
     }
 
+    /** Asigna el rol (lector, colaborador o moderador) a otro participante. Solo el propietario. */
+    @PatchMapping("/{code}/members/{userId}")
+    public ParticipantDto setRole(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code,
+                                  @PathVariable java.util.UUID userId, @Valid @RequestBody RoleRequest req) {
+        return rooms.setMemberRole(p.userId(), p.role(), code, userId, req.role());
+    }
+
     @DeleteMapping("/{code}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void close(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code) {

@@ -71,7 +71,7 @@ public class NoteController {
     @Transactional
     public NoteDto create(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code,
                           @RequestParam(defaultValue = "NOTE") RoomNote.Kind kind, @Valid @RequestBody NoteRequest req) {
-        Room room = rooms.requireMember(p.userId(), code);
+        Room room = rooms.requireWriter(p.userId(), p.role(), code);
         if (notes.countByRoomIdAndKind(room.getId(), kind) >= MAX_ITEMS_PER_KIND) {
             throw ApiException.conflict("Has alcanzado el máximo de elementos; borra alguno antes de añadir más");
         }
@@ -90,10 +90,10 @@ public class NoteController {
     @Transactional
     public NoteDto move(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable UUID id,
                         @RequestBody Map<String, Object> body) {
-        Room room = rooms.requireMember(p.userId(), code);
+        Room room = rooms.requireWriter(p.userId(), p.role(), code);
         RoomNote n = notes.findById(id).filter(x -> x.getRoomId().equals(room.getId()))
                 .orElseThrow(() -> ApiException.notFound("Elemento no encontrado"));
-        if (!n.getAuthorId().equals(p.userId()) && !room.getOwnerId().equals(p.userId()) && p.role() != Role.ADMIN) {
+        if (!n.getAuthorId().equals(p.userId()) && !rooms.canModerate(room, p.userId(), p.role())) {
             throw ApiException.forbidden("No puedes modificar este elemento");
         }
         // Solo se tocan los campos presentes: "folderId" mueve de categoría y "content" edita el texto
@@ -124,10 +124,10 @@ public class NoteController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Transactional
     public void delete(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable UUID id) {
-        Room room = rooms.requireMember(p.userId(), code);
+        Room room = rooms.requireWriter(p.userId(), p.role(), code);
         RoomNote n = notes.findById(id).filter(x -> x.getRoomId().equals(room.getId()))
                 .orElseThrow(() -> ApiException.notFound("Elemento no encontrado"));
-        if (!n.getAuthorId().equals(p.userId()) && !room.getOwnerId().equals(p.userId()) && p.role() != Role.ADMIN) {
+        if (!n.getAuthorId().equals(p.userId()) && !rooms.canModerate(room, p.userId(), p.role())) {
             throw ApiException.forbidden("No puedes borrar este elemento");
         }
         notes.delete(n);
