@@ -9,7 +9,7 @@ import java.util.UUID;
 public final class CollabDtos {
     private CollabDtos() {}
 
-    public enum Kind { DOC, SHEET, SLIDES }
+    public enum Kind { DOC, SHEET, SLIDES, BOARD }
 
     public record CreateRequest(Kind kind, @NotBlank(message = "El nombre es obligatorio") @Size(max = 120, message = "Máximo 120 caracteres") String name, UUID folderId) {}
 
@@ -17,7 +17,7 @@ public final class CollabDtos {
 
     public record DocDto(UUID id, String kind, String name, UUID createdBy, String createdByName, Instant createdAt, Instant updatedAt,
                          UUID sourceFileId, String sourceExt, boolean canEdit,
-                         long seq, long savedSeq, Instant savedAt, String savedByName) {}
+                         long seq, long savedSeq, Instant savedAt, String savedByName, Instant thumbAt) {}
 
     public record UpdateDto(long seq, String data) {}
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import type { Editor } from '@tiptap/react'
-import { Check, ChevronDown, Copy, Download, FileText, History, Loader2, Presentation, Save, Sheet, X } from 'lucide-react'
+import { Check, ChevronDown, Copy, Download, FileText, History, Loader2, PenTool, Presentation, Save, Sheet, Upload, X } from 'lucide-react'
 import { ApiError, api, getAccessToken } from '../api'
 import { useAuth } from '../auth'
 import Avatar from '../components/Avatar'
@@ -9,11 +9,13 @@ import Menu, { type MenuItem } from '../components/Menu'
 import { useRealtime } from '../realtime'
 import { useToast } from '../toast'
 import { CollabProvider, colorFor } from './provider'
+import type { BoardHandle } from './boardIO'
 import { readNativeForExport, restoreNonText, restoreText, seedNonText, type Kind, type Native } from './native'
 
 const TextEditor = lazy(() => import('./TextEditor'))
 const SheetEditor = lazy(() => import('./SheetEditor'))
 const SlidesEditor = lazy(() => import('./SlidesEditor'))
+const BoardEditor = lazy(() => import('./BoardEditor'))
 
 export interface DocInfo {
   id: string
@@ -25,6 +27,7 @@ export interface DocInfo {
   savedSeq?: number
   savedAt?: string | null
   savedByName?: string | null
+  thumbAt?: string | null
 }
 
 interface Props {
@@ -39,8 +42,9 @@ const FORMATS: Record<Kind, { id: string; label: string }[]> = {
   DOC: [{ id: 'docx', label: 'Word (.docx)' }, { id: 'odt', label: 'OpenDocument (.odt)' }, { id: 'pdf', label: 'PDF (.pdf)' }],
   SHEET: [{ id: 'xlsx', label: 'Excel (.xlsx)' }, { id: 'ods', label: 'OpenDocument (.ods)' }, { id: 'csv', label: 'CSV (primera hoja)' }, { id: 'pdf', label: 'PDF (.pdf)' }],
   SLIDES: [{ id: 'pptx', label: 'PowerPoint (.pptx)' }, { id: 'odp', label: 'OpenDocument (.odp)' }, { id: 'pdf', label: 'PDF (.pdf)' }],
+  BOARD: [{ id: 'excalidraw', label: 'Pizarra (.excalidraw)' }, { id: 'png', label: 'Imagen PNG (.png)' }, { id: 'svg', label: 'Imagen vectorial (.svg)' }, { id: 'pdf', label: 'PDF (.pdf)' }],
 }
-const ICON = { DOC: FileText, SHEET: Sheet, SLIDES: Presentation }
+const ICON = { DOC: FileText, SHEET: Sheet, SLIDES: Presentation, BOARD: PenTool }
 
 interface Version { id: string; createdAt: string; createdByName: string; label: string | null; seq: number }
 
@@ -90,6 +94,9 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
     if (state === 'ready') setEverReady(true)
   }, [state])
   const [peers, setPeers] = useState<{ id: string; name: string; color: string }[]>([])
+  const [board, setBoard] = useState<BoardHandle | null>(null)
+  const [importing, setImporting] = useState<File | null>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
   const { user: me } = useAuth()
   // Si el propietario cambia mi rol, se vuelve a comprobar el permiso sin cerrar el documento
   useRealtime('member.updated', (d: { userId: string }) => d.userId === me?.id && provider.refreshAccess())
@@ -99,7 +106,8 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
     const read = () => {
       const seen = new Map<string, { id: string; name: string; color: string }>()
       provider.peers().forEach((p) => seen.set(p.user.id, p.user))
-      setPeers([...seen.values()])
+      const next = [...seen.values()]
+      setPeers((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next)) // los cursores de la pizarra cambian la presencia muy a menudo
     }
     provider.awareness.on('change', read)
     read()
@@ -164,39 +172,111 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
   }
 
   /** Guardar = escribir el contenido actual en el archivo de la sala (el mismo que se ve en Archivos). */
-  async function saveToFile(): Promise<boolean> {
-    if (!editable || busy) return false
-    setBusy('Guardando…')
+  const saving = useRef(false)
+  /**
+   * manual: botón Guardar (aviso y versión) · close: al cerrar una pizarra (espera, sin aviso) · auto: autoguardado de la
+   * pizarra en segundo plano (no se ve ni bloquea nada).
+   */
+  async function saveToFile(mode: 'manual' | 'close' | 'auto' = 'manual'): Promise<boolean> {
+    if (!editable || saving.current || (mode !== 'auto' && busy)) return false
+    saving.current = true
+    if (mode !== 'auto') setBusy('Guardando…')
     try {
       const { res } = await post(null, 'file')
       if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => null))?.message ?? `Error ${res.status}`)
       const f = (await res.json()) as { name: string }
-      toast(`Guardado en «${f.name}»`, 'success')
+      if (mode === 'manual') {
+        toast(`Guardado en «${f.name}»`, 'success')
+        void provider.saveVersion('Guardado en el archivo').catch(() => {})
+      }
       onSaved?.()
-      void provider.saveVersion('Guardado en el archivo').catch(() => {})
+      if (mode !== 'close') uploadThumb(mode === 'auto')
       return true
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'No se pudo guardar', 'error')
+      if (mode !== 'auto') toast(e instanceof Error ? e.message : 'No se pudo guardar', 'error')
       return false
     } finally {
-      setBusy('')
+      saving.current = false
+      if (mode !== 'auto') setBusy('')
     }
+  }
+
+  // La pizarra se guarda sola en su archivo tras cada cambio (la persona «líder» lo hace, así no escriben todos a la vez)
+  const autosave = doc.kind === 'BOARD' && editable
+  const savedRef = useRef(saved)
+  savedRef.current = saved
+  useEffect(() => {
+    if (!autosave) return
+    let lastSeq = provider.seq
+    let lastChange = Date.now()
+    let lastWrite = 0
+    const t = setInterval(() => {
+      if (provider.seq !== lastSeq) {
+        lastSeq = provider.seq
+        lastChange = Date.now()
+      }
+      if (provider.seq <= savedRef.current.seq || provider.state !== 'ready' || provider.seedState !== 'DONE' || !provider.isLeader()) return
+      const now = Date.now()
+      if (now - lastChange < 1000 && now - lastWrite < 10_000) return // se espera a que pare un momento, pero como mucho 10 s seguidos sin guardar
+      lastWrite = now
+      void saveRef.current('auto')
+    }, 500)
+    return () => clearInterval(t)
+  }, [autosave, provider])
+
+  /** Miniatura de la pizarra para la galería: se sube al guardar y al cerrar (empieza a dibujarse antes de que el editor desaparezca). */
+  const lastThumb = useRef(0)
+  function uploadThumb(throttle = false) {
+    if (doc.kind !== 'BOARD' || !board || !editable) return
+    if (throttle && Date.now() - lastThumb.current < 30_000) return
+    lastThumb.current = Date.now()
+    void board.thumbnail().then((blob) => blob && fetch(`/api/rooms/${code}/docs/${doc.id}/thumbnail`, {
+      method: 'PUT', headers: { Authorization: `Bearer ${getAccessToken() ?? ''}`, 'Content-Type': blob.type || 'image/jpeg' }, body: blob,
+    })).catch(() => {})
+  }
+  const closeNow = () => {
+    uploadThumb()
+    onClose()
+  }
+
+  function download(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 10_000)
+  }
+
+  async function uploadToRoom(blob: Blob, filename: string) {
+    const fd = new FormData()
+    fd.append('file', new File([blob], filename, { type: blob.type }))
+    const r = await fetch(`/api/rooms/${code}/files`, { method: 'POST', headers: { Authorization: `Bearer ${getAccessToken() ?? ''}` }, body: fd })
+    if (!r.ok) throw new ApiError(r.status, (await r.json().catch(() => null))?.message ?? `Error ${r.status}`)
+    return (await r.json()) as { name: string }
   }
 
   async function exportAs(format: string, save: 'none' | 'new') {
     setBusy(save === 'none' ? 'Preparando descarga…' : 'Guardando copia…')
     try {
+      if (doc.kind === 'BOARD' && format !== 'excalidraw') {
+        // las imágenes de la pizarra se dibujan en el navegador (con su escena incrustada en PNG y SVG para poder volver a importarlas)
+        if (!board) throw new Error('La pizarra aún se está cargando')
+        const blob = await board.exportBlob(format as 'png' | 'svg' | 'pdf')
+        if (save === 'none') download(blob, `${doc.name}.${format}`)
+        else {
+          const f = await uploadToRoom(blob, `${doc.name}.${format}`)
+          toast(`Copia guardada como «${f.name}» en Archivos`, 'success')
+          onSaved?.()
+        }
+        return
+      }
       const { res } = await post(format, save)
       if (!res.ok) throw new ApiError(res.status, (await res.json().catch(() => null))?.message ?? `Error ${res.status}`)
       if (save === 'none') {
-        const url = URL.createObjectURL(await res.blob())
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `${doc.name}.${format}`
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-        setTimeout(() => URL.revokeObjectURL(url), 10_000)
+        download(await res.blob(), `${doc.name}.${format}`)
       } else {
         const f = (await res.json()) as { name: string }
         toast(`Copia guardada como «${f.name}» en Archivos`, 'success')
@@ -209,20 +289,36 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
     }
   }
 
+  async function runImport(mode: 'merge' | 'replace') {
+    const f = importing
+    setImporting(null)
+    if (!f || !board) return
+    setBusy('Importando…')
+    try {
+      const n = await board.importFile(f, mode)
+      toast(n ? `Importado: ${n} elemento${n === 1 ? '' : 's'}` : 'Importado', 'success')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'No se pudo importar', 'error')
+    } finally {
+      setBusy('')
+    }
+  }
+
   const downloadItems = (): MenuItem[] => [{ heading: 'Descargar al equipo como…' }, ...FORMATS[doc.kind].map((f) => ({ label: f.label, icon: <Download size={16} />, onClick: () => void exportAs(f.id, 'none') }))]
   const moreItems = (): MenuItem[] => [
+    ...(doc.kind === 'BOARD' ? [{ heading: 'Importar' } as MenuItem, { label: 'Importar archivo (.excalidraw, imagen)…', icon: <Upload size={16} />, onClick: () => fileInput.current?.click() } as MenuItem, 'separator' as MenuItem] : []),
     { heading: 'Guardar una copia en la sala como…' },
     ...FORMATS[doc.kind].map((f) => ({ label: f.label, icon: <Copy size={16} />, onClick: () => void exportAs(f.id, 'new') })),
   ]
 
   // Ctrl/Cmd+S guarda en el archivo
-  const saveRef = useRef(saveToFile)
+  const saveRef = useRef<typeof saveToFile>(saveToFile)
   saveRef.current = saveToFile
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault()
-        void saveRef.current()
+        void saveRef.current('manual')
       }
     }
     window.addEventListener('keydown', onKey)
@@ -230,10 +326,16 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
   }, [])
 
   // Al cerrar: si el archivo no tiene lo último y nadie más está dentro, se ofrece guardar
-  function requestClose() {
+  async function requestClose() {
     const dirty = provider.seq > saved.seq
+    if (autosave && !deleted) {
+      // la pizarra se guarda sola: al cerrar se termina de guardar y no hay nada que descartar (solo si no se puede guardar se avisa)
+      if (dirty && !(await saveToFile('close'))) setClosing(true)
+      else closeNow()
+      return
+    }
     if (editable && dirty && peers.length <= 1 && !deleted) setClosing(true)
-    else onClose()
+    else closeNow()
   }
 
   const Icon = ICON[doc.kind]
@@ -247,7 +349,7 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
           <input className="docapp-name" value={name} aria-label="Nombre del documento" readOnly={!editable} maxLength={120}
             onChange={(e) => setName(e.target.value)} onBlur={(e) => void rename(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
           <span className={`sync ${unsaved === 'true' || state !== 'ready' ? 'busy' : 'ok'}`} role="status" title="Los cambios se comparten con todos en tiempo real">{status}</span>
-          <FileState provider={provider} saved={saved} name={`${doc.name}${doc.sourceExt ? `.${doc.sourceExt}` : ''}`} />
+          <FileState provider={provider} saved={saved} auto={autosave} name={`${doc.name}${doc.sourceExt ? `.${doc.sourceExt}` : ''}`} />
           <span className="grow" />
           <div className="docapp-peers" aria-label="Personas en el documento">
             {peers.slice(0, 6).map((p) => <span key={p.id} title={p.name} className="peer-av" style={{ ['--pc' as string]: p.color }}><Avatar name={p.name} /></span>)}
@@ -258,12 +360,14 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
           <Menu label="Descargar" items={downloadItems()} trigger={<span className="btn sm"><Download size={15} /> Descargar <ChevronDown size={14} /></span>} />
           {editable && (
             <>
-              <button className="btn sm primary" onClick={() => void saveToFile()} disabled={!!busy} title="Guardar en el archivo de la sala (Ctrl+S)">
+              <button className="btn sm primary" onClick={() => void saveToFile('manual')} disabled={!!busy} title="Guardar en el archivo de la sala (Ctrl+S)">
                 {busy === 'Guardando…' ? <Loader2 size={15} className="spin-icon" /> : <Save size={15} />} Guardar
               </button>
               <Menu label="Más opciones de guardado" items={moreItems()} />
             </>
           )}
+          <input ref={fileInput} type="file" hidden accept=".excalidraw,.json,application/json,image/png,image/jpeg,image/webp,image/gif,image/svg+xml" aria-label="Importar archivo"
+            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setImporting(f) }} />
           <button className="icon-btn" aria-label="Cerrar el editor" onClick={requestClose}><X size={20} /></button>
         </header>
 
@@ -278,6 +382,7 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
                 {everReady && (
                   doc.kind === 'DOC' ? <TextEditor provider={provider} editable={editable} onEditor={setEditor} />
                   : doc.kind === 'SHEET' ? <SheetEditor provider={provider} editable={editable} />
+                  : doc.kind === 'BOARD' ? <BoardEditor provider={provider} editable={editable} onHandle={setBoard} onImportRequest={() => fileInput.current?.click()} onSaveCopy={() => void exportAs('excalidraw', 'new')} />
                   : <SlidesEditor provider={provider} editable={editable} />
                 )}
               </Suspense>
@@ -287,13 +392,24 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
             )}
             {busy && <div className="seed-overlay"><Loader2 className="spin-icon" size={28} /><strong>{busy}</strong></div>}
           </div>
+          {importing && board && (
+            <div className="seed-overlay" role="alertdialog" aria-label="Importar archivo">
+              <strong>Importar «{importing.name}»</strong>
+              <span className="small muted">¿Añadirlo a lo que ya hay en la pizarra o sustituir todo? Podrás deshacerlo.</span>
+              <div className="row">
+                <button className="btn primary" autoFocus onClick={() => void runImport('merge')}>Añadir a la pizarra</button>
+                <button className="btn" onClick={() => void runImport('replace')}>Reemplazar todo</button>
+                <button className="btn ghost" onClick={() => setImporting(null)}>Cancelar</button>
+              </div>
+            </div>
+          )}
           {closing && (
             <div className="seed-overlay" role="alertdialog" aria-label="Cambios sin guardar">
               <strong>Hay cambios que todavía no están en el archivo</strong>
               <span className="small muted">«{doc.name}{doc.sourceExt ? `.${doc.sourceExt}` : ''}» no incluye lo último que se escribió. Si cierras sin guardar, el documento compartido conserva los cambios, pero el archivo de Archivos seguirá como estaba.</span>
               <div className="row">
-                <button className="btn primary" autoFocus onClick={async () => { setClosing(false); if (await saveToFile()) onClose() }}>Guardar y cerrar</button>
-                <button className="btn" onClick={onClose}>Cerrar sin guardar</button>
+                <button className="btn primary" autoFocus onClick={async () => { setClosing(false); if (await saveToFile('close')) closeNow() }}>Guardar y cerrar</button>
+                <button className="btn" onClick={closeNow}>Cerrar sin guardar</button>
                 <button className="btn ghost" onClick={() => setClosing(false)}>Seguir editando</button>
               </div>
             </div>
@@ -307,7 +423,7 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
 }
 
 /** Estado del archivo de la sala respecto al documento: guardado (y cuándo) o con cambios pendientes. */
-function FileState({ provider, saved, name }: { provider: CollabProvider; saved: { seq: number; at: string | null; by: string | null }; name: string }) {
+function FileState({ provider, saved, name, auto }: { provider: CollabProvider; saved: { seq: number; at: string | null; by: string | null }; name: string; auto?: boolean }) {
   const seq = useSyncExternalStore(useCallback((l) => provider.subscribe(l), [provider]), () => provider.seq)
   const [, tick] = useState(0)
   useEffect(() => {
@@ -315,7 +431,9 @@ function FileState({ provider, saved, name }: { provider: CollabProvider; saved:
     return () => clearInterval(t)
   }, [])
   const dirty = seq > saved.seq
-  return dirty ? (
+  return dirty && auto ? (
+    <span className="filestate" title={`«${name}» se guarda solo en cuanto haces una pausa`}><Loader2 size={12} className="spin-icon" /> Guardando en el archivo…</span>
+  ) : dirty ? (
     <span className="filestate dirty" title={`Los cambios están compartidos, pero «${name}» en Archivos aún no los incluye. Pulsa Guardar.`}>● Sin guardar en el archivo</span>
   ) : (
     <span className="filestate" title={`«${name}» en Archivos está al día`}><Check size={13} /> Archivo guardado{saved.at ? ` ${ago(saved.at)}` : ''}{saved.by ? ` · ${saved.by}` : ''}</span>

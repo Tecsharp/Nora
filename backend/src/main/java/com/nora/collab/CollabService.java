@@ -37,15 +37,20 @@ public class CollabService {
     private static final Map<String, Kind> KIND_OF_EXT = Map.ofEntries(
             Map.entry("docx", Kind.DOC), Map.entry("odt", Kind.DOC), Map.entry("doc", Kind.DOC), Map.entry("rtf", Kind.DOC),
             Map.entry("xlsx", Kind.SHEET), Map.entry("ods", Kind.SHEET), Map.entry("xls", Kind.SHEET), Map.entry("csv", Kind.SHEET), Map.entry("tsv", Kind.SHEET),
-            Map.entry("pptx", Kind.SLIDES), Map.entry("odp", Kind.SLIDES), Map.entry("ppt", Kind.SLIDES));
+            Map.entry("pptx", Kind.SLIDES), Map.entry("odp", Kind.SLIDES), Map.entry("ppt", Kind.SLIDES), Map.entry("excalidraw", Kind.BOARD));
     private static final Map<Kind, List<String>> EXPORT_FORMATS = Map.of(
-            Kind.DOC, List.of("docx", "odt", "pdf"), Kind.SHEET, List.of("xlsx", "ods", "csv", "pdf"), Kind.SLIDES, List.of("pptx", "odp", "pdf"));
-    private static final Map<String, String> MIME = Map.of(
-            "docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "odt", "application/vnd.oasis.opendocument.text",
-            "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "ods", "application/vnd.oasis.opendocument.spreadsheet",
-            "pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "odp", "application/vnd.oasis.opendocument.presentation",
-            "csv", "text/csv", "pdf", "application/pdf");
+            Kind.DOC, List.of("docx", "odt", "pdf"), Kind.SHEET, List.of("xlsx", "ods", "csv", "pdf"), Kind.SLIDES, List.of("pptx", "odp", "pdf"), Kind.BOARD, List.of("excalidraw"));
+    private static final Map<String, String> MIME = Map.ofEntries(
+            Map.entry("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"), Map.entry("odt", "application/vnd.oasis.opendocument.text"),
+            Map.entry("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"), Map.entry("ods", "application/vnd.oasis.opendocument.spreadsheet"),
+            Map.entry("pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"), Map.entry("odp", "application/vnd.oasis.opendocument.presentation"),
+            Map.entry("csv", "text/csv"), Map.entry("pdf", "application/pdf"), Map.entry("excalidraw", "application/json"));
 
+    private static final String BLANK_BOARD = "{\"type\":\"excalidraw\",\"version\":2,\"source\":\"nora\",\"elements\":[],\"appState\":{},\"files\":{}}";
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
+    private static final java.util.Set<String> BOARD_STATE_KEYS = java.util.Set.of("viewBackgroundColor", "gridSize");
+    private static final int MAX_BOARD_ELEMENTS = 50_000;
+    private static final int MAX_THUMB_BYTES = 200_000;
     private static final String BLANK_DOC = "{\"kind\":\"DOC\",\"html\":\"\"}";
     private static final String BLANK_SHEET = "{\"kind\":\"SHEET\",\"sheets\":[{\"id\":\"s1\",\"name\":\"Hoja 1\",\"rows\":100,\"cols\":26,\"cells\":{},\"colWidths\":{},\"merges\":[]}]}";
     private static final String BLANK_SLIDES = "{\"kind\":\"SLIDES\",\"width\":13.333,\"height\":7.5,\"slides\":[{\"id\":\"p1\",\"bg\":\"#ffffff\",\"elements\":["
@@ -111,15 +116,15 @@ public class CollabService {
         return dto(d, repo.creatorName(d.createdBy()), rooms.canWrite(room, userId, sys));
     }
 
-    private static final Map<Kind, String> DEFAULT_EXT = Map.of(Kind.DOC, "docx", Kind.SHEET, "xlsx", Kind.SLIDES, "pptx");
+    private static final Map<Kind, String> DEFAULT_EXT = Map.of(Kind.DOC, "docx", Kind.SHEET, "xlsx", Kind.SLIDES, "pptx", Kind.BOARD, "excalidraw");
 
     /** Crea un documento nuevo: nace ya como archivo de la sala (en la carpeta indicada), así todos lo ven en Archivos y lo abren con un clic. */
     public DocDto create(Room room, UUID userId, Kind kind, String name, UUID folderId) {
         if (kind == null) throw ApiException.badRequest("Indica el tipo de documento");
-        String seed = switch (kind) { case DOC -> BLANK_DOC; case SHEET -> BLANK_SHEET; case SLIDES -> BLANK_SLIDES; };
+        String seed = switch (kind) { case DOC -> BLANK_DOC; case SHEET -> BLANK_SHEET; case SLIDES -> BLANK_SLIDES; case BOARD -> BLANK_BOARD; };
         String title = clean(name);
         String ext = DEFAULT_EXT.get(kind);
-        byte[] blank = converter.export(kind.name(), ext, utf8(seed), 0); // lento: fuera de transacción
+        byte[] blank = kind == Kind.BOARD ? utf8(seed) : converter.export(kind.name(), ext, utf8(seed), 0); // lento: fuera de transacción
         FileDto file = files.saveGenerated(room.getId(), userId, title + "." + ext, MIME.get(ext), blank, folderId);
         UUID id = UUID.randomUUID();
         repo.insert(id, room.getId(), kind.name(), title, userId, file.id(), ext, seed);
@@ -143,7 +148,8 @@ public class CollabService {
         }
         if (!canWrite) throw ApiException.forbidden("Aún no se ha abierto para editar: pide a alguien con permiso de edición que lo abra primero");
         if (file.sizeBytes() > MAX_NATIVE_BYTES) throw new ApiException(HttpStatus.PAYLOAD_TOO_LARGE, "El archivo es demasiado grande para editarlo");
-        String seed = converter.importFile(files.readAll(room.getId(), fileId), ext); // lento: fuera de transacción
+        byte[] content = files.readAll(room.getId(), fileId);
+        String seed = kind == Kind.BOARD ? normalizeBoard(content) : converter.importFile(content, ext); // lento: fuera de transacción
         UUID id = UUID.randomUUID();
         try {
             repo.insert(id, room.getId(), kind.name(), clean(base), userId, fileId, ext, seed);
@@ -275,7 +281,7 @@ public class CollabService {
         if (nativeJson.length == 0 || nativeJson.length > MAX_NATIVE_BYTES) throw ApiException.badRequest("Contenido no válido");
         boolean writes = !"none".equals(save);
         if (writes && !rooms.canWrite(room, userId, sys)) throw ApiException.forbidden("Tu rol en esta sala es de solo lectura");
-        byte[] out = converter.export(kind.name(), format, nativeJson, active);
+        byte[] out = kind == Kind.BOARD ? utf8(normalizeBoard(nativeJson)) : converter.export(kind.name(), format, nativeJson, active);
         String filename = d.name().replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]", "_") + "." + format;
         String mime = MIME.getOrDefault(format, "application/octet-stream");
         if (!writes) return new ExportResult(out, filename, mime, null);
@@ -321,6 +327,50 @@ public class CollabService {
         return KIND_OF_EXT.containsKey(ext == null ? "" : ext.toLowerCase());
     }
 
+    /**
+     * Pizarra (formato .excalidraw): se valida que sea un JSON con una lista de elementos y se conserva solo lo que Nora usa
+     * (elementos, imágenes y el fondo/cuadrícula); el resto del estado de la vista de quien la guardó se descarta.
+     */
+    private static String normalizeBoard(byte[] raw) {
+        try {
+            var n = JSON.readTree(raw);
+            if (n == null || !n.isObject() || !n.path("elements").isArray()) throw ApiException.badRequest("No es un archivo de pizarra válido");
+            if (n.path("elements").size() > MAX_BOARD_ELEMENTS) throw ApiException.badRequest("La pizarra tiene demasiados elementos");
+            var out = JSON.createObjectNode();
+            out.put("type", "excalidraw");
+            out.put("version", 2);
+            out.put("source", "nora");
+            out.set("elements", n.get("elements"));
+            var state = JSON.createObjectNode();
+            n.path("appState").fields().forEachRemaining(e -> { if (BOARD_STATE_KEYS.contains(e.getKey()) && !e.getValue().isContainerNode()) state.set(e.getKey(), e.getValue()); });
+            out.set("appState", state);
+            out.set("files", n.path("files").isObject() ? n.get("files") : JSON.createObjectNode());
+            return JSON.writeValueAsString(out);
+        } catch (java.io.IOException e) {
+            throw ApiException.badRequest("No es un archivo de pizarra válido");
+        }
+    }
+
+    // ---- miniatura de la pizarra ----
+
+    @Transactional
+    public void saveThumb(Room room, UUID docId, byte[] data) {
+        docIn(room, docId);
+        boolean jpeg = data.length > 3 && (data[0] & 0xff) == 0xff && (data[1] & 0xff) == 0xd8;
+        boolean png = data.length > 8 && (data[0] & 0xff) == 0x89 && data[1] == 'P' && data[2] == 'N' && data[3] == 'G';
+        boolean webp = data.length > 12 && data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F' && data[8] == 'W' && data[9] == 'E' && data[10] == 'B' && data[11] == 'P';
+        if (data.length == 0 || data.length > MAX_THUMB_BYTES || !(jpeg || png || webp)) throw ApiException.badRequest("Miniatura no válida");
+        repo.saveThumb(docId, data);
+        DocRow d = repo.find(docId).orElseThrow();
+        events.publishEvent(new RoomEvent(room.getId(), "doc.thumb", dto(d, repo.creatorName(d.createdBy()), true)));
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] thumb(Room room, UUID docId) {
+        docIn(room, docId);
+        return repo.thumb(docId).orElseThrow(() -> ApiException.notFound("Sin miniatura"));
+    }
+
     // ---- utilidades ----
 
     private static String clean(String name) {
@@ -331,7 +381,7 @@ public class CollabService {
 
     private DocDto dto(DocRow d, String creatorName, boolean canEdit) {
         return new DocDto(d.id(), d.kind(), d.name(), d.createdBy(), creatorName, d.createdAt(), d.updatedAt(), d.sourceFileId(), d.sourceExt(), canEdit,
-                d.seq(), d.savedSeq(), d.savedAt(), d.savedBy() == null ? null : repo.creatorName(d.savedBy()));
+                d.seq(), d.savedSeq(), d.savedAt(), d.savedBy() == null ? null : repo.creatorName(d.savedBy()), d.thumbAt());
     }
 
     static byte[] utf8(String s) {

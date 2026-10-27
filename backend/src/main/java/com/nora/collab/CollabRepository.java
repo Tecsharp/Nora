@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class CollabRepository {
 
     public record DocRow(UUID id, UUID roomId, String kind, String name, UUID createdBy, Instant createdAt, Instant updatedAt,
-                         UUID sourceFileId, String sourceExt, long seq, long snapshotSeq, String seedState, long savedSeq, Instant savedAt, UUID savedBy) {}
+                         UUID sourceFileId, String sourceExt, long seq, long snapshotSeq, String seedState, long savedSeq, Instant savedAt, UUID savedBy, Instant thumbAt) {}
 
     public record ListRow(DocRow doc, String createdByName) {}
 
@@ -24,7 +24,7 @@ public class CollabRepository {
 
     public record VersionRow(UUID id, Instant createdAt, String createdByName, String label, long seq) {}
 
-    private static final String COLS = "id, room_id, kind, name, created_by, created_at, updated_at, source_file_id, source_ext, seq, snapshot_seq, seed_state, saved_seq, saved_at, saved_by";
+    private static final String COLS = "id, room_id, kind, name, created_by, created_at, updated_at, source_file_id, source_ext, seq, snapshot_seq, seed_state, saved_seq, saved_at, saved_by, thumb_at";
     private static final int KEEP_VERSIONS = 40;
 
     private final JdbcTemplate jdbc;
@@ -37,7 +37,8 @@ public class CollabRepository {
         return new DocRow(r.getObject("id", UUID.class), r.getObject("room_id", UUID.class), r.getString("kind"), r.getString("name"),
                 r.getObject("created_by", UUID.class), r.getTimestamp("created_at").toInstant(), r.getTimestamp("updated_at").toInstant(),
                 r.getObject("source_file_id", UUID.class), r.getString("source_ext"), r.getLong("seq"), r.getLong("snapshot_seq"), r.getString("seed_state"),
-                r.getLong("saved_seq"), r.getTimestamp("saved_at") == null ? null : r.getTimestamp("saved_at").toInstant(), r.getObject("saved_by", UUID.class));
+                r.getLong("saved_seq"), r.getTimestamp("saved_at") == null ? null : r.getTimestamp("saved_at").toInstant(), r.getObject("saved_by", UUID.class),
+                r.getTimestamp("thumb_at") == null ? null : r.getTimestamp("thumb_at").toInstant());
     }
 
     public void insert(UUID id, UUID roomId, String kind, String name, UUID createdBy, UUID sourceFileId, String sourceExt, String seed) {
@@ -57,7 +58,7 @@ public class CollabRepository {
 
     public List<ListRow> list(UUID roomId) {
         return jdbc.query("select d.id, d.room_id, d.kind, d.name, d.created_by, d.created_at, d.updated_at, d.source_file_id, d.source_ext, d.seq, "
-                        + "d.snapshot_seq, d.seed_state, d.saved_seq, d.saved_at, d.saved_by, u.display_name from collab_docs d join users u on u.id = d.created_by "
+                        + "d.snapshot_seq, d.seed_state, d.saved_seq, d.saved_at, d.saved_by, d.thumb_at, u.display_name from collab_docs d join users u on u.id = d.created_by "
                         + "where d.room_id = ? order by d.updated_at desc",
                 (r, i) -> new ListRow(doc(r, i), r.getString("display_name")), roomId);
     }
@@ -75,6 +76,14 @@ public class CollabRepository {
         int i = 1;
         for (UUID f : fileIds) args[i++] = f;
         return jdbc.query("select id from collab_docs where room_id = ? and source_file_id in (" + in + ")", (r, n) -> r.getObject(1, UUID.class), args);
+    }
+
+    public void saveThumb(UUID id, byte[] data) {
+        jdbc.update("update collab_docs set thumb = ?, thumb_at = now() where id = ?", data, id);
+    }
+
+    public Optional<byte[]> thumb(UUID id) {
+        return jdbc.query("select thumb from collab_docs where id = ? and thumb is not null", (r, i) -> r.getBytes(1), id).stream().findFirst();
     }
 
     /** El archivo de la sala contiene el documento hasta el cambio seq. */

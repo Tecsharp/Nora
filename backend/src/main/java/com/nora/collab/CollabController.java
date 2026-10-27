@@ -118,6 +118,22 @@ public class CollabController {
                 .body(collab.versionSnapshot(room, id, versionId));
     }
 
+    /** Miniatura de una pizarra (la sube el editor al cerrarla). */
+    @PutMapping("/{id}/thumbnail")
+    public ResponseEntity<Void> saveThumb(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable UUID id, HttpServletRequest request) throws IOException {
+        Room room = rooms.requireWriter(p.userId(), p.role(), code);
+        collab.saveThumb(room, id, readBody(request, 200_000));
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/thumbnail")
+    public ResponseEntity<byte[]> thumb(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable UUID id) {
+        Room room = rooms.requireMember(p.userId(), code);
+        byte[] data = collab.thumb(room, id);
+        MediaType type = data.length > 1 && (data[0] & 0xff) == 0xff ? MediaType.IMAGE_JPEG : data.length > 1 && (data[0] & 0xff) == 0x89 ? MediaType.IMAGE_PNG : MediaType.parseMediaType("image/webp");
+        return ResponseEntity.ok().contentType(type).header("X-Content-Type-Options", "nosniff").header(HttpHeaders.CACHE_CONTROL, "private, max-age=300").body(data);
+    }
+
     /** Convierte el contenido del editor (JSON/HTML nativo) y lo devuelve, o lo guarda en la sala (save=file|new). */
     @PostMapping("/{id}/export")
     public ResponseEntity<?> export(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable UUID id,

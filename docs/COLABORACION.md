@@ -12,7 +12,7 @@ Este documento explica **qué se eligió y por qué**, cómo encaja todo, el pro
 |---|---|
 | Modelo de concurrencia | **Yjs (CRDT)** para los tres tipos. Un único protocolo y un único servidor sirven para texto, celdas y diapositivas. |
 | Qué hace el servidor con los cambios | Los trata como **bytes opacos**: les asigna un número de secuencia (`seq`), los guarda, los reparte y valida permisos. No interpreta Yjs (no hay Yjs en Java), así que no hay riesgo de divergencia entre lógica de servidor y de cliente. |
-| Formato «nativo» del editor | DOC = HTML de TipTap/ProseMirror · SHEET = mapa de celdas `"fila,col" → {v, f?, s?}` · SLIDES = elementos posicionados en % de la diapositiva. |
+| Formato «nativo» del editor | DOC = HTML de TipTap/ProseMirror · SHEET = mapa de celdas `"fila,col" → {v, f?, s?}` · SLIDES = elementos posicionados en % de la diapositiva · BOARD = un `Y.Map` de elementos de Excalidraw (ver [PIZARRA.md](PIZARRA.md)). |
 | Conversión | Un **sidecar** (`converter/`, Node 22 + LibreOffice headless) sin acceso a Internet, solo alcanzable desde el backend con un token. |
 | Archivo ↔ documento | **Todo documento es un archivo de la sala.** «Nuevo» crea el archivo (.docx/.xlsx/.pptx) al instante en la carpeta actual; abrir un archivo de oficina con un clic lo edita entre todos. No hay «guardar para que entre otro»: quien tenga acceso a la sala lo ve en Archivos y entra. |
 | Guardar | **Guardar escribe el contenido compartido en ese archivo** (Ctrl+S). El estado («Archivo guardado hace 2 min · Ana» / «Sin guardar en el archivo») es compartido por todos. Descargar y «guardar una copia» son botones aparte. |

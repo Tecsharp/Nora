@@ -14,6 +14,7 @@ import RoomSettingsDialog from '../components/RoomSettingsDialog'
 import Menu from '../components/Menu'
 import Modal from '../components/Modal'
 import FilesTool from '../components/FilesTool'
+import BoardsTool from '../components/BoardsTool'
 import type { DocInfo } from '../collab/DocEditor'
 import { canWrite as canWriteIn } from '../roles'
 import NotesTool from '../components/NotesTool'
@@ -34,7 +35,7 @@ interface Tool {
 
 const TOOLS: Tool[] = [
   { id: 'files', label: 'Archivos', icon: FolderOpen, ready: true, tone: 'blue' },
-  { id: 'board', label: 'Pizarra', icon: PenTool, ready: false },
+  { id: 'board', label: 'Pizarra', icon: PenTool, ready: true, tone: 'violet' },
   { id: 'clipboard', label: 'Portapapeles', icon: Clipboard, ready: true, tone: 'amber' },
   { id: 'notes', label: 'Notas', icon: ClipboardList, ready: true, tone: 'rose' },
   { id: 'media', label: 'Media Review', icon: Clapperboard, ready: false },
@@ -344,6 +345,7 @@ export default function RoomPage() {
       {tool && (
         <Modal title={tool.label} icon={<tool.icon size={20} />} wide={tool.ready} flush={tool.ready} onClose={() => setActive(null)}>
           {tool.id === 'files' && <FilesTool room={room} onEditDoc={openDoc} />}
+          {tool.id === 'board' && <BoardsTool room={room} onOpen={openDoc} />}
           {tool.id === 'notes' && <NotesTool room={room} kind="NOTE" placeholder="Escribe una nota para la sala…" />}
           {tool.id === 'clipboard' && <NotesTool room={room} kind="CLIPBOARD" placeholder="Pega aquí el texto que quieres compartir…" copyable />}
           {!tool.ready && (

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import {
-  ChevronRight, Download, X, File, FileArchive, FileAudio, FileCode, FileImage, FileText, FileVideo, Folder, Presentation, Sheet, FilePlus2, ChevronDown, FolderInput, FolderPlus, FolderUp, Eye, Loader2,
+  ChevronRight, Download, X, File, FileArchive, FileAudio, FileCode, FileImage, FileText, FileVideo, Folder, PenTool, Presentation, Sheet, FilePlus2, ChevronDown, FolderInput, FolderPlus, FolderUp, Eye, Loader2,
   House, LayoutGrid, List, Pencil, Search, Trash2, Upload,
 } from 'lucide-react'
 import { api, ApiError, downloadWithProgress, formatBytes, type DownloadHandle, type Room } from '../api'
@@ -69,6 +69,7 @@ reg('doc docx odt rtf', FileText, 'blue')
 reg('xls xlsx ods csv tsv', Sheet, 'green')
 reg('ppt pptx odp', Presentation, 'orange')
 reg('pdf', FileText, 'red')
+reg('excalidraw', PenTool, 'violet')
 reg('txt md log', FileText, 'gray')
 reg('zip rar 7z tar gz', FileArchive, 'amber')
 reg('js ts tsx json html css py java sh yml xml', FileCode, 'cyan')
@@ -78,6 +79,7 @@ const NEW_KINDS = [
   { kind: 'DOC', label: 'Documento de texto', base: 'Documento sin título', icon: FileText },
   { kind: 'SHEET', label: 'Hoja de cálculo', base: 'Hoja de cálculo sin título', icon: Sheet },
   { kind: 'SLIDES', label: 'Presentación', base: 'Presentación sin título', icon: Presentation },
+  { kind: 'BOARD', label: 'Pizarra', base: 'Pizarra sin título', icon: PenTool },
 ] as const
 
 const when = (iso: string) =>

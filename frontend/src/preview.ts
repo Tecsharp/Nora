@@ -14,7 +14,7 @@ const TEXT = new Set([
 export const PREVIEW_LIMIT: Record<PreviewKind, number> = { image: 40 * 1024 * 1024, pdf: 100 * 1024 * 1024, text: 2 * 1024 * 1024 }
 
 /** Archivos de oficina que se pueden abrir para editar entre varias personas. */
-export const EDITABLE = new Set(['docx', 'odt', 'doc', 'rtf', 'xlsx', 'ods', 'xls', 'csv', 'tsv', 'pptx', 'odp', 'ppt'])
+export const EDITABLE = new Set(['docx', 'odt', 'doc', 'rtf', 'xlsx', 'ods', 'xls', 'csv', 'tsv', 'pptx', 'odp', 'ppt', 'excalidraw'])
 export const isEditable = (name: string) => EDITABLE.has(ext(name))
 
 const ext = (name: string) => name.split('.').pop()?.toLowerCase() ?? ''

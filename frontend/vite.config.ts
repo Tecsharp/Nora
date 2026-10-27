@@ -23,9 +23,28 @@ function pdfjsAssets(): Plugin {
   }
 }
 
+/** Fuentes de la pizarra (Excalidraw): se sirven desde /excalidraw-assets/ (en dev) y se copian a dist (en build). Así funciona sin Internet. */
+function excalidrawAssets(): Plugin {
+  const base = resolve('node_modules/@excalidraw/excalidraw/dist/prod')
+  return {
+    name: 'excalidraw-assets',
+    configureServer(server) {
+      server.middlewares.use('/excalidraw-assets', (req, res, next) => {
+        const file = resolve(base, '.' + decodeURIComponent((req.url ?? '').split('?')[0]!))
+        if (!file.startsWith(resolve(base, 'fonts')) || !existsSync(file) || !statSync(file).isFile()) return next()
+        createReadStream(file).pipe(res)
+      })
+    },
+    closeBundle() {
+      cpSync(resolve(base, 'fonts'), resolve('dist/excalidraw-assets/fonts'), { recursive: true })
+    },
+  }
+}
+
 // En desarrollo (npm run dev) el proxy imita al gateway de Docker.
 export default defineConfig({
-  plugins: [react(), pdfjsAssets()],
+  plugins: [react(), pdfjsAssets(), excalidrawAssets()],
+  define: { 'process.env.IS_PREACT': JSON.stringify('false') },
   build: {
     rollupOptions: {
       output: {
