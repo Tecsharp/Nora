@@ -1,0 +1,17 @@
+{
+  "name": "nora-converter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Servicio interno que convierte documentos de oficina (DOCX/ODT, XLSX/ODS/CSV, PPTX/ODP) a un formato nativo editable y de vuelta",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "exceljs": "4.4.0",
+    "fast-xml-parser": "5.11.2",
+    "jszip": "3.10.1",
+    "pptxgenjs": "4.0.1"
+  }
+}
