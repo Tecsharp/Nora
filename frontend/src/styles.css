@@ -465,3 +465,8 @@ table.table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 .role-tag.strong { color: var(--accent-text); }
 .person .menu { min-width: 280px; }
 .room-hero { position: relative; z-index: 3; }
+
+.check.opt { align-items: flex-start; }
+.check.opt input { margin-top: 3px; }
+.block { display: block; }
+.join-req { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; background: var(--surface-2); border-radius: 14px; }

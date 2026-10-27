@@ -27,6 +27,17 @@ public class Room {
     @Column(name = "expires_at")
     private Instant expiresAt;
 
+    @Column(name = "require_approval", nullable = false)
+    private boolean requireApproval;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "default_role", nullable = false)
+    private RoomRole defaultRole = RoomRole.MEMBER;
+
+    /** Límite de participantes de esta sala (null = el que permita la cuenta del propietario). */
+    @Column(name = "max_participants")
+    private Integer maxParticipants;
+
     protected Room() {}
 
     public Room(String code, String name, UUID ownerId, Instant expiresAt) {
@@ -43,5 +54,11 @@ public class Room {
     public Instant getCreatedAt() { return createdAt; }
     public Instant getExpiresAt() { return expiresAt; }
     public void setExpiresAt(Instant expiresAt) { this.expiresAt = expiresAt; }
+    public boolean isRequireApproval() { return requireApproval; }
+    public void setRequireApproval(boolean requireApproval) { this.requireApproval = requireApproval; }
+    public RoomRole getDefaultRole() { return defaultRole; }
+    public void setDefaultRole(RoomRole defaultRole) { this.defaultRole = defaultRole; }
+    public Integer getMaxParticipants() { return maxParticipants; }
+    public void setMaxParticipants(Integer maxParticipants) { this.maxParticipants = maxParticipants; }
     public boolean isExpired() { return expiresAt != null && expiresAt.isBefore(Instant.now()); }
 }

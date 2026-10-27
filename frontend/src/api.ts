@@ -36,7 +36,14 @@ export interface Room {
   isOwner: boolean
   /** Rol de la persona que consulta la sala */
   role: RoomRole
+  settings: { requireApproval: boolean; defaultRole: 'MEMBER' | 'VIEWER'; maxParticipants: number | null }
   participants: Participant[]
+}
+
+export interface JoinRequest {
+  userId: string
+  displayName: string
+  requestedAt: string
 }
 
 export interface RoomSummary {

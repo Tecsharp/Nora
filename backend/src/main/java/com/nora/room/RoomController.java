@@ -29,9 +29,43 @@ public class RoomController {
         return rooms.create(p.userId(), req);
     }
 
+    /** 200 con la sala; 202 si la sala pide aprobación y la solicitud quedó pendiente. */
     @PostMapping("/join")
-    public RoomDto join(@AuthenticationPrincipal AuthPrincipal p, @Valid @RequestBody JoinRoomRequest req) {
-        return rooms.join(p.userId(), req.code());
+    public org.springframework.http.ResponseEntity<Object> join(@AuthenticationPrincipal AuthPrincipal p, @Valid @RequestBody JoinRoomRequest req) {
+        JoinResult r = rooms.join(p.userId(), req.code());
+        if (r.pending()) {
+            return org.springframework.http.ResponseEntity.status(HttpStatus.ACCEPTED)
+                    .body(java.util.Map.of("pending", true, "roomName", r.roomName(), "code", req.code().trim().toUpperCase()));
+        }
+        return org.springframework.http.ResponseEntity.ok(r.room());
+    }
+
+    @GetMapping("/{code}/join-status")
+    public java.util.Map<String, String> joinStatus(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code) {
+        return java.util.Map.of("status", rooms.joinStatus(p.userId(), code));
+    }
+
+    @DeleteMapping("/{code}/join-request")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void cancelJoin(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code) {
+        rooms.cancelJoin(p.userId(), code);
+    }
+
+    @GetMapping("/{code}/join-requests")
+    public List<JoinRequestDto> joinRequests(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code) {
+        return rooms.joinRequests(p.userId(), p.role(), code);
+    }
+
+    @PostMapping("/{code}/join-requests/{userId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void decide(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable java.util.UUID userId,
+                       @Valid @RequestBody DecisionRequest req) {
+        rooms.decideJoin(p.userId(), p.role(), code, userId, req.approve());
+    }
+
+    @PatchMapping("/{code}/settings")
+    public RoomDto settings(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @Valid @RequestBody SettingsRequest req) {
+        return rooms.updateSettings(p.userId(), p.role(), code, req);
     }
 
     @GetMapping("/{code}")
