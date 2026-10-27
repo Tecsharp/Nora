@@ -1,0 +1,106 @@
+# Nora — arranque: ./setup.sh (Linux/macOS) o ./setup.ps1 (Windows). Solo el gateway publica un puerto.
+name: nora
+
+x-hardening: &hardening
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+
+services:
+  db:
+    <<: *hardening
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: nora
+      POSTGRES_USER: nora
+      POSTGRES_PASSWORD: "${NORA_DB_PASSWORD:?Falta .env, ejecuta ./setup.sh}"
+    volumes:
+      - nora_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nora -d nora"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [internal]
+    cap_add: [CHOWN, SETUID, SETGID, FOWNER, DAC_OVERRIDE]
+
+  garage:
+    <<: *hardening
+    image: dxflrs/garage:v1.0.1
+    environment:
+      GARAGE_RPC_SECRET: "${NORA_GARAGE_RPC_SECRET:?Falta .env, ejecuta ./setup.sh}"
+      GARAGE_ADMIN_TOKEN: "${NORA_GARAGE_ADMIN_TOKEN:?Falta .env, ejecuta ./setup.sh}"
+    volumes:
+      - ./garage/garage.toml:/etc/garage.toml:ro
+      - nora_garage_meta:/var/lib/garage/meta
+      - nora_garage_data:/var/lib/garage/data
+    read_only: true
+    healthcheck:
+      test: ["CMD", "/garage", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [internal]   # sin puertos publicados y sin salida a Internet: solo la API llega aquí
+
+  backend:
+    <<: *hardening
+    build: ./backend
+    depends_on:
+      db: { condition: service_healthy }
+      garage: { condition: service_healthy }
+    environment:
+      NORA_DB_HOST: db
+      NORA_DB_PASSWORD: ${NORA_DB_PASSWORD}
+      NORA_JWT_SECRET: "${NORA_JWT_SECRET:?Falta .env, ejecuta ./setup.sh}"
+      NORA_GARAGE_ADMIN_TOKEN: "${NORA_GARAGE_ADMIN_TOKEN}"
+      NORA_ADMIN_EMAIL: ${NORA_ADMIN_EMAIL:-}
+      NORA_ADMIN_PASSWORD: ${NORA_ADMIN_PASSWORD:-}
+      NORA_ALLOWED_ORIGINS: ${NORA_ALLOWED_ORIGINS:-}
+      NORA_ALLOW_REGISTRATION: ${NORA_ALLOW_REGISTRATION:-true}
+      NORA_COOKIE_SECURE: ${NORA_COOKIE_SECURE:-false}
+      NORA_DEFAULT_STORAGE_QUOTA_MB: ${NORA_DEFAULT_STORAGE_QUOTA_MB:-1024}
+      NORA_DEFAULT_MAX_FILE_MB: ${NORA_DEFAULT_MAX_FILE_MB:-100}
+      NORA_DEFAULT_ROOM_MINUTES: ${NORA_DEFAULT_ROOM_MINUTES:-120}
+      NORA_DEFAULT_MAX_ROOMS: ${NORA_DEFAULT_MAX_ROOMS:-5}
+      NORA_DEFAULT_MAX_PARTICIPANTS: ${NORA_DEFAULT_MAX_PARTICIPANTS:-25}
+    read_only: true
+    tmpfs:
+      - /tmp:size=1g
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health/readiness | grep -q UP"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    networks: [edge, internal]
+
+  frontend:
+    <<: *hardening
+    build: ./frontend
+    read_only: true
+    tmpfs:
+      - /tmp
+    networks: [edge]
+
+  gateway:
+    <<: *hardening
+    build: ./gateway
+    depends_on:
+      backend: { condition: service_healthy }
+      frontend: { condition: service_started }
+    ports:
+      - "${NORA_BIND:-0.0.0.0}:${NORA_PORT:-29817}:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    networks: [edge]
+
+networks:
+  edge: {}
+  internal:
+    internal: true   # sin acceso a Internet ni al exterior
+
+volumes:
+  nora_pgdata: {}
+  nora_garage_meta: {}
+  nora_garage_data: {}
