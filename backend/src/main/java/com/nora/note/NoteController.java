@@ -2,6 +2,8 @@ package com.nora.note;
 
 import com.nora.auth.AuthPrincipal;
 import com.nora.common.ApiException;
+import com.nora.folder.FolderService;
+import com.nora.folder.RoomFolder;
 import com.nora.room.Room;
 import com.nora.room.RoomService;
 import com.nora.user.Role;
@@ -15,6 +17,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import com.nora.ws.RoomEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -29,18 +33,24 @@ public class NoteController {
     private static final int MAX_ITEMS_PER_KIND = 200;
 
     public record NoteRequest(@NotBlank(message = "El contenido es obligatorio")
-                              @Size(max = 20000, message = "Máximo 20000 caracteres") String content) {}
+                              @Size(max = 20000, message = "Máximo 20000 caracteres") String content,
+                              UUID folderId) {}
 
-    public record NoteDto(UUID id, String content, UUID authorId, String authorName, Instant createdAt) {}
+    public record NoteDto(UUID id, String content, UUID authorId, String authorName, Instant createdAt, UUID folderId) {}
 
     private final RoomNoteRepository notes;
     private final RoomService rooms;
     private final UserRepository users;
+    private final ApplicationEventPublisher events;
+    private final FolderService folders;
 
-    public NoteController(RoomNoteRepository notes, RoomService rooms, UserRepository users) {
+    public NoteController(RoomNoteRepository notes, RoomService rooms, UserRepository users, ApplicationEventPublisher events,
+                          FolderService folders) {
+        this.folders = folders;
         this.notes = notes;
         this.rooms = rooms;
         this.users = users;
+        this.events = events;
     }
 
     @GetMapping
@@ -52,7 +62,7 @@ public class NoteController {
         Map<UUID, String> names = users.findAllById(items.stream().map(RoomNote::getAuthorId).distinct().toList()).stream()
                 .collect(Collectors.toMap(u -> u.getId(), u -> u.getDisplayName(), (a, b) -> a));
         return items.stream()
-                .map(n -> new NoteDto(n.getId(), n.getContent(), n.getAuthorId(), names.getOrDefault(n.getAuthorId(), "?"), n.getCreatedAt()))
+                .map(n -> new NoteDto(n.getId(), n.getContent(), n.getAuthorId(), names.getOrDefault(n.getAuthorId(), "?"), n.getCreatedAt(), n.getFolderId()))
                 .toList();
     }
 
@@ -65,9 +75,49 @@ public class NoteController {
         if (notes.countByRoomIdAndKind(room.getId(), kind) >= MAX_ITEMS_PER_KIND) {
             throw ApiException.conflict("Has alcanzado el máximo de elementos; borra alguno antes de añadir más");
         }
-        RoomNote n = notes.save(new RoomNote(room.getId(), p.userId(), kind, req.content()));
+        folders.requireIn(room.getId(), RoomFolder.Kind.valueOf(kind.name()), req.folderId());
+        RoomNote created = new RoomNote(room.getId(), p.userId(), kind, req.content());
+        created.setFolderId(req.folderId());
+        RoomNote n = notes.save(created);
         String name = users.findById(p.userId()).map(u -> u.getDisplayName()).orElse("?");
-        return new NoteDto(n.getId(), n.getContent(), n.getAuthorId(), name, n.getCreatedAt());
+        NoteDto dto = new NoteDto(n.getId(), n.getContent(), n.getAuthorId(), name, n.getCreatedAt(), n.getFolderId());
+        events.publishEvent(new RoomEvent(room.getId(), "note.added", Map.of("kind", kind, "note", dto)));
+        return dto;
+    }
+
+    /** Mueve una nota a otra categoría (folderId null = sin categoría). */
+    @PatchMapping("/{id}")
+    @Transactional
+    public NoteDto move(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable UUID id,
+                        @RequestBody Map<String, Object> body) {
+        Room room = rooms.requireMember(p.userId(), code);
+        RoomNote n = notes.findById(id).filter(x -> x.getRoomId().equals(room.getId()))
+                .orElseThrow(() -> ApiException.notFound("Elemento no encontrado"));
+        if (!n.getAuthorId().equals(p.userId()) && !room.getOwnerId().equals(p.userId()) && p.role() != Role.ADMIN) {
+            throw ApiException.forbidden("No puedes modificar este elemento");
+        }
+        // Solo se tocan los campos presentes: "folderId" mueve de categoría y "content" edita el texto
+        if (body.containsKey("folderId")) {
+            UUID folderId = null;
+            if (body.get("folderId") != null) {
+                try {
+                    folderId = UUID.fromString(String.valueOf(body.get("folderId")));
+                } catch (IllegalArgumentException e) {
+                    throw ApiException.badRequest("Categoría no válida");
+                }
+            }
+            folders.requireIn(room.getId(), RoomFolder.Kind.valueOf(n.getKind().name()), folderId);
+            n.setFolderId(folderId);
+        }
+        if (body.containsKey("content")) {
+            if (!(body.get("content") instanceof String text) || text.isBlank()) throw ApiException.badRequest("El contenido es obligatorio");
+            if (text.length() > 20000) throw ApiException.badRequest("Máximo 20000 caracteres");
+            n.setContent(text);
+        }
+        String name = users.findById(n.getAuthorId()).map(u -> u.getDisplayName()).orElse("?");
+        NoteDto dto = new NoteDto(n.getId(), n.getContent(), n.getAuthorId(), name, n.getCreatedAt(), n.getFolderId());
+        events.publishEvent(new RoomEvent(room.getId(), "note.updated", Map.of("kind", n.getKind(), "note", dto)));
+        return dto;
     }
 
     @DeleteMapping("/{id}")
@@ -81,5 +131,6 @@ public class NoteController {
             throw ApiException.forbidden("No puedes borrar este elemento");
         }
         notes.delete(n);
+        events.publishEvent(new RoomEvent(room.getId(), "note.deleted", Map.of("kind", n.getKind(), "id", n.getId())));
     }
 }

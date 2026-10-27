@@ -3,6 +3,8 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { api, ApiError } from '../api'
 import { useAuth } from '../auth'
 import Brand from '../components/Brand'
+import LegalLinks from '../components/LegalLinks'
+import { ThemeToggle } from '../theme'
 
 export default function Login() {
   const { user, login } = useAuth()
@@ -37,25 +39,30 @@ export default function Login() {
 
   return (
     <div className="auth-page">
+      <div className="auth-corner"><ThemeToggle /></div>
+      <Brand large subtitle="Tu espacio. Tus reglas." />
       <form className="card auth-card" onSubmit={submit}>
-        <Brand />
-        <h2>Iniciar sesión</h2>
+        <div className="auth-head">
+          <h2>Iniciar sesión</h2>
+          <p className="muted small">Accede para crear o unirte a salas de colaboración.</p>
+        </div>
         <label>
-          Email
-          <input type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          Correo electrónico
+          <input type="email" autoComplete="email" required placeholder="tu@correo.com" value={email} onChange={(e) => setEmail(e.target.value)} />
         </label>
         <label>
           Contraseña
           <input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
         </label>
-        {error && <p className="error" role="alert">{error}</p>}
-        <button className="btn primary" disabled={busy}>{busy ? 'Entrando…' : 'Entrar'}</button>
+        {error && <p className="error small" role="alert">{error}</p>}
+        <button className="btn primary block" disabled={busy}>{busy ? 'Entrando…' : 'Entrar'}</button>
         {registration && (
-          <p className="muted small">
+          <p className="muted small center-text">
             ¿No tienes cuenta? <Link to="/register">Regístrate</Link>
           </p>
         )}
       </form>
+      <div className="auth-foot"><LegalLinks /></div>
     </div>
   )
 }

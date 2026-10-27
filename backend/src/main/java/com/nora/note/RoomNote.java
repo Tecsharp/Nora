@@ -29,6 +29,9 @@ public class RoomNote {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
+    @Column(name = "folder_id")
+    private UUID folderId;
+
     protected RoomNote() {}
 
     public RoomNote(UUID roomId, UUID authorId, Kind kind, String content) {
@@ -44,4 +47,7 @@ public class RoomNote {
     public Kind getKind() { return kind; }
     public String getContent() { return content; }
     public Instant getCreatedAt() { return createdAt; }
+    public UUID getFolderId() { return folderId; }
+    public void setFolderId(UUID folderId) { this.folderId = folderId; }
+    public void setContent(String content) { this.content = content; }
 }

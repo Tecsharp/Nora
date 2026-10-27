@@ -4,6 +4,8 @@ import com.nora.auth.AuthPrincipal;
 import com.nora.room.Room;
 import com.nora.room.RoomService;
 import com.nora.file.FileService.FileDto;
+import com.nora.folder.FolderService;
+import com.nora.folder.RoomFolder;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -24,10 +26,34 @@ public class FileController {
 
     private final FileService files;
     private final RoomService rooms;
+    private final FolderService folders;
 
-    public FileController(FileService files, RoomService rooms) {
+    public FileController(FileService files, RoomService rooms, FolderService folders) {
         this.files = files;
         this.rooms = rooms;
+        this.folders = folders;
+    }
+
+    @PatchMapping("/{fileId}")
+    public FileDto update(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable UUID fileId,
+                          @RequestBody java.util.Map<String, Object> body) {
+        Room room = rooms.requireMember(p.userId(), code);
+        boolean move = body.containsKey("folderId");
+        UUID folderId = null;
+        if (move && body.get("folderId") != null) {
+            try {
+                folderId = UUID.fromString(String.valueOf(body.get("folderId")));
+            } catch (IllegalArgumentException e) {
+                throw com.nora.common.ApiException.badRequest("Carpeta no válida");
+            }
+            folders.requireIn(room.getId(), RoomFolder.Kind.FILE, folderId);
+        }
+        String name = null;
+        if (body.get("name") instanceof String s) {
+            if (s.isBlank() || s.length() > 255) throw com.nora.common.ApiException.badRequest("Nombre no válido");
+            name = s;
+        }
+        return files.update(room.getId(), fileId, p.userId(), p.role(), room.getOwnerId(), move, folderId, name);
     }
 
     @GetMapping
@@ -39,9 +65,10 @@ public class FileController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public FileDto upload(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code,
-                          @RequestParam("file") MultipartFile file) {
+                          @RequestParam("file") MultipartFile file, @RequestParam(required = false) UUID folderId) {
         Room room = rooms.requireMember(p.userId(), code);
-        return files.upload(room.getId(), p.userId(), file);
+        folders.requireIn(room.getId(), RoomFolder.Kind.FILE, folderId);
+        return files.upload(room.getId(), p.userId(), file, folderId);
     }
 
     @GetMapping("/{fileId}")

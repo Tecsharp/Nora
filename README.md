@@ -44,6 +44,28 @@ Navegador ──► gateway (nginx, único puerto publicado)
 - **CORS**: por defecto solo mismo origen (el gateway). Para otros orígenes: `NORA_ALLOWED_ORIGINS=https://app.ejemplo.com`.
 - **HTTPS**: el stack escucha en HTTP (por defecto solo en `127.0.0.1`). En producción pon delante un proxy con TLS y define `NORA_COOKIE_SECURE=true` y `NORA_BIND=0.0.0.0`.
 
+### Tiempo real (WebSocket)
+
+Una única conexión `/ws` por pestaña, autenticada con un **ticket de un solo uso** (30 s) que se pide a `POST /api/ws/ticket`: el JWT nunca va en la URL. Se valida el origen igual que CORS, hay límite de conexiones y de mensajes, y las conexiones mudas se cierran a los 90 s (el cliente envía un ping cada 25 s y reconecta solo con espera exponencial).
+
+Eventos de sala: quién está conectado (`presence`, `joined`), nuevos miembros (`member.joined`), archivos (`file.added`, `file.deleted`), notas y portapapeles (`note.added`, `note.deleted`), progreso de subidas ajenas (`upload.progress`, `upload.done`, `upload.aborted`), avisos de expiración a 5 y 1 minuto (`room.expiring`) y cierre de sala (`room.closed`). Eventos de cuenta: `account.updated` (el admin cambió tus límites) y `account.disabled`. Los eventos se emiten **después de confirmar la transacción** de base de datos, así que nadie recibe un aviso de algo que luego se revierte. Si se pierde la conexión, al reconectar la interfaz recarga lo que se perdió.
+
+### Subidas reanudables
+
+Los archivos se suben por trozos de 8 MiB con multipart de S3 (`POST /api/rooms/{code}/uploads`, `PUT …/parts/{n}`, `POST …/complete`). El servidor guarda qué trozos llegaron: si se corta internet, se cierra la pestaña o se reinicia el navegador, al volver a elegir el mismo archivo solo se envían los que faltan. El cliente sube 3 trozos en paralelo, reintenta con espera, se pausa sin conexión y detecta conexiones colgadas (20 s sin avance). Muestra porcentaje, velocidad y tiempo restante; el resto de la sala ve el avance en vivo. Las subidas abandonadas se limpian a las 24 h.
+
+Las subidas corren en segundo plano: un panel flotante las muestra cuando cierras el explorador de archivos o cambias de pantalla (con el explorador abierto el progreso se ve dentro de él, así nunca hay dos indicadores a la vez), y al cerrar la pestaña el navegador avisa. La velocidad se mide en los últimos segundos y cae a `0 KB/s` si la red se queda parada. Para reanudar tras **recargar la página o reiniciar el navegador sin volver a elegir el archivo**, Nora guarda una referencia al archivo en IndexedDB (API File System Access). Solo funciona en Chrome/Edge y en un contexto seguro (HTTPS o `localhost`; no por `http://IP:puerto`), y el navegador puede pedir permiso una vez para releer el archivo. En el resto, la subida interrumpida aparece con un botón «Reanudar» que pide elegir el mismo archivo. Al ir en trozos pequeños, también funcionan detrás de Cloudflare, que limita cada petición a 100 MB en el plan gratuito.
+
+### Interfaz
+
+- **Tema claro, oscuro o del sistema** (selector en la barra superior; se recuerda en el navegador y se aplica antes de pintar para evitar parpadeos).
+- Tipografía del sistema (`-apple-system`, SF Pro en dispositivos Apple; Segoe UI/Roboto en el resto). Las fuentes SF no se incluyen porque su licencia no permite redistribuirlas. Diseño adaptable: en móvil los diálogos son hojas inferiores y las tablas se simplifican.
+- **Archivos** funciona como un explorador: carpetas anidadas, migas de pan, vista cuadrícula/lista, búsqueda, orden, renombrar, mover (menú «Mover a…» o arrastrando) y subir arrastrando archivos a la carpeta actual. Borrar una carpeta elimina todo su contenido, también del almacén S3. Se pueden subir **carpetas enteras** (botón «Subir carpeta» o arrastrándolas): se reproduce su estructura en la sala y se omiten los archivos vacíos. Las descargas solo se inician con el botón y muestran un anillo de progreso sobre el icono (cancelables; se abortan si se quedan 45 s sin datos).
+- **Portapapeles** y **Notas** admiten categorías (crear, renombrar, borrar, filtrar y mover elementos entre ellas).
+- Páginas públicas de **Términos de uso**, **Privacidad** y **Manejo de datos** (`/terms`, `/privacy`, `/data`); el registro exige aceptarlos. Son una plantilla general: quien opere la instancia debe revisarlos y adaptarlos.
+
+- **Duración de la sala**: el propietario (o un admin) puede extenderla o reducirla desde la sala o desde la lista de salas (`PATCH /api/rooms/{code}/expiry`, `{deltaMinutes}` o `{unlimited:true}`). Debe quedar al menos 1 minuto y la duración total respeta el límite de la cuenta.
+
 ### Acceso desde otros equipos y Cloudflare Tunnel
 
 Por defecto el gateway escucha en todas las interfaces (`NORA_BIND=0.0.0.0`), así que Nora es accesible por `http://IP-DEL-SERVIDOR:29817` desde tu red. Si solo quieres usarlo desde la propia máquina, pon `NORA_BIND=127.0.0.1` en `.env` y ejecuta `docker compose up -d`.
@@ -59,7 +81,7 @@ El gateway respeta `X-Forwarded-Proto` y `X-Forwarded-Host`, por lo que el login
 
 ### Administración
 
-El administrador inicial se crea con `NORA_ADMIN_EMAIL` / `NORA_ADMIN_PASSWORD`. En **Admin** puede, por usuario, activar/desactivar la cuenta, cambiar el rol y fijar o poner **infinito (∞)** en: espacio total, tamaño máximo de archivo, duración máxima de sala (y salas sin expiración), salas activas y participantes por sala. Los valores por defecto de usuarios nuevos se configuran en `.env`.
+El administrador inicial se crea con `NORA_ADMIN_EMAIL` / `NORA_ADMIN_PASSWORD`. En **Admin** hay una tabla paginada con búsqueda por nombre o correo y filtro por rol (`GET /api/admin/users?page&size&q&role`); al abrir una fila puede, por usuario, activar/desactivar la cuenta, cambiar el rol y fijar o poner **infinito (∞)** en: espacio total, tamaño máximo de archivo, duración máxima de sala (y salas sin expiración), salas activas y participantes por sala. Los valores por defecto de usuarios nuevos se configuran en `.env`.
 
 ## Desarrollo
 
@@ -73,4 +95,4 @@ cd frontend && npm install && npm run dev
 
 ## Estado
 
-Herramientas operativas: **Archivos**, **Notas**, **Portapapeles**. Pizarra, Media Review, Asistencia, Votaciones y Acciones aparecen como «Próximamente». La presencia de participantes se calcula por latido (cada 10 s); WebSockets quedan como mejora futura.
+Herramientas operativas: **Archivos**, **Notas**, **Portapapeles**. Pizarra, Media Review, Asistencia, Votaciones y Acciones aparecen como «Próximamente». La presencia y los eventos de la sala van por WebSocket.

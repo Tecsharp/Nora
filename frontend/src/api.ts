@@ -59,6 +59,10 @@ export function setAccessToken(token: string | null) {
   accessToken = token
 }
 
+export function getAccessToken(): string | null {
+  return accessToken
+}
+
 export function setSessionLostHandler(fn: () => void) {
   onSessionLost = fn
 }
@@ -115,14 +119,6 @@ export async function api<T = unknown>(path: string, method = 'GET', body?: unkn
   return res.status === 204 ? (undefined as T) : res.json()
 }
 
-export async function upload<T>(path: string, file: File): Promise<T> {
-  const form = new FormData()
-  form.append('file', file)
-  const res = await raw(path, { method: 'POST', body: form })
-  if (!res.ok) return fail(res)
-  return res.json()
-}
-
 export async function download(path: string, filename: string) {
   const res = await raw(path)
   if (!res.ok) return fail(res)
@@ -134,6 +130,92 @@ export async function download(path: string, filename: string) {
   a.click()
   a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 10_000)
+}
+
+export interface DownloadHandle {
+  cancel: () => void
+  promise: Promise<void>
+}
+
+/** Sin recibir ni un byte durante este tiempo se considera que la descarga se perdió. */
+const DOWNLOAD_STALL_MS = 45_000
+
+/**
+ * Descarga con progreso: lee la respuesta en flujo y avisa de los bytes recibidos (total = 0 si el servidor no lo
+ * indica). Si la conexión se queda colgada la aborta con un error claro, en lugar de quedarse esperando para siempre.
+ */
+export function downloadWithProgress(path: string, filename: string, onProgress: (loaded: number, total: number) => void): DownloadHandle {
+  const ctrl = new AbortController()
+  let reason: 'user' | 'stall' | null = null
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const arm = () => {
+    clearTimeout(timer)
+    timer = setTimeout(() => {
+      reason = 'stall'
+      ctrl.abort()
+    }, DOWNLOAD_STALL_MS)
+  }
+  const run = async () => {
+    arm()
+    try {
+      const res = await raw(path, { signal: ctrl.signal })
+      if (!res.ok) return await fail(res)
+      const total = Number(res.headers.get('Content-Length')) || 0
+      onProgress(0, total)
+      const chunks: BlobPart[] = []
+      let loaded = 0
+      if (res.body) {
+        const reader = res.body.getReader()
+        for (;;) {
+          const { done, value } = await reader.read()
+          if (done) break
+          arm()
+          chunks.push(value)
+          loaded += value.byteLength
+          onProgress(loaded, total)
+        }
+      } else {
+        chunks.push(await res.blob())
+      }
+      const url = URL.createObjectURL(new Blob(chunks))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+    } catch (e) {
+      if (ctrl.signal.aborted) {
+        if (reason === 'stall') throw new Error('La descarga se detuvo. Inténtalo de nuevo.')
+        throw new DOMException('Descarga cancelada', 'AbortError')
+      }
+      throw e instanceof ApiError ? e : new Error('No se pudo descargar el archivo. Revisa tu conexión.')
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+  return {
+    cancel: () => {
+      reason = 'user'
+      ctrl.abort()
+    },
+    promise: run(),
+  }
+}
+
+export function formatSpeed(bytesPerSecond: number): string {
+  if (bytesPerSecond < 1024) return '0 KB/s' // por debajo de 1 KB/s se considera parado
+  if (bytesPerSecond < 1024 * 1024) return `${Math.round(bytesPerSecond / 1024)} KB/s`
+  return `${(bytesPerSecond / 1024 / 1024).toFixed(1)} MB/s`
+}
+
+export function formatEta(seconds: number | null): string {
+  if (seconds === null || !Number.isFinite(seconds)) return '—'
+  const s = Math.max(0, Math.round(seconds))
+  if (s < 60) return `${s} s`
+  if (s < 3600) return `${Math.floor(s / 60)} min ${s % 60} s`
+  return `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min`
 }
 
 export function formatBytes(bytes: number | null | undefined): string {

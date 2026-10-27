@@ -39,6 +39,12 @@ public class RoomController {
         return rooms.get(p.userId(), code);
     }
 
+    /** Extiende o reduce la duración de la sala (propietario o admin). */
+    @PatchMapping("/{code}/expiry")
+    public RoomDto expiry(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @Valid @RequestBody ExpiryRequest req) {
+        return rooms.adjustExpiry(p.userId(), p.role(), code, req);
+    }
+
     @DeleteMapping("/{code}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void close(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code) {

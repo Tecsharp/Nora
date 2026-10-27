@@ -12,6 +12,7 @@ export default defineConfig({
         // Como el gateway: el navegador y la API se ven como el mismo origen, así que no hay CORS.
         configure: (proxy) => proxy.on('proxyReq', (req) => req.removeHeader('origin')),
       },
+      '/ws': { target: 'http://localhost:8080', ws: true },
     },
   },
 })

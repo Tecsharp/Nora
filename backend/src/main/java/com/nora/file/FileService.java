@@ -6,7 +6,10 @@ import com.nora.user.User;
 import com.nora.user.UserRepository;
 import java.io.InputStream;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import com.nora.ws.RoomEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,9 +18,9 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class FileService {
 
-    public record FileDto(UUID id, String name, long sizeBytes, UUID uploaderId, java.time.Instant createdAt) {
+    public record FileDto(UUID id, String name, long sizeBytes, UUID uploaderId, java.time.Instant createdAt, UUID folderId) {
         static FileDto of(RoomFile f) {
-            return new FileDto(f.getId(), f.getOriginalName(), f.getSizeBytes(), f.getUploaderId(), f.getCreatedAt());
+            return new FileDto(f.getId(), f.getOriginalName(), f.getSizeBytes(), f.getUploaderId(), f.getCreatedAt(), f.getFolderId());
         }
     }
 
@@ -26,11 +29,13 @@ public class FileService {
     private final RoomFileRepository files;
     private final ObjectStorage storage;
     private final UserRepository users;
+    private final ApplicationEventPublisher events;
 
-    public FileService(RoomFileRepository files, ObjectStorage storage, UserRepository users) {
+    public FileService(RoomFileRepository files, ObjectStorage storage, UserRepository users, ApplicationEventPublisher events) {
         this.files = files;
         this.storage = storage;
         this.users = users;
+        this.events = events;
     }
 
     public long usedBytes(UUID userId) {
@@ -43,7 +48,7 @@ public class FileService {
     }
 
     @Transactional
-    public FileDto upload(UUID roomId, UUID userId, MultipartFile multipart) {
+    public FileDto upload(UUID roomId, UUID userId, MultipartFile multipart, UUID folderId) {
         if (multipart.isEmpty()) throw ApiException.badRequest("El archivo está vacío");
         User user = users.findById(userId).orElseThrow(() -> ApiException.notFound("Usuario no encontrado"));
         long size = multipart.getSize();
@@ -57,13 +62,14 @@ public class FileService {
         String contentType = multipart.getContentType() == null ? "application/octet-stream" : multipart.getContentType();
         RoomFile entity = new RoomFile(roomId, userId, sanitize(multipart.getOriginalFilename()),
                 contentType.length() > 127 ? "application/octet-stream" : contentType, size);
+        entity.setFolderId(folderId);
         try (InputStream in = multipart.getInputStream()) {
             storage.put(entity.getObjectKey(), in, size);
         } catch (Exception e) {
             throw new IllegalStateException("No se pudo guardar el archivo", e);
         }
         try {
-            return FileDto.of(files.saveAndFlush(entity));
+            return added(files.saveAndFlush(entity));
         } catch (RuntimeException e) {
             storage.delete(entity.getObjectKey());
             throw e;
@@ -88,6 +94,42 @@ public class FileService {
         }
         files.delete(f);
         storage.delete(f.getObjectKey());
+        events.publishEvent(new RoomEvent(roomId, "file.deleted", Map.of("id", f.getId())));
+    }
+
+    /** Mueve a otra carpeta (null = raíz) y/o renombra. Solo quien lo subió, el dueño de la sala o un admin. */
+    @Transactional
+    public FileDto update(UUID roomId, UUID fileId, UUID userId, Role role, UUID roomOwnerId, boolean moveRequested, UUID folderId, String name) {
+        RoomFile f = find(roomId, fileId);
+        if (!f.getUploaderId().equals(userId) && !roomOwnerId.equals(userId) && role != Role.ADMIN) {
+            throw ApiException.forbidden("No puedes modificar este archivo");
+        }
+        if (moveRequested) f.setFolderId(folderId);
+        if (name != null) f.setOriginalName(sanitize(name));
+        FileDto dto = FileDto.of(files.saveAndFlush(f));
+        events.publishEvent(new RoomEvent(roomId, "file.updated", dto));
+        return dto;
+    }
+
+    /** Borra del almacén y de la base de datos los archivos de las carpetas dadas. Devuelve sus ids. */
+    @Transactional
+    public List<UUID> deleteInFolders(UUID roomId, java.util.Collection<UUID> folderIds) {
+        List<RoomFile> doomed = files.findByRoomIdAndFolderIdIn(roomId, folderIds);
+        for (RoomFile f : doomed) storage.delete(f.getObjectKey());
+        files.deleteAll(doomed);
+        return doomed.stream().map(RoomFile::getId).toList();
+    }
+
+    /** Registra un archivo cuyo contenido ya está en el almacén (subida reanudable completada). */
+    @Transactional
+    public FileDto register(RoomFile entity) {
+        return added(files.saveAndFlush(entity));
+    }
+
+    private FileDto added(RoomFile saved) {
+        FileDto dto = FileDto.of(saved);
+        events.publishEvent(new RoomEvent(saved.getRoomId(), "file.added", dto));
+        return dto;
     }
 
     @Transactional
@@ -104,7 +146,7 @@ public class FileService {
     }
 
     /** Elimina rutas, caracteres de control y limita la longitud del nombre original. */
-    static String sanitize(String name) {
+    public static String sanitize(String name) {
         if (name == null || name.isBlank()) return "archivo";
         String n = name.replace('\\', '/');
         n = n.substring(n.lastIndexOf('/') + 1).replaceAll("[\\p{Cntrl}]", "").trim();
