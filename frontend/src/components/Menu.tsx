@@ -7,7 +7,7 @@ export type MenuItem =
   | 'separator'
 
 /** Menú «más acciones». Se abre hacia arriba si no cabe debajo. */
-export default function Menu({ items, label = 'Más acciones' }: { items: MenuItem[]; label?: string }) {
+export default function Menu({ items, label = 'Más acciones', trigger }: { items: MenuItem[]; label?: string; trigger?: ReactNode }) {
   const [open, setOpen] = useState(false)
   const [up, setUp] = useState(false)
   const wrap = useRef<HTMLSpanElement>(null)
@@ -28,7 +28,7 @@ export default function Menu({ items, label = 'Más acciones' }: { items: MenuIt
   return (
     <span className="menu-anchor" ref={wrap} onClick={(e) => e.stopPropagation()}>
       <button
-        className="icon-btn sm"
+        className={trigger ? 'menu-trigger' : 'icon-btn sm'}
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -38,7 +38,7 @@ export default function Menu({ items, label = 'Más acciones' }: { items: MenuIt
           setOpen((o) => !o)
         }}
       >
-        <MoreHorizontal size={18} />
+        {trigger ?? <MoreHorizontal size={18} />}
       </button>
       {open && (
         <div className={`menu ${up ? 'up' : ''}`} role="menu">

@@ -53,6 +53,8 @@ services:
       NORA_DB_PASSWORD: ${NORA_DB_PASSWORD}
       NORA_JWT_SECRET: "${NORA_JWT_SECRET:?Falta .env, ejecuta ./setup.sh}"
       NORA_GARAGE_ADMIN_TOKEN: "${NORA_GARAGE_ADMIN_TOKEN}"
+      NORA_CONVERTER_URL: http://converter:3100
+      NORA_CONVERTER_TOKEN: "${NORA_CONVERTER_TOKEN:-}"
       NORA_ADMIN_EMAIL: ${NORA_ADMIN_EMAIL:-}
       NORA_ADMIN_PASSWORD: ${NORA_ADMIN_PASSWORD:-}
       NORA_ALLOWED_ORIGINS: ${NORA_ALLOWED_ORIGINS:-}
@@ -73,6 +75,21 @@ services:
       retries: 30
       start_period: 30s
     networks: [edge, internal]
+
+  # Convierte archivos de oficina (DOCX/ODT, XLSX/ODS/CSV, PPTX/ODP) a formato editable y de vuelta con LibreOffice.
+  # Procesa archivos de usuarios (no confiables): solo red interna, sin salida a Internet, sistema de ficheros de solo lectura.
+  converter:
+    <<: *hardening
+    build: ./converter
+    environment:
+      CONVERTER_TOKEN: "${NORA_CONVERTER_TOKEN:-}"
+      LO_PARALLEL: "2"
+    read_only: true
+    tmpfs:
+      - /tmp:size=1g
+    mem_limit: 1536m
+    pids_limit: 256
+    networks: [internal]
 
   frontend:
     <<: *hardening

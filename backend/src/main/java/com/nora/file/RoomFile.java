@@ -62,6 +62,7 @@ public class RoomFile {
     public String getObjectKey() { return objectKey; }
     public Instant getCreatedAt() { return createdAt; }
     public UUID getFolderId() { return folderId; }
+    public void setSizeBytes(long sizeBytes) { this.sizeBytes = sizeBytes; }
     public void setFolderId(UUID folderId) { this.folderId = folderId; }
     public void setOriginalName(String originalName) { this.originalName = originalName; }
 }

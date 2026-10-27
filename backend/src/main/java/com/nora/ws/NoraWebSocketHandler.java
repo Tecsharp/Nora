@@ -2,6 +2,7 @@ package com.nora.ws;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nora.collab.CollabWs;
 import com.nora.common.ApiException;
 import com.nora.room.Room;
 import com.nora.room.RoomService;
@@ -32,8 +33,9 @@ public class NoraWebSocketHandler extends TextWebSocketHandler {
     private static final Logger log = LoggerFactory.getLogger(NoraWebSocketHandler.class);
     private static final int MAX_SESSIONS_PER_USER = 10;
     private static final int MAX_MESSAGES_PER_10S = 60;
+    private static final int MAX_DOC_MESSAGES_PER_10S = 1500;
 
-    static final class Conn {
+    static final class Conn implements CollabWs.Peer {
         final WebSocketSession session;
         final UUID userId;
         final String displayName;
@@ -47,7 +49,13 @@ public class NoraWebSocketHandler extends TextWebSocketHandler {
             this.displayName = displayName;
         }
 
-        String id() { return session.getId(); }
+        @Override public String id() { return session.getId(); }
+        @Override public UUID userId() { return userId; }
+        @Override public String displayName() { return displayName; }
+        @Override public void send(String type, Object data) { owner.send(this, type, data); }
+        NoraWebSocketHandler owner;
+        long docWindowStart = System.currentTimeMillis();
+        int docWindowCount;
     }
 
     private final Map<String, Conn> conns = new ConcurrentHashMap<>();
@@ -55,8 +63,10 @@ public class NoraWebSocketHandler extends TextWebSocketHandler {
     private final RoomService rooms;
     private final PresenceService presence;
     private final UploadService uploads;
+    private final CollabWs collab;
 
-    public NoraWebSocketHandler(ObjectMapper json, @Lazy RoomService rooms, PresenceService presence, @Lazy UploadService uploads) {
+    public NoraWebSocketHandler(ObjectMapper json, @Lazy RoomService rooms, PresenceService presence, @Lazy UploadService uploads, @Lazy CollabWs collab) {
+        this.collab = collab;
         this.json = json;
         this.rooms = rooms;
         this.presence = presence;
@@ -72,8 +82,10 @@ public class NoraWebSocketHandler extends TextWebSocketHandler {
             return;
         }
         // Si un cliente lento no consume, se corta en vez de acumular memoria.
-        var safe = new ConcurrentWebSocketSessionDecorator(raw, 5_000, 512 * 1024);
-        conns.put(raw.getId(), new Conn(safe, userId, name));
+        var safe = new ConcurrentWebSocketSessionDecorator(raw, 10_000, 8 * 1024 * 1024);
+        Conn conn = new Conn(safe, userId, name);
+        conn.owner = this;
+        conns.put(raw.getId(), conn);
     }
 
     @Override
@@ -81,13 +93,27 @@ public class NoraWebSocketHandler extends TextWebSocketHandler {
         Conn conn = conns.get(raw.getId());
         if (conn == null) return;
         long now = System.currentTimeMillis();
-        if (now - conn.windowStart > 10_000) {
-            conn.windowStart = now;
-            conn.windowCount = 0;
-        }
-        if (++conn.windowCount > MAX_MESSAGES_PER_10S) {
-            conn.session.close(CloseStatus.POLICY_VIOLATION.withReason("Demasiados mensajes"));
-            return;
+        String payload = message.getPayload();
+        // Los mensajes de edición (una pulsación de tecla puede generar varios) tienen su propio presupuesto
+        boolean docMsg = payload.startsWith("{\"type\":\"doc.");
+        if (docMsg) {
+            if (now - conn.docWindowStart > 10_000) {
+                conn.docWindowStart = now;
+                conn.docWindowCount = 0;
+            }
+            if (++conn.docWindowCount > MAX_DOC_MESSAGES_PER_10S) {
+                conn.session.close(CloseStatus.POLICY_VIOLATION.withReason("Demasiados cambios"));
+                return;
+            }
+        } else {
+            if (now - conn.windowStart > 10_000) {
+                conn.windowStart = now;
+                conn.windowCount = 0;
+            }
+            if (++conn.windowCount > MAX_MESSAGES_PER_10S) {
+                conn.session.close(CloseStatus.POLICY_VIOLATION.withReason("Demasiados mensajes"));
+                return;
+            }
         }
         JsonNode msg;
         try {
@@ -101,7 +127,19 @@ public class NoraWebSocketHandler extends TextWebSocketHandler {
             case "join" -> join(conn, msg.path("code").asText(""));
             case "leave" -> leaveRoom(conn);
             case "upload.progress" -> relayUploadProgress(conn, msg);
+            case "doc.join" -> withDoc(conn, msg, id -> collab.join(conn, id));
+            case "doc.leave" -> withDoc(conn, msg, id -> collab.leave(conn, id));
+            case "doc.update" -> withDoc(conn, msg, id -> collab.update(conn, id, msg.path("update").asText(""), msg.path("ref").asText("")));
+            case "doc.awareness" -> withDoc(conn, msg, id -> collab.awareness(conn, id, msg.path("update").asText(""), msg.path("clientId").asLong(0)));
             default -> send(conn, "error", Map.of("message", "Tipo de mensaje desconocido"));
+        }
+    }
+
+    private void withDoc(Conn conn, JsonNode msg, java.util.function.Consumer<UUID> action) {
+        try {
+            action.accept(UUID.fromString(msg.path("docId").asText("")));
+        } catch (IllegalArgumentException e) {
+            send(conn, "error", Map.of("message", "Documento no válido"));
         }
     }
 
@@ -151,7 +189,10 @@ public class NoraWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionClosed(WebSocketSession raw, CloseStatus status) {
         Conn conn = conns.remove(raw.getId());
-        if (conn != null) leaveRoom(conn);
+        if (conn != null) {
+            collab.leaveAll(conn);
+            leaveRoom(conn);
+        }
     }
 
     @Override
@@ -193,7 +234,7 @@ public class NoraWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    private void send(Conn conn, String type, Object data) {
+    void send(Conn conn, String type, Object data) {
         try {
             conn.session.sendMessage(new TextMessage(json.writeValueAsString(Map.of("type", type, "data", data))));
         } catch (Exception e) {
