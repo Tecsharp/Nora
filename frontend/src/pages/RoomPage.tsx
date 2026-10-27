@@ -145,8 +145,8 @@ export default function RoomPage() {
   const secure = window.location.protocol === 'https:'
 
   return (
-    <div className="room card">
-      <header className="room-head">
+    <div className="room">
+      <header className="room-top">
         <Link to="/" className="btn ghost sm"><ArrowLeft size={15} /> Mis salas</Link>
         <div className="row">
           <span className={`badge ${expired ? 'red' : 'green'}`}><i /> {expired ? 'Sala expirada' : 'Sala activa'}</span>
@@ -158,8 +158,8 @@ export default function RoomPage() {
         </div>
       </header>
 
-      <div className="room-hero">
-        <section aria-label="Sala">
+      <div className="room-hero stagger">
+        <section className="card" style={{ ['--i' as string]: 0 }} aria-label="Sala">
           <span className="eyebrow">Sala</span>
           <h2 className="room-title">{room.name}</h2>
           <div className="meta-row">
@@ -173,7 +173,7 @@ export default function RoomPage() {
           </div>
         </section>
 
-        <section aria-label="Participantes">
+        <section className="card" style={{ ['--i' as string]: 1 }} aria-label="Participantes">
           <div className="people-head">
             <span className="eyebrow">Participantes</span>
             <span className="badge green"><i /> {onlineCount} {onlineCount === 1 ? 'conectado' : 'conectados'}</span>
@@ -193,9 +193,9 @@ export default function RoomPage() {
 
       <div className="tools-wrap">
         <div className="section-title"><h3>Herramientas</h3></div>
-        <div className="tools">
-          {TOOLS.map((t) => (
-            <button key={t.id} className={`tool t-${t.id} ${t.ready ? '' : 'soon'}`} onClick={() => setActive(t.id)}>
+        <div className="tools stagger">
+          {TOOLS.map((t, i) => (
+            <button key={t.id} className={`tool t-${t.id} ${t.ready ? '' : 'soon'}`} style={{ ['--i' as string]: i + 2 }} onClick={() => setActive(t.id)}>
               <span className="ico"><t.icon size={22} /></span>
               <span className="tl">
                 <span>{t.label}</span>

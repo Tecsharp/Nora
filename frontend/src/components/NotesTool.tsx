@@ -5,6 +5,7 @@ import { useAuth } from '../auth'
 import { useRealtime } from '../realtime'
 import { useToast } from '../toast'
 import Menu, { type MenuItem } from './Menu'
+import Tabs from './Tabs'
 
 interface Note {
   id: string
@@ -191,14 +192,13 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
       </form>
 
       <div className="ex-toolbar">
-        <div className="chips grow" role="tablist" aria-label="Categorías">
-          <button className={`chip ${filter === ALL ? 'active' : ''}`} onClick={() => setFilter(ALL)}>Todas <span className="count">{items.length}</span></button>
-          <button className={`chip ${filter === NONE ? 'active' : ''}`} onClick={() => setFilter(NONE)}>Sin categoría <span className="count">{countOf(NONE)}</span></button>
-          {cats.map((c) => (
-            <button key={c.id} className={`chip ${filter === c.id ? 'active' : ''}`} onClick={() => setFilter(c.id)}>
-              {c.name} <span className="count">{countOf(c.id)}</span>
-            </button>
-          ))}
+        <div className="grow" style={{ minWidth: 0 }}>
+          <Tabs label="Categorías" value={filter} onChange={setFilter} size="sm"
+            items={[
+              { id: ALL, label: 'Todas', count: items.length },
+              { id: NONE, label: 'Sin categoría', count: countOf(NONE) },
+              ...cats.map((c) => ({ id: c.id, label: c.name, count: countOf(c.id) })),
+            ]} />
         </div>
         <button className="btn sm" onClick={() => { setAdding((a) => !a); setRenaming(false); setCatName('') }}><Plus size={15} /> Categoría</button>
       </div>
@@ -240,7 +240,7 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
             <span className="small">{query ? 'Prueba con otra búsqueda.' : 'Escribe arriba para añadir el primer elemento.'}</span>
           </div>
         ) : (
-          <div className="note-grid">
+          <div key={`${filter}-${query}`} className="note-grid swap">
             {shown.map((n) => (
               <article key={n.id} className="note-card">
                 <p className="pre">{n.content}</p>

@@ -11,6 +11,7 @@ import { useToast } from '../toast'
 import { fileFromHandle, isActive, loadInterrupted, pruneStaleHandles, uploads, useUploads, type PendingUpload } from '../uploadManager'
 import Menu, { type MenuItem } from './Menu'
 import Modal from './Modal'
+import Tabs from './Tabs'
 import ProgressBar from './ProgressBar'
 
 interface FileItem {
@@ -371,10 +372,8 @@ export default function FilesTool({ room }: { room: Room }) {
           <option value="date">Más recientes</option>
           <option value="size">Tamaño</option>
         </select>
-        <div className="seg" role="group" aria-label="Vista">
-          <button aria-pressed={view === 'grid'} aria-label="Cuadrícula" title="Cuadrícula" onClick={() => setView('grid')}><LayoutGrid size={15} /></button>
-          <button aria-pressed={view === 'list'} aria-label="Lista" title="Lista" onClick={() => setView('list')}><List size={15} /></button>
-        </div>
+        <Tabs role="radiogroup" label="Vista" size="sm" value={view} onChange={(v) => setView(v as View)}
+          items={[{ id: 'grid', title: 'Cuadrícula', icon: <LayoutGrid size={15} /> }, { id: 'list', title: 'Lista', icon: <List size={15} /> }]} />
       </div>
 
       {creating && (
@@ -467,7 +466,7 @@ export default function FilesTool({ room }: { room: Room }) {
         ) : (
           <>
             {!searching && <div className="ex-section">{shownFolders.length > 0 && shownFiles.length > 0 ? 'Carpetas y archivos' : shownFolders.length > 0 ? 'Carpetas' : 'Archivos'}</div>}
-            <div className={view === 'grid' ? 'fgrid' : 'flist'}>{rows}</div>
+            <div key={`${view}-${current}-${searching}`} className={`${view === 'grid' ? 'fgrid' : 'flist'} swap`}>{rows}</div>
           </>
         )}
       </div>

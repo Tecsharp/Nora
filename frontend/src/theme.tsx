@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Monitor, Moon, Sun } from 'lucide-react'
+import Tabs from './components/Tabs'
 
 export type ThemePref = 'system' | 'light' | 'dark'
 
@@ -60,16 +61,16 @@ const OPTIONS: { id: ThemePref; label: string; icon: typeof Sun }[] = [
   { id: 'dark', label: 'Tema oscuro', icon: Moon },
 ]
 
-/** Selector segmentado claro / sistema / oscuro. */
+/** Selector claro / sistema / oscuro con indicador deslizante. */
 export function ThemeToggle() {
   const { pref, setPref } = useTheme()
   return (
-    <div className="seg" role="radiogroup" aria-label="Tema">
-      {OPTIONS.map(({ id, label, icon: Icon }) => (
-        <button key={id} role="radio" aria-checked={pref === id} aria-label={label} title={label} onClick={() => setPref(id)}>
-          <Icon size={15} />
-        </button>
-      ))}
-    </div>
+    <Tabs
+      role="radiogroup"
+      label="Tema"
+      value={pref}
+      onChange={(id) => setPref(id as ThemePref)}
+      items={OPTIONS.map(({ id, label, icon: Icon }) => ({ id, title: label, icon: <Icon size={15} /> }))}
+    />
   )
 }

@@ -1,4 +1,4 @@
-import { Link, Outlet, useNavigate } from 'react-router-dom'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { LogOut, Shield } from 'lucide-react'
 import { useAuth } from '../auth'
 import { ThemeToggle } from '../theme'
@@ -11,6 +11,7 @@ import UploadDock from './UploadDock'
 export default function Layout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   return (
     <>
       <TopBar>
@@ -42,7 +43,9 @@ export default function Layout() {
       </TopBar>
       <div className="shell">
       <main>
-        <Outlet />
+        <div key={pathname} className="page-enter">
+          <Outlet />
+        </div>
       </main>
       <footer className="site-footer">
         <span>© {new Date().getFullYear()} Nora · Salas temporales de colaboración</span>

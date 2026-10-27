@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowRight, Clock, DoorOpen, Hash, Plus, Users } from 'lucide-react'
+import { ArrowRight, Clock, DoorOpen, FileUp, Hash, HardDrive, Plus, Timer, Users } from 'lucide-react'
 import { api, ApiError, formatBytes, type Room, type RoomSummary, type User } from '../api'
 import { useAuth } from '../auth'
 import { remaining } from '../time'
@@ -110,9 +110,9 @@ export default function Home() {
             <span className="small">Crea una arriba o únete con un código.</span>
           </div>
         )}
-        <ul className="room-list">
-          {rooms?.map((r) => (
-            <li key={r.code}>
+        <ul className="room-list stagger">
+          {rooms?.map((r, i) => (
+            <li key={r.code} style={{ ['--i' as string]: i }}>
               <Link to={`/room/${r.code}`} className="room-card">
                 <div className="row spread nowrap">
                   <strong className="truncate">{r.name}</strong>
@@ -127,17 +127,18 @@ export default function Home() {
       </section>
 
       {limits && (
-        <section className="card">
+        <section>
           <div className="section-title"><h2>Tu cuenta</h2></div>
-          <div className="stat-grid">
-            <div className="stat">
+          <div className="stat-grid stagger">
+            <div className="stat" style={{ ['--i' as string]: 0 }}>
+              <span className="ico"><HardDrive size={22} /></span>
+              <b>{formatBytes(used)} <small>/ {formatBytes(quota)}</small></b>
               <span className="muted small">Almacenamiento</span>
-              <b>{formatBytes(used)} <span className="muted small">/ {formatBytes(quota)}</span></b>
               {quota !== null && <div className="meter"><i style={{ width: `${pct}%` }} /></div>}
             </div>
-            <div className="stat"><span className="muted small">Archivo máximo</span><b>{formatBytes(limits.maxFileSizeBytes)}</b></div>
-            <div className="stat"><span className="muted small">Salas activas</span><b>{limits.maxActiveRooms ?? '∞'}</b></div>
-            <div className="stat"><span className="muted small">Duración máxima</span><b>{limits.maxRoomMinutes == null ? '∞' : `${limits.maxRoomMinutes} min`}</b></div>
+            <div className="stat" style={{ ['--i' as string]: 1 }}><span className="ico"><FileUp size={22} /></span><b>{formatBytes(limits.maxFileSizeBytes)}</b><span className="muted small">Archivo máximo</span></div>
+            <div className="stat" style={{ ['--i' as string]: 2 }}><span className="ico"><DoorOpen size={22} /></span><b>{limits.maxActiveRooms ?? '∞'}</b><span className="muted small">Salas activas</span></div>
+            <div className="stat" style={{ ['--i' as string]: 3 }}><span className="ico"><Timer size={22} /></span><b>{limits.maxRoomMinutes == null ? '∞' : `${limits.maxRoomMinutes} min`}</b><span className="muted small">Duración máxima</span></div>
           </div>
         </section>
       )}

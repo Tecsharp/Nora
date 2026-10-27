@@ -1,6 +1,7 @@
-import { Link, Navigate, useLocation } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { ThemeToggle } from '../theme'
+import Tabs from '../components/Tabs'
 import TopBar from '../components/TopBar'
 
 const UPDATED = '27 de octubre de 2026'
@@ -128,6 +129,7 @@ const PAGES: Record<string, { label: string; body: ReactNode }> = {
 /** Páginas legales públicas (no requieren sesión). */
 export default function Legal() {
   const doc = useLocation().pathname.replace('/', '')
+  const navigate = useNavigate()
   const page = PAGES[doc]
   if (!page) return <Navigate to="/terms" replace />
   return (
@@ -136,11 +138,10 @@ export default function Legal() {
       <div className="shell">
       <main className="legal">
         <div className="legal-tabs">
-          {Object.entries(PAGES).map(([id, p]) => (
-            <Link key={id} to={`/${id}`} className={`chip ${id === doc ? 'active' : ''}`} style={{ textDecoration: 'none' }}>{p.label}</Link>
-          ))}
+          <Tabs label="Documentos legales" value={doc} onChange={(id) => navigate(`/${id}`)}
+            items={Object.entries(PAGES).map(([id, p]) => ({ id, label: p.label }))} />
         </div>
-        <article className="prose card">{page.body}</article>
+        <article key={doc} className="prose card swap">{page.body}</article>
       </main>
       <footer className="site-footer"><span>© {new Date().getFullYear()} Nora</span><Link to="/">Volver a Nora</Link></footer>
       </div>
