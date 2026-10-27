@@ -44,6 +44,16 @@ Navegador ──► gateway (nginx, único puerto publicado)
 - **CORS**: por defecto solo mismo origen (el gateway). Para otros orígenes: `NORA_ALLOWED_ORIGINS=https://app.ejemplo.com`.
 - **HTTPS**: el stack escucha en HTTP (por defecto solo en `127.0.0.1`). En producción pon delante un proxy con TLS y define `NORA_COOKIE_SECURE=true` y `NORA_BIND=0.0.0.0`.
 
+### Acceso desde otros equipos y Cloudflare Tunnel
+
+Por defecto el gateway solo escucha en `127.0.0.1` (`NORA_BIND`), así que únicamente se ve desde la propia máquina. Según cómo quieras entrar:
+
+- **Por IP:puerto desde la red**: en `.env` pon `NORA_BIND=0.0.0.0` y recrea con `docker compose up -d`. Entra por `http://IP:29817`.
+- **Cloudflare Tunnel con `cloudflared` instalado en el host**: apunta el servicio a `http://localhost:29817` (el `127.0.0.1` por defecto basta).
+- **Cloudflare Tunnel con `cloudflared` en un contenedor**: dentro de ese contenedor `localhost` no es el host. Usa `NORA_BIND=0.0.0.0` y apunta a `http://IP-DEL-HOST:29817`, o conecta el contenedor a la red `nora_edge` y apunta a `http://gateway:8080`.
+
+El gateway respeta `X-Forwarded-Proto` y `X-Forwarded-Host`, por lo que el login funciona tras HTTPS, y la cookie de sesión se marca `Secure` automáticamente cuando se entra por HTTPS.
+
 ### Administración
 
 El administrador inicial se crea con `NORA_ADMIN_EMAIL` / `NORA_ADMIN_PASSWORD`. En **Admin** puede, por usuario, activar/desactivar la cuenta, cambiar el rol y fijar o poner **infinito (∞)** en: espacio total, tamaño máximo de archivo, duración máxima de sala (y salas sin expiración), salas activas y participantes por sala. Los valores por defecto de usuarios nuevos se configuran en `.env`.

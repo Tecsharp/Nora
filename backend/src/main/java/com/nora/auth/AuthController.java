@@ -4,6 +4,7 @@ import com.nora.auth.AuthDtos.*;
 import com.nora.config.AppProperties;
 import com.nora.user.UserDto;
 import com.nora.user.UserRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.time.Duration;
 import org.springframework.http.HttpHeaders;
@@ -40,32 +41,33 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest req) {
-        return withCookie(auth.login(req));
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest req, HttpServletRequest http) {
+        return withCookie(auth.login(req), http);
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<AuthResponse> refresh(@CookieValue(name = COOKIE, required = false) String token) {
-        return withCookie(auth.refresh(token));
+    public ResponseEntity<AuthResponse> refresh(@CookieValue(name = COOKIE, required = false) String token, HttpServletRequest http) {
+        return withCookie(auth.refresh(token), http);
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@CookieValue(name = COOKIE, required = false) String token) {
+    public ResponseEntity<Void> logout(@CookieValue(name = COOKIE, required = false) String token, HttpServletRequest http) {
         auth.logout(token);
-        return ResponseEntity.noContent().header(HttpHeaders.SET_COOKIE, cookie("", Duration.ZERO).toString()).build();
+        return ResponseEntity.noContent().header(HttpHeaders.SET_COOKIE, cookie("", Duration.ZERO, http).toString()).build();
     }
 
-    private ResponseEntity<AuthResponse> withCookie(AuthService.Session s) {
+    private ResponseEntity<AuthResponse> withCookie(AuthService.Session s, HttpServletRequest http) {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE,
-                        cookie(s.refreshToken(), Duration.ofDays(props.jwt().refreshTtlDays())).toString())
+                        cookie(s.refreshToken(), Duration.ofDays(props.jwt().refreshTtlDays()), http).toString())
                 .body(s.response());
     }
 
-    private ResponseCookie cookie(String value, Duration maxAge) {
+    /** Secure si se fuerza por configuración o si el cliente entra por HTTPS (según X-Forwarded-Proto del gateway). */
+    private ResponseCookie cookie(String value, Duration maxAge, HttpServletRequest http) {
         return ResponseCookie.from(COOKIE, value)
                 .httpOnly(true)
-                .secure(props.cookieSecure())
+                .secure(props.cookieSecure() || http.isSecure())
                 .sameSite("Strict")
                 .path("/api/auth")
                 .maxAge(maxAge)

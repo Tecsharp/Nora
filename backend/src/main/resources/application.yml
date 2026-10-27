@@ -1,6 +1,8 @@
 server:
   port: 8080
   shutdown: graceful
+  # Respeta X-Forwarded-Proto/Host del gateway: sin esto, detrás de HTTPS el origen no coincide y CORS rechaza el login
+  forward-headers-strategy: framework
   error:
     include-message: never
     include-stacktrace: never
