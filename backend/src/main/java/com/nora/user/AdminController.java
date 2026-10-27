@@ -40,12 +40,21 @@ public class AdminController {
         this.events = events;
     }
 
+    public record UserPage(List<AdminUserView> items, long total, int page, int size) {}
+
+    /** Listado paginado con búsqueda por nombre o email y filtro opcional por rol. */
     @GetMapping
-    public List<AdminUserView> list() {
-        return users.findAll().stream()
-                .sorted((a, b) -> a.getCreatedAt().compareTo(b.getCreatedAt()))
-                .map(u -> new AdminUserView(UserDto.of(u), files.usedBytes(u.getId())))
-                .toList();
+    @Transactional(readOnly = true)
+    public UserPage list(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size,
+                         @RequestParam(defaultValue = "") String q, @RequestParam(required = false) Role role) {
+        int safeSize = Math.max(1, Math.min(size, 100));
+        String term = q.trim().toLowerCase().replace("!", "!!").replace("%", "!%").replace("_", "!_");
+        var result = users.search(term, role,
+                org.springframework.data.domain.PageRequest.of(Math.max(0, page), safeSize,
+                        org.springframework.data.domain.Sort.by("createdAt").ascending()));
+        return new UserPage(result.getContent().stream()
+                .map(u -> new AdminUserView(UserDto.of(u), files.usedBytes(u.getId()))).toList(),
+                result.getTotalElements(), result.getNumber(), safeSize);
     }
 
     /** PUT: los límites se reemplazan por completo, así que un campo ausente (null) significa "infinito". */

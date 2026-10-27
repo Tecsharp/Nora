@@ -10,6 +10,7 @@ export interface UploadItem {
   code: string
   file: File
   fingerprint: string
+  folderId?: string | null
   progress: UploadProgress
   task?: UploadTask
   /** instante del último aviso de progreso enviado al resto de la sala */
@@ -67,7 +68,7 @@ class UploadManager {
     return this.items.some((i) => i.code === code && i.fingerprint === fingerprint && isActive(i))
   }
 
-  add(code: string, file: File, handle?: FsHandle) {
+  add(code: string, file: File, handle?: FsHandle, folderId?: string | null) {
     const fingerprint = fingerprintOf(file)
     if (this.isUploading(code, fingerprint)) return // ya se está subiendo
     if (handle) void saveHandle(code, fingerprint, handle)
@@ -76,6 +77,7 @@ class UploadManager {
       code,
       file,
       fingerprint,
+      folderId,
       lastReport: 0,
       progress: { state: 'queued', loaded: 0, total: file.size, speed: 0, eta: null },
     }
@@ -103,7 +105,7 @@ class UploadManager {
       last = progress
       this.patch(item.key, { progress })
       this.report(item.key, progress)
-    })
+    }, item.folderId)
     this.patch(item.key, { task })
     await task.promise
     if (last.state === 'done') {

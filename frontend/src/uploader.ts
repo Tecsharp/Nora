@@ -50,7 +50,7 @@ function waitOnline(): Promise<void> {
  * Subida por trozos de 8 MiB con reintentos y reanudación: si se corta la red (o se cierra la pestaña) el servidor
  * conserva los trozos recibidos y, al volver a subir el mismo archivo, solo se envían los que faltan.
  */
-export function startUpload(code: string, file: File, onUpdate: (p: UploadProgress) => void): UploadTask {
+export function startUpload(code: string, file: File, onUpdate: (p: UploadProgress) => void, folderId?: string | null): UploadTask {
   let canceled = false
   let sessionId: string | null = null
   const xhrs = new Set<XMLHttpRequest>()
@@ -117,7 +117,7 @@ export function startUpload(code: string, file: File, onUpdate: (p: UploadProgre
       setState('preparing')
       const fingerprint = fingerprintOf(file)
       const session = await withRetry(() =>
-        api<Session>(base, 'POST', { name: file.name, size: file.size, contentType: file.type || undefined, fingerprint }),
+        api<Session>(base, 'POST', { name: file.name, size: file.size, contentType: file.type || undefined, fingerprint, folderId: folderId ?? undefined }),
       )
       sessionId = session.id
       const have = new Set(session.received.map((p) => p.number))

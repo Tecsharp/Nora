@@ -4,6 +4,8 @@ import com.nora.common.ApiException;
 import com.nora.file.FileService;
 import com.nora.file.ObjectStorage;
 import com.nora.file.RoomFile;
+import com.nora.folder.FolderService;
+import com.nora.folder.RoomFolder;
 import com.nora.upload.UploadDtos.PartInfo;
 import com.nora.upload.UploadDtos.UploadDto;
 import com.nora.user.Role;
@@ -45,9 +47,12 @@ public class UploadService {
     private final FileService files;
     private final UserRepository users;
     private final ApplicationEventPublisher events;
+    private final FolderService folders;
 
     public UploadService(UploadSessionRepository sessions, UploadPartRepository parts, ObjectStorage storage,
-                         FileService files, UserRepository users, ApplicationEventPublisher events) {
+                         FileService files, UserRepository users, ApplicationEventPublisher events,
+                         FolderService folders) {
+        this.folders = folders;
         this.sessions = sessions;
         this.parts = parts;
         this.storage = storage;
@@ -64,6 +69,7 @@ public class UploadService {
             existing.get().touch();
             return dto(existing.get());
         }
+        folders.requireIn(roomId, RoomFolder.Kind.FILE, req.folderId());
         User user = users.findById(userId).orElseThrow(() -> ApiException.notFound("Usuario no encontrado"));
         if (req.size() > (long) MAX_PARTS * PART_SIZE) throw ApiException.badRequest("Archivo demasiado grande");
         if (user.getMaxFileSizeBytes() != null && req.size() > user.getMaxFileSizeBytes()) {
@@ -85,8 +91,10 @@ public class UploadService {
             throw new IllegalStateException("No se pudo iniciar la subida", e);
         }
         String contentType = req.contentType() == null || req.contentType().isBlank() ? "application/octet-stream" : req.contentType();
-        UploadSession s = sessions.save(new UploadSession(roomId, userId, fileId, FileService.sanitize(req.name()),
-                req.fingerprint(), contentType, req.size(), PART_SIZE, s3Id, key));
+        UploadSession fresh = new UploadSession(roomId, userId, fileId, FileService.sanitize(req.name()),
+                req.fingerprint(), contentType, req.size(), PART_SIZE, s3Id, key);
+        fresh.setFolderId(req.folderId());
+        UploadSession s = sessions.save(fresh);
         return dto(s);
     }
 
@@ -148,7 +156,9 @@ public class UploadService {
         } catch (Exception e) {
             throw new IllegalStateException("No se pudo completar la subida", e);
         }
-        var dto = files.register(new RoomFile(s.getFileId(), roomId, userId, s.getName(), s.getContentType(), s.getSizeBytes()));
+        RoomFile entity = new RoomFile(s.getFileId(), roomId, userId, s.getName(), s.getContentType(), s.getSizeBytes());
+        if (folders.exists(roomId, s.getFolderId())) entity.setFolderId(s.getFolderId()); // la carpeta pudo borrarse mientras tanto
+        var dto = files.register(entity);
         sessions.delete(s);
         events.publishEvent(new RoomEvent(roomId, "upload.done", Map.of("uploadId", uploadId, "userId", userId, "name", s.getName())));
         return dto;

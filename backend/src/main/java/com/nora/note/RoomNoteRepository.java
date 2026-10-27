@@ -8,4 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface RoomNoteRepository extends JpaRepository<RoomNote, UUID> {
     List<RoomNote> findByRoomIdAndKindOrderByCreatedAtDesc(UUID roomId, RoomNote.Kind kind, Pageable page);
     long countByRoomIdAndKind(UUID roomId, RoomNote.Kind kind);
+
+    @org.springframework.transaction.annotation.Transactional
+    void deleteByRoomIdAndFolderIdIn(UUID roomId, java.util.Collection<UUID> folderIds);
 }

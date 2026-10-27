@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useState, type ComponentType } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
-  ClipboardList, Clipboard, Copy, Check, FolderOpen, Monitor, PenTool, Plus, ShieldCheck, Trash2, Zap, Clapperboard, SquareCheckBig,
-  type LucideProps,
+  ArrowLeft, Check, Clapperboard, Clipboard, ClipboardList, Clock, Copy, FolderOpen, Hash, Monitor, PenTool, Plus, ShieldCheck,
+  SquareCheckBig, Trash2, Zap, type LucideProps,
 } from 'lucide-react'
 import { api, ApiError, type Room } from '../api'
 import { useAuth } from '../auth'
 import { rt, useRealtime, useRtStatus } from '../realtime'
 import { useToast } from '../toast'
-import Brand from '../components/Brand'
+import Avatar from '../components/Avatar'
+import Modal from '../components/Modal'
 import FilesTool from '../components/FilesTool'
 import NotesTool from '../components/NotesTool'
 import { remaining } from '../time'
+import { setFilesOpen } from '../ui'
 import { resumeInterrupted } from '../uploadManager'
 
 type Icon = ComponentType<LucideProps>
@@ -35,9 +37,6 @@ const TOOLS: Tool[] = [
   { id: 'more', label: 'Más herramientas', icon: Plus, ready: false },
 ]
 
-const initials = (name: string) =>
-  name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join('') || '?'
-
 export default function RoomPage() {
   const { code = '' } = useParams()
   const { user } = useAuth()
@@ -50,6 +49,12 @@ export default function RoomPage() {
   const toast = useToast()
   const status = useRtStatus()
   const [, tick] = useState(0)
+
+  // Mientras el explorador de archivos está abierto el panel flotante de subidas se oculta
+  useEffect(() => {
+    setFilesOpen(active === 'files')
+    return () => setFilesOpen(false)
+  }, [active])
 
   const load = useCallback(async () => {
     try {
@@ -142,53 +147,68 @@ export default function RoomPage() {
   return (
     <div className="room card">
       <header className="room-head">
-        <Brand />
-        <span className={`pill ${expired ? 'off' : ''}`}>
-          <i /> {expired ? 'Room expired' : 'Room active'}
-        </span>
-      </header>
-
-      <section className="room-info">
-        <div>
-          <h2>{room.name}</h2>
-          <p className="muted">Código: {room.code} · {remaining(room.expiresAt)}</p>
-          <div className="avatars">
-            {room.participants.slice(0, 8).map((p) => (
-              <span key={p.userId} className={`avatar ${online.has(p.userId) ? 'on' : ''}`} title={`${p.displayName}${online.has(p.userId) ? '' : ' (desconectado)'}`}>
-                {initials(p.displayName)}
-              </span>
-            ))}
-            <span className="muted">
-              {onlineCount} {onlineCount === 1 ? 'participante conectado' : 'participantes conectados'}
-            </span>
-          </div>
-        </div>
+        <Link to="/" className="btn ghost sm"><ArrowLeft size={15} /> Mis salas</Link>
         <div className="row">
-          <button className="icon-btn" onClick={copy} aria-label="Copiar código" title="Copiar código">
-            {copied ? <Check size={20} /> : <Copy size={20} />}
-          </button>
+          <span className={`badge ${expired ? 'red' : 'green'}`}><i /> {expired ? 'Sala expirada' : 'Sala activa'}</span>
           {(room.isOwner || user?.role === 'ADMIN') && (
             <button className="icon-btn danger" onClick={closeRoom} aria-label="Cerrar sala" title="Cerrar sala">
-              <Trash2 size={20} />
+              <Trash2 size={18} />
             </button>
           )}
         </div>
-      </section>
+      </header>
 
-      <h3>Herramientas disponibles</h3>
-      <div className="tools">
-        {TOOLS.map((t) => (
-          <button key={t.id} className={`tool ${t.ready ? '' : 'soon'}`} onClick={() => setActive(t.id)}>
-            <t.icon size={26} />
-            <span>{t.label}</span>
-            {!t.ready && <small>Próximamente</small>}
-          </button>
-        ))}
+      <div className="room-hero">
+        <section aria-label="Sala">
+          <span className="eyebrow">Sala</span>
+          <h2 className="room-title">{room.name}</h2>
+          <div className="meta-row">
+            <span className="meta-pill">
+              <Hash size={16} /> <b>{room.code}</b>
+              <button className="icon-btn sm" onClick={copy} aria-label="Copiar código" title="Copiar código">
+                {copied ? <Check size={15} /> : <Copy size={15} />}
+              </button>
+            </span>
+            <span className="meta-pill"><Clock size={16} /> {remaining(room.expiresAt)}</span>
+          </div>
+        </section>
+
+        <section aria-label="Participantes">
+          <div className="people-head">
+            <span className="eyebrow">Participantes</span>
+            <span className="badge green"><i /> {onlineCount} {onlineCount === 1 ? 'conectado' : 'conectados'}</span>
+          </div>
+          <div className="avatars">
+            {room.participants.slice(0, 10).map((p) => (
+              <span key={p.userId} className={`person ${online.has(p.userId) ? '' : 'off'}`}
+                title={`${p.displayName}${online.has(p.userId) ? '' : ' (desconectado)'}`}>
+                <Avatar name={p.displayName} online={online.has(p.userId)} />
+                <span className="truncate">{p.displayName}</span>
+              </span>
+            ))}
+            {room.participants.length > 10 && <span className="person muted">+{room.participants.length - 10} más</span>}
+          </div>
+        </section>
+      </div>
+
+      <div className="tools-wrap">
+        <div className="section-title"><h3>Herramientas</h3></div>
+        <div className="tools">
+          {TOOLS.map((t) => (
+            <button key={t.id} className={`tool t-${t.id} ${t.ready ? '' : 'soon'}`} onClick={() => setActive(t.id)}>
+              <span className="ico"><t.icon size={22} /></span>
+              <span className="tl">
+                <span>{t.label}</span>
+                {!t.ready && <small>Próximamente</small>}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
       <footer className="room-foot">
         <span className={secure ? 'ok' : 'muted'}>
-          <ShieldCheck size={18} /> {secure ? 'Conexión cifrada' : 'Conexión local (HTTP)'}
+          <ShieldCheck size={16} /> {secure ? 'Conexión cifrada' : 'Conexión local (HTTP)'}
         </span>
         <span className={status === 'open' ? 'ok' : 'muted'}>
           <i className={`live ${status}`} /> {status === 'open' ? 'En vivo' : status === 'connecting' ? 'Conectando…' : 'Sin conexión en vivo'} · {room.participants.length} en la sala
@@ -196,18 +216,18 @@ export default function RoomPage() {
       </footer>
 
       {tool && (
-        <div className="modal-backdrop" onClick={() => setActive(null)}>
-          <div className="modal card" role="dialog" aria-label={tool.label} onClick={(e) => e.stopPropagation()}>
-            <div className="row spread">
-              <h2>{tool.label}</h2>
-              <button className="btn ghost" onClick={() => setActive(null)}>Cerrar</button>
+        <Modal title={tool.label} icon={<tool.icon size={20} />} wide={tool.ready} flush={tool.ready} onClose={() => setActive(null)}>
+          {tool.id === 'files' && <FilesTool room={room} />}
+          {tool.id === 'notes' && <NotesTool room={room} kind="NOTE" placeholder="Escribe una nota para la sala…" />}
+          {tool.id === 'clipboard' && <NotesTool room={room} kind="CLIPBOARD" placeholder="Pega aquí el texto que quieres compartir…" copyable />}
+          {!tool.ready && (
+            <div className="empty">
+              <tool.icon size={36} />
+              <strong>Próximamente</strong>
+              <span className="small">Esta herramienta llegará en una próxima versión.</span>
             </div>
-            {tool.id === 'files' && <FilesTool room={room} />}
-            {tool.id === 'notes' && <NotesTool code={room.code} kind="NOTE" placeholder="Escribe una nota para la sala…" />}
-            {tool.id === 'clipboard' && <NotesTool code={room.code} kind="CLIPBOARD" placeholder="Pega aquí el texto que quieres compartir…" copyable />}
-            {!tool.ready && <p className="muted">Esta herramienta llegará en una próxima versión.</p>}
-          </div>
-        </div>
+          )}
+        </Modal>
       )}
     </div>
   )

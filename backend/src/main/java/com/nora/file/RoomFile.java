@@ -32,6 +32,9 @@ public class RoomFile {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
+    @Column(name = "folder_id")
+    private UUID folderId;
+
     protected RoomFile() {}
 
     public RoomFile(UUID roomId, UUID uploaderId, String originalName, String contentType, long sizeBytes) {
@@ -58,4 +61,7 @@ public class RoomFile {
     public long getSizeBytes() { return sizeBytes; }
     public String getObjectKey() { return objectKey; }
     public Instant getCreatedAt() { return createdAt; }
+    public UUID getFolderId() { return folderId; }
+    public void setFolderId(UUID folderId) { this.folderId = folderId; }
+    public void setOriginalName(String originalName) { this.originalName = originalName; }
 }

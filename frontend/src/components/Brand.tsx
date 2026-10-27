@@ -1,12 +1,14 @@
 import { Layers } from 'lucide-react'
 
-export default function Brand({ subtitle = 'Tu espacio. Tus reglas.' }: { subtitle?: string }) {
+export default function Brand({ subtitle, large }: { subtitle?: string; large?: boolean }) {
   return (
-    <div className="brand">
-      <Layers size={26} />
+    <div className={`brand ${large ? 'lg' : ''}`}>
+      <span className="brand-mark">
+        <Layers size={large ? 26 : 19} strokeWidth={2.2} />
+      </span>
       <div>
         <h1>Nora</h1>
-        <p>{subtitle}</p>
+        {subtitle && <p>{subtitle}</p>}
       </div>
     </div>
   )

@@ -41,6 +41,9 @@ public class UploadSession {
     @Column(name = "object_key", nullable = false)
     private String objectKey;
 
+    @Column(name = "folder_id")
+    private UUID folderId;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -74,6 +77,8 @@ public class UploadSession {
     public int getPartSize() { return partSize; }
     public String getS3UploadId() { return s3UploadId; }
     public String getObjectKey() { return objectKey; }
+    public UUID getFolderId() { return folderId; }
+    public void setFolderId(UUID folderId) { this.folderId = folderId; }
     public Instant getUpdatedAt() { return updatedAt; }
     public void touch() { this.updatedAt = Instant.now(); }
 

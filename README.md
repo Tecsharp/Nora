@@ -54,7 +54,15 @@ Eventos de sala: quién está conectado (`presence`, `joined`), nuevos miembros 
 
 Los archivos se suben por trozos de 8 MiB con multipart de S3 (`POST /api/rooms/{code}/uploads`, `PUT …/parts/{n}`, `POST …/complete`). El servidor guarda qué trozos llegaron: si se corta internet, se cierra la pestaña o se reinicia el navegador, al volver a elegir el mismo archivo solo se envían los que faltan. El cliente sube 3 trozos en paralelo, reintenta con espera, se pausa sin conexión y detecta conexiones colgadas (20 s sin avance). Muestra porcentaje, velocidad y tiempo restante; el resto de la sala ve el avance en vivo. Las subidas abandonadas se limpian a las 24 h.
 
-Las subidas corren en segundo plano: un panel flotante las muestra aunque cierres el modal o cambies de pantalla, y al cerrar la pestaña el navegador avisa. La velocidad se mide en los últimos segundos y cae a `0 KB/s` si la red se queda parada. Para reanudar tras **recargar la página o reiniciar el navegador sin volver a elegir el archivo**, Nora guarda una referencia al archivo en IndexedDB (API File System Access). Solo funciona en Chrome/Edge y en un contexto seguro (HTTPS o `localhost`; no por `http://IP:puerto`), y el navegador puede pedir permiso una vez para releer el archivo. En el resto, la subida interrumpida aparece con un botón «Reanudar» que pide elegir el mismo archivo. Al ir en trozos pequeños, también funcionan detrás de Cloudflare, que limita cada petición a 100 MB en el plan gratuito.
+Las subidas corren en segundo plano: un panel flotante las muestra cuando cierras el explorador de archivos o cambias de pantalla (con el explorador abierto el progreso se ve dentro de él, así nunca hay dos indicadores a la vez), y al cerrar la pestaña el navegador avisa. La velocidad se mide en los últimos segundos y cae a `0 KB/s` si la red se queda parada. Para reanudar tras **recargar la página o reiniciar el navegador sin volver a elegir el archivo**, Nora guarda una referencia al archivo en IndexedDB (API File System Access). Solo funciona en Chrome/Edge y en un contexto seguro (HTTPS o `localhost`; no por `http://IP:puerto`), y el navegador puede pedir permiso una vez para releer el archivo. En el resto, la subida interrumpida aparece con un botón «Reanudar» que pide elegir el mismo archivo. Al ir en trozos pequeños, también funcionan detrás de Cloudflare, que limita cada petición a 100 MB en el plan gratuito.
+
+### Interfaz
+
+- **Tema claro, oscuro o del sistema** (selector en la barra superior; se recuerda en el navegador y se aplica antes de pintar para evitar parpadeos).
+- Tipografía del sistema (`-apple-system`, SF Pro en dispositivos Apple; Segoe UI/Roboto en el resto). Las fuentes SF no se incluyen porque su licencia no permite redistribuirlas. Diseño adaptable: en móvil los diálogos son hojas inferiores y las tablas se simplifican.
+- **Archivos** funciona como un explorador: carpetas anidadas, migas de pan, vista cuadrícula/lista, búsqueda, orden, renombrar, mover (menú «Mover a…» o arrastrando) y subir arrastrando archivos a la carpeta actual. Borrar una carpeta elimina todo su contenido, también del almacén S3.
+- **Portapapeles** y **Notas** admiten categorías (crear, renombrar, borrar, filtrar y mover elementos entre ellas).
+- Páginas públicas de **Términos de uso**, **Privacidad** y **Manejo de datos** (`/terms`, `/privacy`, `/data`); el registro exige aceptarlos. Son una plantilla general: quien opere la instancia debe revisarlos y adaptarlos.
 
 ### Acceso desde otros equipos y Cloudflare Tunnel
 
@@ -71,7 +79,7 @@ El gateway respeta `X-Forwarded-Proto` y `X-Forwarded-Host`, por lo que el login
 
 ### Administración
 
-El administrador inicial se crea con `NORA_ADMIN_EMAIL` / `NORA_ADMIN_PASSWORD`. En **Admin** puede, por usuario, activar/desactivar la cuenta, cambiar el rol y fijar o poner **infinito (∞)** en: espacio total, tamaño máximo de archivo, duración máxima de sala (y salas sin expiración), salas activas y participantes por sala. Los valores por defecto de usuarios nuevos se configuran en `.env`.
+El administrador inicial se crea con `NORA_ADMIN_EMAIL` / `NORA_ADMIN_PASSWORD`. En **Admin** hay una tabla paginada con búsqueda por nombre o correo y filtro por rol (`GET /api/admin/users?page&size&q&role`); al abrir una fila puede, por usuario, activar/desactivar la cuenta, cambiar el rol y fijar o poner **infinito (∞)** en: espacio total, tamaño máximo de archivo, duración máxima de sala (y salas sin expiración), salas activas y participantes por sala. Los valores por defecto de usuarios nuevos se configuran en `.env`.
 
 ## Desarrollo
 

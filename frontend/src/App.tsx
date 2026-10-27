@@ -4,6 +4,7 @@ import { useAuth } from './auth'
 import Layout from './components/Layout'
 import Admin from './pages/Admin'
 import Home from './pages/Home'
+import Legal from './pages/Legal'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import RoomPage from './pages/RoomPage'
@@ -22,6 +23,9 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/terms" element={<Legal />} />
+      <Route path="/privacy" element={<Legal />} />
+      <Route path="/data" element={<Legal />} />
       <Route element={<Layout />}>
         <Route path="/" element={<Protected><Home /></Protected>} />
         <Route path="/room/:code" element={<Protected><RoomPage /></Protected>} />

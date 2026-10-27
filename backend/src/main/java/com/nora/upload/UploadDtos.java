@@ -14,7 +14,9 @@ public final class UploadDtos {
             @Min(1) long size,
             @Size(max = 127) String contentType,
             /** Identifica el archivo en el cliente (nombre+tamaño+fecha) para reanudar la misma subida tras un corte. */
-            @NotBlank @Size(max = 160) String fingerprint) {}
+            @NotBlank @Size(max = 160) String fingerprint,
+            /** Carpeta de destino (opcional). */
+            UUID folderId) {}
 
     public record PartInfo(int number, int size) {}
 
