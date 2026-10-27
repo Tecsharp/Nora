@@ -1,0 +1,13 @@
+package com.nora.file;
+
+import java.util.List;
+import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+
+public interface RoomFileRepository extends JpaRepository<RoomFile, UUID> {
+    List<RoomFile> findByRoomIdOrderByCreatedAtDesc(UUID roomId);
+
+    @Query("select coalesce(sum(f.sizeBytes), 0) from RoomFile f where f.uploaderId = :userId")
+    long sumSizeByUploader(UUID userId);
+}

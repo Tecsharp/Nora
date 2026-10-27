@@ -1,0 +1,60 @@
+server:
+  port: 8080
+  shutdown: graceful
+  error:
+    include-message: never
+    include-stacktrace: never
+
+spring:
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+  application:
+    name: nora
+  datasource:
+    url: jdbc:postgresql://${NORA_DB_HOST:db}:5432/${NORA_DB_NAME:nora}
+    username: ${NORA_DB_USER:nora}
+    password: ${NORA_DB_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  servlet:
+    multipart:
+      max-file-size: ${NORA_UPLOAD_HARD_LIMIT:2GB}
+      max-request-size: ${NORA_UPLOAD_HARD_LIMIT:2GB}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+app:
+  jwt:
+    secret: ${NORA_JWT_SECRET}
+    access-ttl-minutes: ${NORA_ACCESS_TTL_MINUTES:15}
+    refresh-ttl-days: ${NORA_REFRESH_TTL_DAYS:7}
+  cookie-secure: ${NORA_COOKIE_SECURE:false}
+  allowed-origins: ${NORA_ALLOWED_ORIGINS:}
+  allow-registration: ${NORA_ALLOW_REGISTRATION:true}
+  admin:
+    email: ${NORA_ADMIN_EMAIL:}
+    password: ${NORA_ADMIN_PASSWORD:}
+    name: ${NORA_ADMIN_NAME:Administrador}
+  defaults:
+    storage-quota-mb: ${NORA_DEFAULT_STORAGE_QUOTA_MB:1024}
+    max-file-mb: ${NORA_DEFAULT_MAX_FILE_MB:100}
+    max-room-minutes: ${NORA_DEFAULT_ROOM_MINUTES:120}
+    max-active-rooms: ${NORA_DEFAULT_MAX_ROOMS:5}
+    max-participants: ${NORA_DEFAULT_MAX_PARTICIPANTS:25}
+  storage:
+    endpoint: ${NORA_MINIO_ENDPOINT:http://minio:9000}
+    access-key: ${NORA_MINIO_ACCESS_KEY}
+    secret-key: ${NORA_MINIO_SECRET_KEY}
+    bucket: ${NORA_MINIO_BUCKET:nora-files}
