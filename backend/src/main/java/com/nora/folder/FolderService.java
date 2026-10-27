@@ -116,13 +116,10 @@ public class FolderService {
     }
 
     private static int depth(List<RoomFolder> all, RoomFolder f) {
+        Map<UUID, UUID> parents = new java.util.HashMap<>();
+        for (RoomFolder x : all) parents.put(x.getId(), x.getParentId()); // HashMap admite padres nulos
         int d = 1;
-        UUID p = f.getParentId();
-        while (p != null && d <= MAX_DEPTH + 1) {
-            UUID cur = p;
-            p = all.stream().filter(x -> x.getId().equals(cur)).map(RoomFolder::getParentId).findFirst().orElse(null);
-            d++;
-        }
+        for (UUID p = f.getParentId(); p != null && d <= MAX_DEPTH + 1; p = parents.get(p)) d++;
         return d;
     }
 

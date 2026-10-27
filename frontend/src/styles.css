@@ -441,3 +441,20 @@ table.table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 .menu.up { top: auto; bottom: calc(100% + 4px); }
 .menu-anchor { position: relative; display: inline-flex; }
 .room-hero .eyebrow { line-height: 28px; }
+
+/* Anillo de descarga sobre el icono */
+.fitem .ficon { position: relative; }
+.ring { position: absolute; inset: -5px; width: calc(100% + 10px); height: calc(100% + 10px); transform: rotate(-90deg); pointer-events: none; }
+.ring circle { fill: none; stroke-width: 2.6; }
+.ring .track { stroke: var(--hairline); }
+.ring .val { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 0.25s linear; }
+.ring.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(270deg); } }
+.fitem.busy .factions { opacity: 1; }
+
+.quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.quick-grid .btn { padding-left: 8px; padding-right: 8px; }
+.btn.danger-soft { color: var(--red); }
+@media (max-width: 420px) { .quick-grid { grid-template-columns: repeat(2, 1fr); } }
+.room-card-wrap { position: relative; }
+.room-card-act { position: absolute; right: 10px; bottom: 10px; }

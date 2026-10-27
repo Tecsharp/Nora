@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ComponentType } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowLeft, Check, Clapperboard, Clipboard, ClipboardList, Clock, Copy, FolderOpen, Hash, Monitor, PenTool, Plus, ShieldCheck,
+  ArrowLeft, Check, Pencil, Clapperboard, Clipboard, ClipboardList, Clock, Copy, FolderOpen, Hash, Monitor, PenTool, Plus, ShieldCheck,
   SquareCheckBig, Trash2, Zap, type LucideProps,
 } from 'lucide-react'
 import { api, ApiError, type Room } from '../api'
@@ -9,6 +9,7 @@ import { useAuth } from '../auth'
 import { rt, useRealtime, useRtStatus } from '../realtime'
 import { useToast } from '../toast'
 import Avatar from '../components/Avatar'
+import ExpiryDialog from '../components/ExpiryDialog'
 import Modal from '../components/Modal'
 import FilesTool from '../components/FilesTool'
 import NotesTool from '../components/NotesTool'
@@ -46,6 +47,7 @@ export default function RoomPage() {
   const [error, setError] = useState('')
   const [active, setActive] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [adjusting, setAdjusting] = useState(false)
   const [online, setOnline] = useState<Set<string>>(new Set())
   const toast = useToast()
   const status = useRtStatus()
@@ -96,6 +98,7 @@ export default function RoomPage() {
 
   useRealtime('joined', (d: { online: string[] }) => setOnline(new Set(d.online)))
   useRealtime('reconnected', load)
+  useRealtime('room.updated', (d: { expiresAt: string | null }) => setRoom((r) => (r ? { ...r, expiresAt: d.expiresAt } : r)))
   useRealtime('presence', (d: { userId: string; displayName: string; online: boolean }) => {
     setOnline((s) => {
       const next = new Set(s)
@@ -170,7 +173,14 @@ export default function RoomPage() {
                 {copied ? <Check size={15} /> : <Copy size={15} />}
               </button>
             </span>
-            <span className="meta-pill"><Clock size={16} /> {remaining(room.expiresAt)}</span>
+            <span className="meta-pill">
+              <Clock size={16} /> {remaining(room.expiresAt)}
+              {(room.isOwner || user?.role === 'ADMIN') && (
+                <button className="icon-btn sm" onClick={() => setAdjusting(true)} aria-label="Cambiar la duración" title="Extender o reducir la sala">
+                  <Pencil size={14} />
+                </button>
+              )}
+            </span>
           </div>
         </section>
 
@@ -215,6 +225,11 @@ export default function RoomPage() {
           <i className={`live ${status}`} /> {status === 'open' ? 'En vivo' : status === 'connecting' ? 'Conectando…' : 'Sin conexión en vivo'} · {room.participants.length} en la sala
         </span>
       </footer>
+
+      {adjusting && (
+        <ExpiryDialog code={room.code} name={room.name} expiresAt={room.expiresAt} onClose={() => setAdjusting(false)}
+          onChanged={(expiresAt) => setRoom((r) => (r ? { ...r, expiresAt } : r))} />
+      )}
 
       {tool && (
         <Modal title={tool.label} icon={<tool.icon size={20} />} wide={tool.ready} flush={tool.ready} onClose={() => setActive(null)}>

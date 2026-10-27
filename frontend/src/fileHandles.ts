@@ -84,3 +84,16 @@ export async function pickFiles(): Promise<Picked[]> {
     input.click()
   })
 }
+
+/** Selector de carpeta (funciona en todos los navegadores de escritorio). Devuelve los archivos con su ruta relativa. */
+export function pickFolder(): Promise<File[]> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.multiple = true
+    input.setAttribute('webkitdirectory', '')
+    input.onchange = () => resolve(Array.from(input.files ?? []))
+    input.oncancel = () => resolve([])
+    input.click()
+  })
+}

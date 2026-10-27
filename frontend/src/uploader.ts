@@ -37,7 +37,12 @@ class SessionGone extends Error {}
 class Canceled extends Error {}
 
 /** Identifica un archivo del cliente para reanudar la misma subida (el servidor la guarda con cada sesión). */
-export const fingerprintOf = (f: File) => `${f.name}:${f.size}:${f.lastModified}`.slice(0, 160)
+export const fingerprintOf = (f: File, dir = '') => {
+  // La carpeta de origen forma parte de la huella: dos archivos iguales en carpetas distintas son subidas distintas.
+  let h = 5381
+  for (const c of dir) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0
+  return `${dir ? `${h.toString(36)}|` : ''}${f.name}:${f.size}:${f.lastModified}`.slice(0, 160)
+}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -50,7 +55,7 @@ function waitOnline(): Promise<void> {
  * Subida por trozos de 8 MiB con reintentos y reanudación: si se corta la red (o se cierra la pestaña) el servidor
  * conserva los trozos recibidos y, al volver a subir el mismo archivo, solo se envían los que faltan.
  */
-export function startUpload(code: string, file: File, onUpdate: (p: UploadProgress) => void, folderId?: string | null): UploadTask {
+export function startUpload(code: string, file: File, onUpdate: (p: UploadProgress) => void, folderId?: string | null, fingerprintOverride?: string): UploadTask {
   let canceled = false
   let sessionId: string | null = null
   const xhrs = new Set<XMLHttpRequest>()
@@ -115,7 +120,11 @@ export function startUpload(code: string, file: File, onUpdate: (p: UploadProgre
       }
 
       setState('preparing')
-      const fingerprint = fingerprintOf(file)
+      const fingerprint = fingerprintOverride ?? fingerprintOf(file)
+      // Una carpeta (o un archivo que ya no existe) no se puede leer: es un error definitivo, no hay que reintentarlo
+      await file.slice(0, 1).arrayBuffer().catch(() => {
+        throw new FatalError(`No se puede leer «${file.name}». Si es una carpeta, usa «Subir carpeta».`)
+      })
       const session = await withRetry(() =>
         api<Session>(base, 'POST', { name: file.name, size: file.size, contentType: file.type || undefined, fingerprint, folderId: folderId ?? undefined }),
       )
@@ -169,9 +178,16 @@ export function startUpload(code: string, file: File, onUpdate: (p: UploadProgre
           }
           xhr.onerror = () => {
             done()
+            // Si el propio archivo dejó de ser legible, reintentar no sirve de nada
+            blob.slice(0, 1).arrayBuffer().then(
+              () => reject(new Error('Sin conexión')),
+              () => reject(new FatalError(`No se puede leer «${file.name}»`)),
+            )
+          }
+          xhr.ontimeout = () => {
+            done()
             reject(new Error('Sin conexión'))
           }
-          xhr.ontimeout = xhr.onerror
           xhr.onabort = () => {
             done()
             reject(retryAborts.has(xhr) ? new Error('Sin conexión') : new Canceled())

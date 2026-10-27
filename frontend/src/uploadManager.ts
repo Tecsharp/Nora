@@ -68,8 +68,8 @@ class UploadManager {
     return this.items.some((i) => i.code === code && i.fingerprint === fingerprint && isActive(i))
   }
 
-  add(code: string, file: File, handle?: FsHandle, folderId?: string | null) {
-    const fingerprint = fingerprintOf(file)
+  add(code: string, file: File, handle?: FsHandle, folderId?: string | null, fingerprintOverride?: string) {
+    const fingerprint = fingerprintOverride ?? fingerprintOf(file)
     if (this.isUploading(code, fingerprint)) return // ya se está subiendo
     if (handle) void saveHandle(code, fingerprint, handle)
     const item: UploadItem = {
@@ -105,7 +105,7 @@ class UploadManager {
       last = progress
       this.patch(item.key, { progress })
       this.report(item.key, progress)
-    }, item.folderId)
+    }, item.folderId, item.fingerprint)
     this.patch(item.key, { task })
     await task.promise
     if (last.state === 'done') {

@@ -42,5 +42,6 @@ public class Room {
     public UUID getOwnerId() { return ownerId; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getExpiresAt() { return expiresAt; }
+    public void setExpiresAt(Instant expiresAt) { this.expiresAt = expiresAt; }
     public boolean isExpired() { return expiresAt != null && expiresAt.isBefore(Instant.now()); }
 }

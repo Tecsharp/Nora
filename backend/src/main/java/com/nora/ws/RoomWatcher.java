@@ -36,7 +36,10 @@ public class RoomWatcher {
             if (room == null || room.getExpiresAt() == null) continue;
             long seconds = Duration.between(Instant.now(), room.getExpiresAt()).toSeconds();
             int threshold = seconds <= 60 ? 1 : seconds <= 300 ? 5 : 0;
-            if (threshold == 0) continue;
+            if (threshold == 0) {
+                lastWarning.remove(roomId); // la sala se amplió: volverá a avisar cuando se acerque el final
+                continue;
+            }
             Integer last = lastWarning.get(roomId);
             if (last != null && last <= threshold) continue;
             lastWarning.put(roomId, threshold);

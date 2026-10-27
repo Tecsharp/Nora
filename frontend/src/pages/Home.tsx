@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowRight, Clock, DoorOpen, FileUp, Hash, HardDrive, Plus, Timer, Users } from 'lucide-react'
+import { ArrowRight, Clock, Pencil, DoorOpen, FileUp, Hash, HardDrive, Plus, Timer, Users } from 'lucide-react'
 import { api, ApiError, formatBytes, type Room, type RoomSummary, type User } from '../api'
 import { useAuth } from '../auth'
+import ExpiryDialog from '../components/ExpiryDialog'
 import { remaining } from '../time'
 
 interface Me {
@@ -19,6 +20,7 @@ export default function Home() {
   const [minutes, setMinutes] = useState(120)
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
+  const [adjust, setAdjust] = useState<RoomSummary | null>(null)
 
   useEffect(() => {
     api<RoomSummary[]>('/rooms').then(setRooms).catch(() => setRooms([]))
@@ -112,7 +114,7 @@ export default function Home() {
         )}
         <ul className="room-list stagger">
           {rooms?.map((r, i) => (
-            <li key={r.code} style={{ ['--i' as string]: i }}>
+            <li key={r.code} style={{ ['--i' as string]: i }} className="room-card-wrap">
               <Link to={`/room/${r.code}`} className="room-card">
                 <div className="row spread nowrap">
                   <strong className="truncate">{r.name}</strong>
@@ -121,10 +123,19 @@ export default function Home() {
                 <span className="code">{r.code}</span>
                 <span className="muted small row" style={{ gap: 6 }}><Clock size={14} /> {remaining(r.expiresAt)}</span>
               </Link>
+              {r.isOwner && (
+                <button className="icon-btn sm room-card-act" aria-label={`Cambiar la duración de ${r.name}`} title="Extender o reducir"
+                  onClick={() => setAdjust(r)}><Pencil size={14} /></button>
+              )}
             </li>
           ))}
         </ul>
       </section>
+
+      {adjust && (
+        <ExpiryDialog code={adjust.code} name={adjust.name} expiresAt={adjust.expiresAt} onClose={() => setAdjust(null)}
+          onChanged={(expiresAt) => setRooms((all) => all && all.map((x) => (x.code === adjust.code ? { ...x, expiresAt } : x)))} />
+      )}
 
       {limits && (
         <section>

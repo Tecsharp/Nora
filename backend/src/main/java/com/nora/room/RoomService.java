@@ -132,6 +132,40 @@ public class RoomService {
         destroy(room, "closed");
     }
 
+    /**
+     * Cambia la expiración. La duración total (desde la creación) no puede superar el límite del propietario, salvo que
+     * quien lo pide sea administrador; y siempre debe quedar al menos un minuto.
+     */
+    @Transactional
+    public RoomDto adjustExpiry(UUID userId, Role role, String code, ExpiryRequest req) {
+        Room room = openRoom(code);
+        if (!room.getOwnerId().equals(userId) && role != Role.ADMIN) {
+            throw ApiException.forbidden("Solo el propietario puede cambiar la duración de la sala");
+        }
+        Integer limit = role == Role.ADMIN ? null : user(room.getOwnerId()).getMaxRoomMinutes();
+        Instant now = Instant.now();
+        if (Boolean.TRUE.equals(req.unlimited())) {
+            if (limit != null) throw ApiException.forbidden("Tu cuenta no permite salas sin expiración");
+            room.setExpiresAt(null);
+        } else {
+            if (req.deltaMinutes() == null || req.deltaMinutes() == 0) throw ApiException.badRequest("Indica cuántos minutos añadir o quitar");
+            Instant base = room.getExpiresAt() != null ? room.getExpiresAt() : now;
+            Instant next = base.plus(Duration.ofMinutes(req.deltaMinutes()));
+            if (next.isBefore(now.plus(Duration.ofMinutes(1)))) {
+                throw ApiException.badRequest("La sala debe durar al menos 1 minuto más");
+            }
+            if (limit != null && Duration.between(room.getCreatedAt(), next).toMinutes() > limit) {
+                throw ApiException.forbidden("Tu cuenta permite salas de hasta " + limit + " minutos en total");
+            }
+            room.setExpiresAt(next);
+        }
+        rooms.save(room);
+        Map<String, Object> data = new java.util.HashMap<>();
+        data.put("expiresAt", room.getExpiresAt());
+        events.publishEvent(new RoomEvent(room.getId(), "room.updated", data));
+        return toDto(room, userId);
+    }
+
     /** Sala abierta (no expirada) en la que el usuario participa. */
     @Transactional(readOnly = true)
     public Room requireMember(UUID userId, String code) {

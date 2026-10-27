@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useMemo, useState, type DragEvent, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import {
-  ChevronRight, Download, File, FileArchive, FileAudio, FileCode, FileImage, FileText, FileVideo, Folder, FolderInput, FolderPlus,
+  ChevronRight, Download, X, File, FileArchive, FileAudio, FileCode, FileImage, FileText, FileVideo, Folder, FolderInput, FolderPlus, FolderUp,
   House, LayoutGrid, List, Pencil, Search, Trash2, Upload,
 } from 'lucide-react'
-import { api, ApiError, download, formatBytes, type Room } from '../api'
+import { api, ApiError, downloadWithProgress, formatBytes, type DownloadHandle, type Room } from '../api'
 import { useAuth } from '../auth'
-import { pickFiles } from '../fileHandles'
+import { pickFiles, pickFolder } from '../fileHandles'
+import { collectFromEntries, collectFromFiles, entriesFromDrop, type Collected } from '../folderUpload'
 import { useRealtime } from '../realtime'
 import { useToast } from '../toast'
+import { fingerprintOf } from '../uploader'
 import { fileFromHandle, isActive, loadInterrupted, pruneStaleHandles, uploads, useUploads, type PendingUpload } from '../uploadManager'
+import ProgressRing from './ProgressRing'
 import Menu, { type MenuItem } from './Menu'
 import Modal from './Modal'
 import Tabs from './Tabs'
@@ -87,6 +90,10 @@ export default function FilesTool({ room }: { room: Room }) {
   const [moving, setMoving] = useState<FileItem | null>(null)
   const [dropTarget, setDropTarget] = useState<string | 'root' | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [dl, setDl] = useState<Record<string, { loaded: number; total: number }>>({})
+  const dlHandles = useRef(new Map<string, DownloadHandle>())
+  const foldersRef = useRef<FolderItem[]>([])
+  foldersRef.current = folders
 
   const setView = (v: View) => {
     setViewState(v)
@@ -183,15 +190,79 @@ export default function FilesTool({ room }: { room: Room }) {
     for (const { file, handle } of await pickFiles()) uploads.add(room.code, file, handle, current)
   }
 
+  async function onPickFolder() {
+    setError('')
+    const picked = await pickFolder()
+    if (picked.length > 0) await uploadCollected(collectFromFiles(picked), current)
+  }
+
+  /** Crea (o reutiliza) cada carpeta bajo `parent` y devuelve su id. */
+  async function ensureFolder(parent: string | null, name: string): Promise<string> {
+    const same = (f: FolderItem) => f.parentId === parent && f.name.toLowerCase() === name.toLowerCase()
+    const found = foldersRef.current.find(same)
+    if (found) return found.id
+    try {
+      const f = await api<FolderItem>(`/rooms/${room.code}/folders?kind=FILE`, 'POST', { name, parentId: parent })
+      foldersRef.current = [...foldersRef.current, f]
+      setFolders((all) => (all.some((x) => x.id === f.id) ? all : [...all, f]))
+      return f.id
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        // otra persona la creó a la vez: se vuelve a leer la lista
+        const fresh = await api<FolderItem[]>(`/rooms/${room.code}/folders?kind=FILE`)
+        foldersRef.current = fresh
+        setFolders(fresh)
+        const again = fresh.find(same)
+        if (again) return again.id
+      }
+      throw err
+    }
+  }
+
+  /** Reproduce la estructura de carpetas en la sala y pone en cola cada archivo en su carpeta. */
+  async function uploadCollected(c: Collected, base: string | null) {
+    const ids = new Map<string, string | null>([['', base]])
+    const resolve = async (dir: string[]) => {
+      let parent = base
+      for (let i = 1; i <= dir.length; i++) {
+        const key = dir.slice(0, i).join('/')
+        if (!ids.has(key)) ids.set(key, await ensureFolder(parent, dir[i - 1]!))
+        parent = ids.get(key)!
+      }
+      return parent
+    }
+    try {
+      for (const dir of c.dirs.slice().sort((a, b) => a.length - b.length)) await resolve(dir)
+      let queued = 0
+      let empty = 0
+      for (const { file, dir } of c.files) {
+        if (file.size === 0) {
+          empty++ // el servidor no admite archivos vacíos
+          continue
+        }
+        uploads.add(room.code, file, undefined, await resolve(dir), fingerprintOf(file, dir.join('/')))
+        queued++
+      }
+      if (queued > 0) toast(`Subiendo ${queued} archivo${queued === 1 ? '' : 's'}${c.dirs.length ? ` en ${c.dirs.length} carpeta${c.dirs.length === 1 ? '' : 's'}` : ''}`, 'info')
+      if (empty > 0) toast(`${empty} archivo${empty === 1 ? ' vacío omitido' : 's vacíos omitidos'}`, 'warning')
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo crear la estructura de carpetas')
+    }
+  }
+
   async function resume(p: PendingUpload) {
     setError('')
     const file = await fileFromHandle(room.code, p, true) // 1 clic: si hace falta, el navegador pide permiso
     if (file) {
-      uploads.add(room.code, file)
+      uploads.add(room.code, file, undefined, undefined, p.fingerprint)
       return
     }
     toast(`Elige de nuevo «${p.name}» para continuar`, 'info')
-    onPick()
+    for (const { file: f, handle } of await pickFiles()) {
+      // El mismo archivo continúa la subida a medias (con su carpeta de destino); cualquier otro se sube como nuevo
+      const same = f.name === p.name && f.size === p.size
+      uploads.add(room.code, f, handle, same ? undefined : current, same ? p.fingerprint : undefined)
+    }
   }
 
   const fail = (e: unknown) => setError(e instanceof ApiError ? e.message : 'Algo salió mal')
@@ -250,8 +321,28 @@ export default function FilesTool({ room }: { room: Room }) {
     }
   }
 
-  const downloadFile = (f: FileItem) =>
-    download(`/rooms/${room.code}/files/${f.id}`, f.name).catch((e) => setError(e instanceof ApiError ? e.message : 'Error al descargar'))
+  /** La descarga solo se inicia desde el botón. Muestra el progreso sobre el icono y se puede cancelar. */
+  function downloadFile(f: FileItem) {
+    if (dlHandles.current.has(f.id)) return
+    setError('')
+    setDl((d) => ({ ...d, [f.id]: { loaded: 0, total: f.sizeBytes } }))
+    const h = downloadWithProgress(`/rooms/${room.code}/files/${f.id}`, f.name, (loaded, total) =>
+      setDl((d) => (d[f.id] ? { ...d, [f.id]: { loaded, total: total || f.sizeBytes } } : d)))
+    dlHandles.current.set(f.id, h)
+    h.promise
+      .catch((e) => {
+        if (e instanceof DOMException && e.name === 'AbortError') return
+        setError(`«${f.name}»: ${e instanceof Error ? e.message : 'error al descargar'}`)
+      })
+      .finally(() => {
+        dlHandles.current.delete(f.id)
+        setDl(({ [f.id]: _gone, ...rest }) => rest)
+      })
+  }
+
+  const cancelDownload = (id: string) => dlHandles.current.get(id)?.cancel()
+  // Al cerrar el explorador se cancelan las descargas en curso
+  useEffect(() => () => dlHandles.current.forEach((h) => h.cancel()), [])
 
   // ── Arrastrar y soltar ──
   const isFileDrag = (e: DragEvent) => e.dataTransfer.types.includes('Files')
@@ -268,7 +359,11 @@ export default function FilesTool({ room }: { room: Room }) {
       if (f && canTouch(f.uploaderId)) void moveFile(f, folderId)
       return
     }
-    for (const file of Array.from(e.dataTransfer.files)) uploads.add(room.code, file, undefined, folderId)
+    // Las entradas del drop solo son válidas durante el evento: se capturan antes de cualquier espera.
+    const entries = entriesFromDrop(e.dataTransfer.items)
+    const plain = Array.from(e.dataTransfer.files)
+    if (entries.length > 0) void collectFromEntries(entries).then((c) => uploadCollected(c, folderId)).catch(() => setError('No se pudo leer la carpeta soltada'))
+    else for (const file of plain) uploads.add(room.code, file, undefined, folderId)
   }
 
   const dropProps = (key: string, folderId: string | null) => ({
@@ -332,23 +427,39 @@ export default function FilesTool({ room }: { room: Room }) {
 
   for (const f of shownFiles) {
     const Icon = iconFor(f.name)
+    const d = dl[f.id]
+    const pct = d && d.total > 0 ? Math.min(100, Math.round((d.loaded / d.total) * 100)) : 0
     rows.push(
-      <div key={`f-${f.id}`} className="fitem" role="button" tabIndex={0} aria-label={`Descargar ${f.name}`}
+      <div key={`f-${f.id}`} className={`fitem ${d ? 'busy' : ''}`}
         draggable={canTouch(f.uploaderId)}
-        onDragStart={(e) => { e.dataTransfer.setData(NORA_MIME, f.id); e.dataTransfer.effectAllowed = 'move' }}
-        onClick={() => void downloadFile(f)} onKeyDown={activate(() => void downloadFile(f))}>
-        <span className={`ficon tn-${TONES.get(Icon) ?? 'gray'}`}><Icon size={22} /></span>
+        onDragStart={(e) => { e.dataTransfer.setData(NORA_MIME, f.id); e.dataTransfer.effectAllowed = 'move' }}>
+        <span className={`ficon tn-${TONES.get(Icon) ?? 'gray'}`}>
+          <Icon size={22} />
+          {d && <ProgressRing percent={d.loaded > 0 ? pct : null} />}
+        </span>
         <span className="fbody">
           <span className="fname truncate">{f.name}</span>
           <span className="fmeta truncate">
-            {formatBytes(f.sizeBytes)} · {who(f.uploaderId)}{view === 'list' ? ` · ${when(f.createdAt)}` : ''}
-            {searching && f.folderId ? ` · ${where(f.folderId)}` : ''}
+            {d
+              ? d.loaded > 0
+                ? `Descargando ${pct}% · ${formatBytes(d.loaded)} / ${formatBytes(d.total)}`
+                : 'Preparando descarga…'
+              : <>
+                  {formatBytes(f.sizeBytes)} · {who(f.uploaderId)}{view === 'list' ? ` · ${when(f.createdAt)}` : ''}
+                  {searching && f.folderId ? ` · ${where(f.folderId)}` : ''}
+                </>}
           </span>
         </span>
         <span className="factions">
-          <button className="icon-btn sm" title="Descargar" aria-label={`Descargar ${f.name}`} onClick={(e) => { e.stopPropagation(); void downloadFile(f) }}>
-            <Download size={16} />
-          </button>
+          {d ? (
+            <button className="icon-btn sm" title="Cancelar descarga" aria-label={`Cancelar descarga de ${f.name}`} onClick={() => cancelDownload(f.id)}>
+              <X size={16} />
+            </button>
+          ) : (
+            <button className="icon-btn sm" title="Descargar" aria-label={`Descargar ${f.name}`} onClick={() => downloadFile(f)}>
+              <Download size={16} />
+            </button>
+          )}
           <Menu items={fileMenu(f)} />
         </span>
       </div>,
@@ -364,6 +475,7 @@ export default function FilesTool({ room }: { room: Room }) {
     >
       <div className="ex-toolbar">
         <button className="btn primary sm" onClick={onPick}><Upload size={15} /> Subir</button>
+        <button className="btn sm" onClick={onPickFolder}><FolderUp size={15} /> Subir carpeta</button>
         <button className="btn sm" onClick={() => { setCreating((c) => !c); setFolderName('') }}><FolderPlus size={15} /> Nueva carpeta</button>
         <span className="grow" />
         <div className="input-icon">
@@ -462,7 +574,7 @@ export default function FilesTool({ room }: { room: Room }) {
             {searching ? <Search size={36} /> : <Folder size={36} />}
             <strong>{searching ? 'Sin resultados' : current ? 'Esta carpeta está vacía' : 'No hay archivos en esta sala'}</strong>
             <span className="small">
-              {searching ? 'Prueba con otro nombre.' : 'Pulsa «Subir» o arrastra archivos aquí.'}
+              {searching ? 'Prueba con otro nombre.' : 'Pulsa «Subir» o arrastra archivos y carpetas aquí.'}
               {!searching && ` Máx. por archivo: ${formatBytes(user?.limits.maxFileSizeBytes)}.`}
             </span>
           </div>

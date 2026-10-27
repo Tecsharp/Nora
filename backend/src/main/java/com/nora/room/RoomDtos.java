@@ -16,6 +16,12 @@ public final class RoomDtos {
             @NotBlank(message = "El nombre es obligatorio") @Size(max = 80, message = "Máximo 80 caracteres") String name,
             @Min(0) Integer minutes) {}
 
+    /** deltaMinutes > 0 extiende y < 0 reduce; unlimited = true quita la expiración (solo con tiempo infinito). */
+    public record ExpiryRequest(
+            @jakarta.validation.constraints.Min(value = -10080, message = "Máximo 7 días por cambio")
+            @jakarta.validation.constraints.Max(value = 10080, message = "Máximo 7 días por cambio") Integer deltaMinutes,
+            Boolean unlimited) {}
+
     public record JoinRoomRequest(
             @NotBlank @Size(max = 12) @Pattern(regexp = "^[A-Za-z0-9-]+$", message = "Código no válido") String code) {}
 
