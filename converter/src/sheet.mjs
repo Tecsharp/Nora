@@ -44,9 +44,11 @@ export async function importSheet(buf, ext) {
     ws.columns?.forEach((col, i) => {
       if (col?.width && i < MAX_COLS) colWidths[i] = Math.round(col.width * 7 + 5)
     })
+    const view = ws.views?.[0]
+    const freeze = view?.state === 'frozen' && view.ySplit > 0 && view.ySplit <= 50 ? view.ySplit : undefined
     sheets.push({
       id: `s${sheets.length + 1}`, name: ws.name.slice(0, 60), rows: Math.max(rows, 50), cols: Math.max(cols, 12),
-      cells, colWidths, merges: (ws.model.merges ?? []).slice(0, 2000),
+      cells, colWidths, merges: (ws.model.merges ?? []).slice(0, 2000), ...(freeze ? { freeze } : {}),
     })
   })
   if (!sheets.length) sheets.push(fromGrid('Hoja 1', []))
@@ -77,6 +79,14 @@ function cellOut(cell) {
   if (cell.font?.bold) s.b = 1
   if (cell.font?.italic) s.i = 1
   if (cell.font?.underline) s.u = 1
+  if (cell.font?.strike) s.st = 1
+  const fname = cell.font?.name
+  if (fname && !['Calibri', 'Arial', 'Liberation Sans', 'Calibri Light'].includes(fname)) s.ff = String(fname).slice(0, 40)
+  const fsize = cell.font?.size
+  if (fsize && Math.round(fsize) !== 10 && Math.round(fsize) !== 11 && fsize >= 6 && fsize <= 96) s.fs = Math.round(fsize)
+  if (['top', 'middle', 'bottom'].includes(cell.alignment?.vertical) && cell.alignment.vertical !== 'bottom') s.va = cell.alignment.vertical
+  const bd = ['top', 'right', 'bottom', 'left'].filter((e) => cell.border?.[e]?.style).map((e) => e[0]).join('')
+  if (bd) s.bd = bd
   const color = argb(cell.font?.color)
   if (color && color !== '#000000') s.color = color
   const bg = cell.fill?.type === 'pattern' ? argb(cell.fill.fgColor) : undefined
@@ -158,13 +168,37 @@ export async function exportSheet(native, format, active = 0) {
       x.value = cell.f ? { formula: cell.f, result: cell.v } : cell.v
       const s = cell.s
       if (!s) continue
-      if (s.b || s.i || s.u || s.color) x.font = { bold: !!s.b, italic: !!s.i, underline: !!s.u, ...(toArgb(s.color) ? { color: { argb: toArgb(s.color) } } : {}) }
+      if (s.b || s.i || s.u || s.st || s.color || s.ff || s.fs) {
+        x.font = {
+          bold: !!s.b, italic: !!s.i, underline: !!s.u, strike: !!s.st,
+          ...(toArgb(s.color) ? { color: { argb: toArgb(s.color) } } : {}),
+          ...(s.ff ? { name: String(s.ff).slice(0, 40) } : {}), ...(s.fs ? { size: Math.max(6, Math.min(96, Number(s.fs))) } : {}),
+        }
+      }
       if (toArgb(s.bg)) x.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: toArgb(s.bg) } }
-      if (s.align) x.alignment = { horizontal: s.align }
+      if (s.align || s.va) x.alignment = { ...(s.align ? { horizontal: s.align } : {}), ...(['top', 'middle', 'bottom'].includes(s.va) ? { vertical: s.va } : {}) }
       if (s.fmt) x.numFmt = s.fmt
+      if (s.bd) {
+        const edge = { style: 'thin', color: { argb: 'FF1F2937' } }
+        x.border = { ...(s.bd.includes('t') ? { top: edge } : {}), ...(s.bd.includes('r') ? { right: edge } : {}), ...(s.bd.includes('b') ? { bottom: edge } : {}), ...(s.bd.includes('l') ? { left: edge } : {}) }
+      }
     }
     for (const [i, w] of Object.entries(sh.colWidths ?? {})) ws.getColumn(Number(i) + 1).width = Math.max(2, (w - 5) / 7)
     for (const m of sh.merges ?? []) { try { ws.mergeCells(m) } catch { /* combinación inválida: se omite */ } }
+    if (Number(sh.freeze) > 0) ws.views = [{ state: 'frozen', ySplit: Math.min(50, Number(sh.freeze)) }]
+    // Los gráficos llegan ya dibujados (PNG): se colocan sobre la hoja en la misma posición que en el editor (filas de 26 px, columnas según su ancho)
+    if (sh.images?.length) {
+      ws.properties.defaultRowHeight = 19.5
+      const colX = [0]
+      for (let c = 0; c < 200; c++) colX.push(colX[c] + (Number(sh.colWidths?.[c]) || 100))
+      for (const im of sh.images.slice(0, 50)) {
+        if (!/^data:image\/png;base64,/.test(im.png ?? '')) continue
+        const id = wb.addImage({ base64: im.png, extension: 'png' })
+        let col = 0
+        while (col < 199 && colX[col + 1] <= im.x) col++
+        ws.addImage(id, { tl: { col: col + (im.x - colX[col]) / (colX[col + 1] - colX[col]), row: Math.max(0, im.y / 26) }, ext: { width: Math.round(im.w), height: Math.round(im.h) } })
+      }
+    }
   }
   const xlsx = Buffer.from(await wb.xlsx.writeBuffer())
   if (format === 'xlsx') return xlsx

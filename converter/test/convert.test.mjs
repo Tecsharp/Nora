@@ -71,13 +71,57 @@ test('presentación: PPTX -> nativo -> PPTX/ODP conserva textos, formas e imáge
   assert.equal(n.slides.length, 2)
   assert.deepEqual(n.slides[0].elements.map((e) => e.type), ['text', 'shape', 'image'])
   assert.equal(n.slides[0].bg, '#F5F5F5')
-  assert.equal(n.slides[0].elements[0].bold, true)
+  assert.match(n.slides[0].elements[0].html, /<strong>Título<\/strong>/)
   for (const fmt of ['pptx', 'odp']) {
     const out = Buffer.from(await (await post(`/v1/export?kind=SLIDES&format=${fmt}`, n, true)).arrayBuffer())
     const again = await (await post(`/v1/import?ext=${fmt}`, out)).json()
     assert.equal(again.slides.length, 2, fmt)
     assert.equal(again.slides[0].elements.find((e) => e.type === 'text').text, 'Título', fmt)
   }
+})
+
+test('presentación: texto con formato, listas, tablas, gráficos, formas y notas viajan en PPTX', async () => {
+  const native = { kind: 'SLIDES', width: 13.333, height: 7.5, slides: [{ id: 'a', bg: '#ffffff', notes: 'Nota del orador', elements: [
+    { id: 't', type: 'text', x: 5, y: 5, w: 60, h: 40, html: '<p style="text-align: center">Hola <strong>negrita</strong> y <span style="color: #ff0000; font-size: 30pt">rojo grande</span></p><ul><li><p>uno</p></li><li><p>dos</p></li></ul>', fontSize: 20, color: '#111827' },
+    { id: 'tb', type: 'table', x: 5, y: 50, w: 50, h: 20, cells: JSON.stringify([['A', 'B'], ['1', '2']]), hdr: true, fontSize: 14, fill: '#dbe4ff' },
+    { id: 'ch', type: 'chart', x: 60, y: 10, w: 35, h: 50, spec: JSON.stringify({ type: 'column', title: 'Ventas', labels: ['T1', 'T2'], series: [{ name: 'A', values: [1, 2] }, { name: 'B', values: [3, 4] }] }) },
+    { id: 'sh', type: 'shape', shape: 'star5', x: 60, y: 65, w: 20, h: 25, fill: '#ff0000', op: 0.5, rot: 45 },
+  ] }] }
+  const out = Buffer.from(await (await post('/v1/export?kind=SLIDES&format=pptx', native, true)).arrayBuffer())
+  const back = await (await post('/v1/import?ext=pptx', out)).json()
+  const els = back.slides[0].elements
+  const text = els.find((e) => e.type === 'text' || (e.type === 'shape' && e.html))
+  assert.match(text.html, /<strong>negrita<\/strong>/)
+  assert.match(text.html, /color: #FF0000/i)
+  assert.match(text.html, /font-size: 30pt/)
+  assert.match(text.html, /<ul>[\s\S]*<li>[\s\S]*uno/)
+  const table = els.find((e) => e.type === 'table')
+  assert.deepEqual(JSON.parse(table.cells), [['A', 'B'], ['1', '2']])
+  assert.equal(table.hdr, true)
+  const chart = JSON.parse(els.find((e) => e.type === 'chart').spec)
+  assert.equal(chart.type, 'column')
+  assert.deepEqual(chart.labels, ['T1', 'T2'])
+  assert.deepEqual(chart.series.map((x) => x.name), ['A', 'B'])
+  assert.deepEqual(chart.series[1].values, [3, 4])
+  const star = els.find((e) => e.shape === 'star5')
+  assert.equal(star.rot, 45)
+  assert.ok(Math.abs(star.op - 0.5) < 0.02)
+  assert.equal(back.slides[0].notes, 'Nota del orador')
+  const odp = Buffer.from(await (await post('/v1/export?kind=SLIDES&format=odp', native, true)).arrayBuffer())
+  assert.equal(odp.subarray(0, 2).toString(), 'PK')
+})
+
+test('hoja: estilos nuevos (fuente, tamaño, tachado, bordes, alineación vertical, fijar fila) e imagen de gráfico', async () => {
+  const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+  const native = { kind: 'SHEET', sheets: [{ id: 's1', name: 'H', rows: 20, cols: 10, colWidths: {}, merges: [], freeze: 1, images: [{ png, x: 120, y: 60, w: 200, h: 100 }],
+    cells: { '0,0': { v: 'Hola', s: { ff: 'Georgia', fs: 14, st: 1, va: 'top', bd: 'tb', b: 1 } }, '1,0': { v: 5 } } }] }
+  const out = Buffer.from(await (await post('/v1/export?kind=SHEET&format=xlsx', native, true)).arrayBuffer())
+  const back = await (await post('/v1/import?ext=xlsx', out)).json()
+  const c = back.sheets[0].cells['0,0']
+  assert.equal(c.s.ff, 'Georgia'); assert.equal(c.s.fs, 14); assert.equal(c.s.st, 1); assert.equal(c.s.va, 'top'); assert.equal(c.s.bd, 'tb'); assert.equal(c.s.b, 1)
+  assert.equal(back.sheets[0].freeze, 1)
+  const wb = new ExcelJS.Workbook(); await wb.xlsx.load(out)
+  assert.equal(wb.getWorksheet(1).getImages().length, 1)
 })
 
 test('rechaza formatos no admitidos y cuerpos vacíos', async () => {

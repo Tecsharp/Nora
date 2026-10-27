@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class CollabRepository {
 
     public record DocRow(UUID id, UUID roomId, String kind, String name, UUID createdBy, Instant createdAt, Instant updatedAt,
-                         UUID sourceFileId, String sourceExt, long seq, long snapshotSeq, String seedState) {}
+                         UUID sourceFileId, String sourceExt, long seq, long snapshotSeq, String seedState, long savedSeq, Instant savedAt, UUID savedBy) {}
 
     public record ListRow(DocRow doc, String createdByName) {}
 
@@ -24,7 +24,7 @@ public class CollabRepository {
 
     public record VersionRow(UUID id, Instant createdAt, String createdByName, String label, long seq) {}
 
-    private static final String COLS = "id, room_id, kind, name, created_by, created_at, updated_at, source_file_id, source_ext, seq, snapshot_seq, seed_state";
+    private static final String COLS = "id, room_id, kind, name, created_by, created_at, updated_at, source_file_id, source_ext, seq, snapshot_seq, seed_state, saved_seq, saved_at, saved_by";
     private static final int KEEP_VERSIONS = 40;
 
     private final JdbcTemplate jdbc;
@@ -36,7 +36,8 @@ public class CollabRepository {
     private static DocRow doc(java.sql.ResultSet r, int i) throws java.sql.SQLException {
         return new DocRow(r.getObject("id", UUID.class), r.getObject("room_id", UUID.class), r.getString("kind"), r.getString("name"),
                 r.getObject("created_by", UUID.class), r.getTimestamp("created_at").toInstant(), r.getTimestamp("updated_at").toInstant(),
-                r.getObject("source_file_id", UUID.class), r.getString("source_ext"), r.getLong("seq"), r.getLong("snapshot_seq"), r.getString("seed_state"));
+                r.getObject("source_file_id", UUID.class), r.getString("source_ext"), r.getLong("seq"), r.getLong("snapshot_seq"), r.getString("seed_state"),
+                r.getLong("saved_seq"), r.getTimestamp("saved_at") == null ? null : r.getTimestamp("saved_at").toInstant(), r.getObject("saved_by", UUID.class));
     }
 
     public void insert(UUID id, UUID roomId, String kind, String name, UUID createdBy, UUID sourceFileId, String sourceExt, String seed) {
@@ -56,13 +57,34 @@ public class CollabRepository {
 
     public List<ListRow> list(UUID roomId) {
         return jdbc.query("select d.id, d.room_id, d.kind, d.name, d.created_by, d.created_at, d.updated_at, d.source_file_id, d.source_ext, d.seq, "
-                        + "d.snapshot_seq, d.seed_state, u.display_name from collab_docs d join users u on u.id = d.created_by "
+                        + "d.snapshot_seq, d.seed_state, d.saved_seq, d.saved_at, d.saved_by, u.display_name from collab_docs d join users u on u.id = d.created_by "
                         + "where d.room_id = ? order by d.updated_at desc",
                 (r, i) -> new ListRow(doc(r, i), r.getString("display_name")), roomId);
     }
 
     public void rename(UUID id, String name) {
         jdbc.update("update collab_docs set name = ?, updated_at = now() where id = ?", name, id);
+    }
+
+    /** Documentos que se guardan en alguno de estos archivos (para borrarlos cuando el archivo se borra). */
+    public List<UUID> idsBySource(UUID roomId, java.util.Collection<UUID> fileIds) {
+        if (fileIds.isEmpty()) return List.of();
+        String in = String.join(",", java.util.Collections.nCopies(fileIds.size(), "?"));
+        Object[] args = new Object[fileIds.size() + 1];
+        args[0] = roomId;
+        int i = 1;
+        for (UUID f : fileIds) args[i++] = f;
+        return jdbc.query("select id from collab_docs where room_id = ? and source_file_id in (" + in + ")", (r, n) -> r.getObject(1, UUID.class), args);
+    }
+
+    /** El archivo de la sala contiene el documento hasta el cambio seq. */
+    public void markSaved(UUID id, long seq, UUID userId) {
+        jdbc.update("update collab_docs set saved_seq = greatest(saved_seq, ?), saved_at = now(), saved_by = ? where id = ?", seq, userId, id);
+    }
+
+    /** El documento pasa a guardarse en otro archivo (p. ej. al convertir un .doc antiguo a .docx). */
+    public void relink(UUID id, UUID fileId, String ext) {
+        jdbc.update("update collab_docs set source_file_id = ?, source_ext = ? where id = ?", fileId, ext, id);
     }
 
     public void delete(UUID id) {

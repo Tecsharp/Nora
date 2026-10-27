@@ -119,6 +119,15 @@ export class CollabProvider {
     this.state = s
     this.listeners.forEach((l) => l())
   }
+  /** Último cambio del servidor que este cliente ya tiene aplicado (sirve para saber si el archivo de la sala está al día). */
+  get seq() {
+    return this.tracker.contiguous
+  }
+  /** Espera a que lo escrito localmente esté confirmado por el servidor (para guardar el archivo con todo incluido). */
+  async flushed(maxMs = 8000) {
+    const t0 = Date.now()
+    while (this.unsaved && Date.now() - t0 < maxMs) await new Promise((r) => setTimeout(r, 100))
+  }
   get unsaved() {
     return this.pending.length > 0 || this.inflight !== null
   }
@@ -251,6 +260,7 @@ export class CollabProvider {
   private onRemoteUpdate(d: { seq: number; update: string }) {
     Y.applyUpdate(this.doc, unb64(d.update), this)
     this.tracker.observe(d.seq)
+    this.listeners.forEach((l) => l())
     if (this.tracker.hasGap && !this.gapSince) this.gapSince = Date.now()
     if (!this.tracker.hasGap) this.gapSince = 0
     // Un cambio que depende de otro aún no recibido queda pendiente en Yjs: se pide el estado completo enseguida

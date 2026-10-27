@@ -1,7 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useState, type ComponentType } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  ArrowLeft, Check, Pencil, Settings, UserCheck, X, Clapperboard, Clipboard, ClipboardList, Clock, Copy, FilePenLine, FolderOpen, Hash, Monitor, PenTool, Plus, ShieldCheck,
+  ArrowLeft, Check, Pencil, Settings, UserCheck, X, Clapperboard, Clipboard, ClipboardList, Clock, Copy, FolderOpen, Hash, Monitor, PenTool, Plus, ShieldCheck,
   SquareCheckBig, Trash2, Zap, type LucideProps,
 } from 'lucide-react'
 import { api, ApiError, type JoinRequest, type Room } from '../api'
@@ -13,7 +13,6 @@ import ExpiryDialog from '../components/ExpiryDialog'
 import RoomSettingsDialog from '../components/RoomSettingsDialog'
 import Menu from '../components/Menu'
 import Modal from '../components/Modal'
-import DocsTool from '../components/DocsTool'
 import FilesTool from '../components/FilesTool'
 import type { DocInfo } from '../collab/DocEditor'
 import { canWrite as canWriteIn } from '../roles'
@@ -35,7 +34,6 @@ interface Tool {
 
 const TOOLS: Tool[] = [
   { id: 'files', label: 'Archivos', icon: FolderOpen, ready: true, tone: 'blue' },
-  { id: 'docs', label: 'Documentos', icon: FilePenLine, ready: true, tone: 'violet' },
   { id: 'board', label: 'Pizarra', icon: PenTool, ready: false },
   { id: 'clipboard', label: 'Portapapeles', icon: Clipboard, ready: true, tone: 'amber' },
   { id: 'notes', label: 'Notas', icon: ClipboardList, ready: true, tone: 'rose' },
@@ -172,8 +170,7 @@ export default function RoomPage() {
   }
 
   const openDoc = useCallback((d: DocInfo) => {
-    setActive(null)
-    setEditingDoc(d)
+    setEditingDoc(d) // el editor se abre encima: al cerrarlo se vuelve a Archivos
     setParams((p) => { p.set('doc', d.id); return p }, { replace: true })
   }, [setParams])
   const closeDoc = useCallback(() => {
@@ -347,7 +344,6 @@ export default function RoomPage() {
       {tool && (
         <Modal title={tool.label} icon={<tool.icon size={20} />} wide={tool.ready} flush={tool.ready} onClose={() => setActive(null)}>
           {tool.id === 'files' && <FilesTool room={room} onEditDoc={openDoc} />}
-          {tool.id === 'docs' && <DocsTool room={room} onOpen={openDoc} />}
           {tool.id === 'notes' && <NotesTool room={room} kind="NOTE" placeholder="Escribe una nota para la sala…" />}
           {tool.id === 'clipboard' && <NotesTool room={room} kind="CLIPBOARD" placeholder="Pega aquí el texto que quieres compartir…" copyable />}
           {!tool.ready && (

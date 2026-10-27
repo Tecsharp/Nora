@@ -2,6 +2,8 @@ import * as Y from 'yjs'
 import { SheetStore, type NativeSheets } from './sheetModel'
 import { SlidesStore, type NativeSlides } from './slidesModel'
 import { Evaluator, isError } from './formulas'
+import { chartPng } from './chart'
+import { chartSpecOf } from './sheetCharts'
 
 export type Kind = 'DOC' | 'SHEET' | 'SLIDES'
 export interface NativeDoc {
@@ -65,4 +67,17 @@ export function restoreText(doc: Y.Doc, snapshot: Uint8Array) {
     to.insert(0, from.toArray().map((n) => n.clone() as Y.XmlElement | Y.XmlText))
   })
   old.destroy()
+}
+
+/** Contenido para exportar. Es asíncrono porque los gráficos se convierten a imagen antes de enviarlos al conversor. */
+export async function readNativeForExport(kind: Kind, doc: Y.Doc, html?: () => string): Promise<Native> {
+  const native = readNative(kind, doc, html)
+  if (native.kind === 'SHEET') {
+    const ev = new Evaluator(new SheetStore(doc))
+    for (const sh of native.sheets) {
+      sh.images = await Promise.all((sh.charts ?? []).map(async (ch) => ({ png: await chartPng(chartSpecOf(ev, ch), ch.w, ch.h, 2), x: ch.x, y: ch.y, w: ch.w, h: ch.h })))
+      delete sh.charts
+    }
+  }
+  return native
 }

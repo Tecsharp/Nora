@@ -14,7 +14,9 @@ Este documento explica **qué se eligió y por qué**, cómo encaja todo, el pro
 | Qué hace el servidor con los cambios | Los trata como **bytes opacos**: les asigna un número de secuencia (`seq`), los guarda, los reparte y valida permisos. No interpreta Yjs (no hay Yjs en Java), así que no hay riesgo de divergencia entre lógica de servidor y de cliente. |
 | Formato «nativo» del editor | DOC = HTML de TipTap/ProseMirror · SHEET = mapa de celdas `"fila,col" → {v, f?, s?}` · SLIDES = elementos posicionados en % de la diapositiva. |
 | Conversión | Un **sidecar** (`converter/`, Node 22 + LibreOffice headless) sin acceso a Internet, solo alcanzable desde el backend con un token. |
-| Fidelidad | Se importa lo que el editor sabe representar; el original **no se destruye** salvo que la persona elija «sobrescribir». |
+| Archivo ↔ documento | **Todo documento es un archivo de la sala.** «Nuevo» crea el archivo (.docx/.xlsx/.pptx) al instante en la carpeta actual; abrir un archivo de oficina con un clic lo edita entre todos. No hay «guardar para que entre otro»: quien tenga acceso a la sala lo ve en Archivos y entra. |
+| Guardar | **Guardar escribe el contenido compartido en ese archivo** (Ctrl+S). El estado («Archivo guardado hace 2 min · Ana» / «Sin guardar en el archivo») es compartido por todos. Descargar y «guardar una copia» son botones aparte. |
+| Fidelidad | Se importa lo que el editor sabe representar; el archivo original solo cambia cuando alguien pulsa Guardar. |
 | Permisos | Los de la sala (propietario/moderador/miembro/espectador). Solo quien puede escribir en la sala puede enviar `doc.update`; se revalida cada 5 s. |
 
 ---
@@ -89,7 +91,8 @@ Se reutiliza el **WebSocket `/ws` de Nora** (un solo canal por pestaña) en vez 
 * **Siembra del contenido importado:** al abrir un archivo, el backend convierte **una vez** y guarda el resultado en `seed_content`. Exactamente **un** cliente lo escribe en el documento Yjs: `POST /seed/claim` hace una reclamación atómica en SQL (`PENDING→CLAIMED→DONE`, caduca a los 60 s si quien reclamó se cae, idempotente para la misma persona) y solo quien reclamó puede llamar a `/seed/done`. Los demás ven «Preparando el documento…» y reciben el contenido por el canal normal. Así no hay contenido duplicado aunque diez personas abran el mismo archivo a la vez.
 * **Versiones** (`collab_versions`, se conservan 40): automática cada 10 min si hubo cambios (la hace el cliente «líder» = menor `clientID` presente) y manual con nombre. Restaurar **no** borra historial: se reescribe el contenido como un cambio normal de Yjs (y por tanto se puede deshacer).
 * **Deshacer/rehacer:** `Y.UndoManager` (en TipTap vía la extensión de colaboración): cada persona deshace **solo sus cambios**.
-* **Exportación:** `POST /export?format=…&save=none|overwrite|new`. `none` descarga; `overwrite` reemplaza el archivo original de la sala (misma entrada, nuevo contenido); `new` guarda un archivo nuevo junto al original.
+* **Guardado y estado del archivo:** `POST /export?save=file&seq=N` convierte el contenido que envía el cliente y **reemplaza el archivo de la sala** (misma entrada); el servidor anota `saved_seq`, `saved_at` y `saved_by` y avisa a todos con el evento `doc.saved`. Un cliente compara su último cambio recibido con `saved_seq` para saber si el archivo está al día. Si el archivo es de un formato antiguo (`.doc`, `.xls`, `.ppt`, `.rtf`, `.tsv`) se escribe un archivo nuevo en el formato moderno y el documento pasa a usarlo; el original no se toca. `save=new` guarda una copia con otro formato; `save=none` solo descarga.
+* **Ciclo de vida:** borrar el archivo (o su carpeta) en Archivos borra su documento y avisa a quien lo tenía abierto. Renombrar desde el editor renombra el archivo. Al cerrar con cambios sin guardar y siendo la última persona dentro, el editor ofrece «Guardar y cerrar»; si hay más gente dentro no molesta (el documento compartido conserva todo).
 
 ### 3.1 Permisos
 
@@ -122,21 +125,21 @@ servidor → cliente
   doc.peer.left  {docId, clientIds[]}
   doc.error      {docId, message, status}
   # eventos de sala (para la lista de documentos)
-  doc.created / doc.renamed / doc.deleted / doc.seeded
+  doc.created / doc.renamed / doc.deleted / doc.seeded / doc.saved{…,savedSeq,savedAt,savedByName}
 ```
 
 REST (`/api/rooms/{code}/docs`):
 
 | Método y ruta | Uso |
 |---|---|
-| `GET /`, `POST /` | Listar / crear en blanco (`{kind,name}`) |
-| `POST /from-file/{fileId}` | Abrir un archivo de oficina de la sala (convierte y deja listo para sembrar; idempotente) |
+| `GET /`, `POST /` | Listar / crear (`{kind,name,folderId?}`): crea el archivo en blanco en la sala y su documento |
+| `POST /from-file/{fileId}` | Abrir un archivo de oficina de la sala (convierte y deja listo para sembrar; idempotente, índice único por archivo). Un lector solo puede abrir lo que ya se abrió para editar |
 | `GET/PATCH/DELETE /{id}` | Ficha, renombrar, borrar |
 | `GET /{id}/state` | Instantánea + cambios (base64) + estado de siembra |
 | `POST /{id}/seed/claim`, `/seed/done` | Siembra del contenido importado |
 | `PUT /{id}/snapshot?upToSeq=N` | Compactación (cuerpo binario Yjs) |
 | `GET/POST /{id}/versions`, `GET /{id}/versions/{v}` | Historial |
-| `POST /{id}/export?format=&save=` | Convertir y descargar / guardar en la sala |
+| `POST /{id}/export?save=file|new|none&format=&seq=` | `file` = Guardar en el archivo (formato del propio archivo) · `new` = copia en la sala · `none` = descarga |
 
 API interna del conversor (`converter/`, cabecera `X-Converter-Token`): `POST /v1/import?ext=` (archivo → modelo nativo JSON), `POST /v1/export?kind=&format=` (modelo nativo → archivo). Solo en la red interna de Docker; sin Internet.
 
@@ -146,11 +149,11 @@ API interna del conversor (`converter/`, cabecera `X-Converter-Token`): `POST /v
 
 | Tipo | Importa | Exporta | Se conserva | Se pierde / aproxima |
 |---|---|---|---|---|
-| DOCX/ODT | LO → HTML → `tidy()` | HTML → LO | Títulos, párrafos, negrita/cursiva/subrayado/tachado, listas, tablas, imágenes, alineación, fuente y color | Cabeceras/pies, saltos de página, columnas, notas al pie, campos, cambios controlados, formas flotantes, estilos con nombre |
-| XLSX | exceljs | exceljs | Valores, **fórmulas**, formato básico (negrita, color de fondo/texto, alineación), anchos, combinadas, varias hojas | Gráficos, tablas dinámicas, formato condicional, validación, macros, imágenes |
+| DOCX/ODT | LO → HTML → `tidy()` | HTML → LO | Títulos, párrafos, negrita/cursiva/subrayado/tachado, sub/superíndice, **fuente y tamaño**, interlineado, sangría, listas, tablas (fusión de celdas y color de fondo), imágenes (con ancho), alineación y color; **gráficos como imagen** | Cabeceras/pies, saltos de página, columnas, notas al pie, campos, cambios controlados, formas flotantes, estilos con nombre. Un gráfico insertado aquí solo se vuelve a editar mientras siga en el documento: en el DOCX es una imagen |
+| XLSX | exceljs | exceljs | Valores, **fórmulas**, formato (negrita/cursiva/subrayado/tachado, fuente y tamaño, colores, alineación horizontal y vertical, bordes, formatos numéricos), anchos, combinadas, fila fijada, varias hojas; **los gráficos que se crean aquí viajan como imagen** | Los gráficos, imágenes y tablas dinámicas **que ya traía el XLSX original** (exceljs no los lee: se pierden al guardar encima), formato condicional, validación, macros, ajuste de texto |
 | ODS/XLS | LO → XLSX → exceljs | ídem → LO | Lo mismo que XLSX | Lo mismo |
 | CSV | Parser propio (comillas, `;`/`,`) | Primera hoja | Valores | Fórmulas como texto, otras hojas |
-| PPTX | Parser XML propio (herencia de marcadores de posición, colores de tema) | pptxgenjs | Texto con tamaño/negrita/color/alineación, formas básicas, imágenes, fondos, orden | Animaciones, transiciones, SmartArt, gráficos, vídeo/audio, notas, patrones de diapositiva |
+| PPTX | Parser XML propio (herencia de marcadores de posición, colores de tema) | pptxgenjs | **Texto con formato por fragmentos** (negrita, color, tamaño, fuente, listas, alineación), 14 tipos de forma con relleno/contorno/opacidad/giro, líneas, imágenes, **tablas**, **gráficos nativos** (columnas, barras, líneas, áreas, circular, anillo), notas del orador, fondos, orden | Animaciones, transiciones, SmartArt, vídeo/audio, patrones de diapositiva, formas personalizadas (se aproximan a rectángulos), viñetas heredadas del patrón |
 | ODP | LO → PPTX → parser | ídem → LO | Lo mismo que PPTX | Lo mismo |
 | PDF | — | LO | Salida de lectura | — |
 
@@ -169,9 +172,10 @@ Principios:
 | Protocolo y reparto en el servidor | `backend/src/main/java/com/nora/collab/CollabWs.java`, `CollabService.java` |
 | Siembra atómica, snapshots, versiones | `CollabRepository.java` (SQL), `db/migration/V7__collab_docs.sql`, `V8__…` |
 | Proveedor Yjs ↔ WebSocket (cola, ack, reconexión) | `frontend/src/collab/provider.ts` |
-| Editor de documentos | `frontend/src/collab/TextEditor.tsx` |
-| Editor de hojas | `frontend/src/collab/SheetEditor.tsx`, `sheetModel.ts`, `formulas.ts` |
-| Editor de diapositivas | `frontend/src/collab/SlidesEditor.tsx`, `slidesModel.ts` |
+| Editor de documentos | `frontend/src/collab/TextEditor.tsx`, `textExtras.ts` (tamaño de letra, interlineado, sangría, gráfico, buscar/reemplazar) |
+| Editor de hojas | `frontend/src/collab/SheetEditor.tsx`, `SheetRibbon.tsx`, `sheetModel.ts`, `refs.ts` (referencias A1, ajuste y copia de fórmulas), `formulas.ts` |
+| Editor de diapositivas | `frontend/src/collab/SlidesEditor.tsx`, `SlidesRibbon.tsx`, `SlideRender.tsx`, `slidesModel.ts`, `richtext.ts` (limpieza del HTML compartido) |
+| Gráficos y barra de herramientas común | `frontend/src/collab/chart.tsx`, `ui.tsx` |
 | Conversión | `converter/src/{lo,doc,sheet,slides,server}.mjs` |
 
 ---
@@ -184,16 +188,17 @@ Principios:
 | 2 — Hojas | Rejilla virtualizada, fórmulas, presencia por celda, XLSX/ODS/CSV | ✔ |
 | 3 — Diapositivas | Editor propio, importación PPTX/ODP, exportación PPTX/ODP/PDF, modo presentación | ✔ (subconjunto) |
 | 4 — Operación | Compactación, versiones, siembra segura, límites de tasa, revalidación de permisos | ✔ |
-| 5 — Siguientes | Insertar/borrar filas y columnas en hojas · formato de texto por tramos en diapositivas · gráficos · comentarios · sugerencias · tablas de diapositivas · pruebas con documentos reales de usuarios | Pendiente |
-| 6 — Escala | Varias instancias del backend (hoy el reparto es en memoria: hace falta un bus, p. ej. Postgres `LISTEN/NOTIFY` o Redis) | Pendiente |
+| 5 — Herramientas de oficina | Cinta de opciones por tipo (Inicio/Insertar/…): documentos con fuente, tamaño, interlineado, sangría, tablas completas, gráficos, buscar y reemplazar, esquema y zoom · hojas con formato completo, bordes, combinar, insertar/eliminar filas y columnas con ajuste de fórmulas, ordenar, fijar fila, relleno, autosuma, biblioteca de funciones (nombres en español), gráficos, buscar, estadísticas de selección · diapositivas con texto enriquecido, formas, tablas, gráficos, giro, alineación, selección múltiple, guías de alineación, notas y diseños | ✔ |
+| 6 — Siguientes | Comentarios y sugerencias · formato condicional y validación de datos en hojas · transiciones y animaciones · ajuste de texto y altura de fila en hojas · pruebas con documentos reales de usuarios | Pendiente |
+| 7 — Escala | Varias instancias del backend (hoy el reparto es en memoria: hace falta un bus, p. ej. Postgres `LISTEN/NOTIFY` o Redis) | Pendiente |
 
 ---
 
 ## 8. Riesgos y limitaciones (honestos)
 
 1. **Fidelidad de conversión.** Un DOCX complejo (columnas, cabeceras, campos, formas) no sobrevive a ida y vuelta. Es una limitación del enfoque «editor propio + LibreOffice», no un bug puntual. Mitigación: el original se conserva y «sobrescribir» es una acción explícita.
-2. **PPTX/ODP.** Subconjunto: texto, formas básicas e imágenes. Sin animaciones, SmartArt, gráficos ni tablas. El formato de texto se aplica a **todo el cuadro de texto** (no por tramos).
-3. **Fórmulas.** `fast-formula-parser` cubre la gran mayoría de funciones de Excel, pero no todas; las desconocidas muestran un error en vez de un valor falso. Dos personas editando la misma celda: gana la última. No hay insertar/eliminar filas o columnas todavía (se evita porque en un CRDT por celda reindexar exige reescribir muchas claves y entra en conflicto con ediciones concurrentes).
+2. **PPTX/ODP.** Subconjunto: texto enriquecido, 14 formas, imágenes, tablas, gráficos y notas. Sin animaciones, transiciones ni SmartArt; las formas personalizadas se aproximan. Cada cuadro de texto tiene su propio editor TipTap enlazado a un fragmento Yjs, mientras que el HTML resultante se guarda en el elemento para mostrarlo y exportarlo: si dos personas empiezan a editar exactamente a la vez el mismo cuadro, el texto inicial podría duplicarse (poco probable). Al restaurar una versión, los fragmentos se regeneran desde el HTML.
+3. **Fórmulas.** `fast-formula-parser` cubre la gran mayoría de funciones de Excel, pero no todas; las desconocidas muestran un error en vez de un valor falso. Dos personas editando la misma celda: gana la última. **Insertar o eliminar filas/columnas** reescribe las claves de las celdas y ajusta las fórmulas de todo el libro, las combinaciones y los gráficos en una sola transacción; si dos personas insertan filas a la vez en la misma hoja el resultado es la suma de ambos cambios, pero una edición de celda concurrente a esa operación puede quedar desplazada una fila. Ordenar mueve filas con sus fórmulas (se trasladan las referencias relativas a la misma fila). No hay ajuste de texto ni altura de fila variable.
 4. **CSV** exporta solo la primera hoja.
 5. **Tamaño.** El documento completo vive en memoria del navegador y las imágenes se incrustan en Yjs (base64): documentos con muchas imágenes grandes serán lentos y pesarán en cada instantánea. Límite de 40 MB al abrir.
 6. **Confianza en las instantáneas.** El servidor no entiende Yjs, así que acepta la instantánea de un cliente con permiso de edición. Un miembro malicioso puede subir una instantánea vacía o corrupta. Mitigaciones: solo quien puede editar, solo hasta un `seq` ya visto, y el historial de versiones permite recuperar. No protege frente a un miembro editor hostil (eso ya podría borrar el contenido editando).

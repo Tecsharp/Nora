@@ -52,7 +52,9 @@ Eventos de sala: quién está conectado (`presence`, `joined`), nuevos miembros 
 
 ### Edición colaborativa (documentos, hojas y presentaciones)
 
-Desde **Archivos → Editar** (o **Documentos → Nuevo**) se abren DOCX/ODT, XLSX/ODS/CSV y PPTX/ODP en un editor a pantalla completa donde varias personas escriben a la vez, con cursores y selección de cada una, historial de versiones y exportación a formatos de oficina o PDF. Usa **Yjs (CRDT)** sobre el WebSocket de Nora; el servidor solo ordena, guarda y reparte los cambios y respeta los permisos de la sala (el espectador ve pero no edita). La conversión la hace el servicio interno `converter` (LibreOffice headless, sin acceso a Internet). Diseño, protocolo, fidelidad de conversión, fases y **limitaciones conocidas** en [docs/COLABORACION.md](docs/COLABORACION.md).
+Todo documento es un **archivo de la sala**. En **Archivos** el botón **Nuevo** crea un documento, una hoja o una presentación (nace como `.docx`, `.xlsx` o `.pptx` en la carpeta actual) y un clic sobre cualquier DOCX/ODT/XLSX/ODS/CSV/PPTX/ODP lo abre para editarlo entre todos, con cursores, selección de cada persona, historial de versiones y control de permisos (el lector ve pero no edita). **Guardar** (o Ctrl+S) escribe el contenido compartido en ese archivo y todos ven si está al día; **Descargar** y «guardar una copia» son botones aparte.
+
+Cada editor tiene una cinta de opciones al estilo Office: **texto** (fuentes, tamaños, colores, listas, tablas, gráficos, buscar y reemplazar), **hojas** (formato, bordes, fórmulas con nombres en español, insertar/eliminar filas y columnas, ordenar, gráficos, estadísticas) y **diapositivas** (texto enriquecido, formas, tablas, gráficos, notas, modo presentación). Usa **Yjs (CRDT)** sobre el WebSocket de Nora; el servidor solo ordena, guarda y reparte los cambios. La conversión la hace el servicio interno `converter` (LibreOffice headless, sin acceso a Internet). Diseño, protocolo, fidelidad de conversión, fases y **limitaciones conocidas** en [docs/COLABORACION.md](docs/COLABORACION.md).
 
 ### Subidas reanudables
 
@@ -127,4 +129,4 @@ cd frontend && npm install && npm run dev
 
 ## Estado
 
-Herramientas operativas: **Archivos**, **Notas**, **Portapapeles** y **Documentos** (edición colaborativa). Pizarra, Media Review, Asistencia, Votaciones y Acciones aparecen como «Próximamente». La presencia y los eventos de la sala van por WebSocket.
+Herramientas operativas: **Archivos**, **Notas**, **Portapapeles**; la edición colaborativa de documentos vive dentro de **Archivos**. Pizarra, Media Review, Asistencia, Votaciones y Acciones aparecen como «Próximamente». La presencia y los eventos de la sala van por WebSocket.

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import {
-  ChevronRight, Download, X, File, FileArchive, FileAudio, FileCode, FileImage, FileText, FileVideo, Folder, FolderInput, FolderPlus, FolderUp, Eye, Loader2,
+  ChevronRight, Download, X, File, FileArchive, FileAudio, FileCode, FileImage, FileText, FileVideo, Folder, Presentation, Sheet, FilePlus2, ChevronDown, FolderInput, FolderPlus, FolderUp, Eye, Loader2,
   House, LayoutGrid, List, Pencil, Search, Trash2, Upload,
 } from 'lucide-react'
 import { api, ApiError, downloadWithProgress, formatBytes, type DownloadHandle, type Room } from '../api'
@@ -59,18 +59,26 @@ const readView = (): View => {
   }
 }
 
-const EXT: Record<string, typeof File> = {
-  png: FileImage, jpg: FileImage, jpeg: FileImage, gif: FileImage, webp: FileImage, svg: FileImage, heic: FileImage, jxl: FileImage, avif: FileImage,
-  mp4: FileVideo, mov: FileVideo, mkv: FileVideo, webm: FileVideo, avi: FileVideo,
-  mp3: FileAudio, wav: FileAudio, flac: FileAudio, m4a: FileAudio, ogg: FileAudio,
-  pdf: FileText, doc: FileText, docx: FileText, txt: FileText, md: FileText, rtf: FileText, xls: FileText, xlsx: FileText, ppt: FileText, pptx: FileText, csv: FileText,
-  zip: FileArchive, rar: FileArchive, '7z': FileArchive, tar: FileArchive, gz: FileArchive,
-  js: FileCode, ts: FileCode, tsx: FileCode, json: FileCode, html: FileCode, css: FileCode, py: FileCode, java: FileCode, sh: FileCode, yml: FileCode, xml: FileCode,
-}
-const iconFor = (name: string) => EXT[name.split('.').pop()?.toLowerCase() ?? ''] ?? File
-const TONES = new Map<typeof File, string>([
-  [FileImage, 'rose'], [FileVideo, 'violet'], [FileAudio, 'teal'], [FileText, 'blue'], [FileArchive, 'amber'], [FileCode, 'orange'],
-])
+/** Icono y color por tipo de archivo: documentos azul, hojas verde, presentaciones naranja, PDF rojo… */
+const KIND_OF: Record<string, [typeof File, string]> = {}
+const reg = (exts: string, icon: typeof File, tone: string) => exts.split(' ').forEach((e) => (KIND_OF[e] = [icon, tone]))
+reg('png jpg jpeg gif webp svg heic jxl avif bmp ico', FileImage, 'rose')
+reg('mp4 mov mkv webm avi', FileVideo, 'violet')
+reg('mp3 wav flac m4a ogg', FileAudio, 'teal')
+reg('doc docx odt rtf', FileText, 'blue')
+reg('xls xlsx ods csv tsv', Sheet, 'green')
+reg('ppt pptx odp', Presentation, 'orange')
+reg('pdf', FileText, 'red')
+reg('txt md log', FileText, 'gray')
+reg('zip rar 7z tar gz', FileArchive, 'amber')
+reg('js ts tsx json html css py java sh yml xml', FileCode, 'cyan')
+const kindOf = (name: string): [typeof File, string] => KIND_OF[name.split('.').pop()?.toLowerCase() ?? ''] ?? [File, 'gray']
+
+const NEW_KINDS = [
+  { kind: 'DOC', label: 'Documento de texto', base: 'Documento sin título', icon: FileText },
+  { kind: 'SHEET', label: 'Hoja de cálculo', base: 'Hoja de cálculo sin título', icon: Sheet },
+  { kind: 'SLIDES', label: 'Presentación', base: 'Presentación sin título', icon: Presentation },
+] as const
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -94,6 +102,7 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
   const [moving, setMoving] = useState<FileItem | null>(null)
   const [dropTarget, setDropTarget] = useState<string | 'root' | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [newBusy, setNewBusy] = useState(false)
   const [opening, setOpening] = useState<string | null>(null)
   const [viewing, setViewing] = useState<string | null>(null)
   const [dl, setDl] = useState<Record<string, { loaded: number; total: number }>>({})
@@ -332,6 +341,20 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
     }
   }
 
+  /** Crea un documento, hoja o presentación nueva: nace como archivo de la sala (en la carpeta actual) y se abre para editar. */
+  async function createDoc(k: (typeof NEW_KINDS)[number]) {
+    if (newBusy || !onEditDoc) return
+    setNewBusy(true)
+    setError('')
+    try {
+      onEditDoc(await api<DocInfo>(`/rooms/${room.code}/docs`, 'POST', { kind: k.kind, name: k.base, folderId: current }))
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'No se pudo crear el documento')
+    } finally {
+      setNewBusy(false)
+    }
+  }
+
   /** Abre un archivo de oficina en el editor colaborativo (la primera vez lo convierte en el servidor). */
   async function editFile(f: FileItem) {
     if (opening || !onEditDoc) return
@@ -411,8 +434,8 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
 
   function fileMenu(f: FileItem): MenuItem[] {
     const items: MenuItem[] = [
-      ...(canWrite && onEditDoc && isEditable(f.name) ? [{ label: 'Editar', icon: <Pencil size={16} />, onClick: () => void editFile(f) }] : []),
-      ...(previewKind(f.name) ? [{ label: 'Ver', icon: <Eye size={16} />, onClick: () => setViewing(f.id) }] : []),
+      ...(onEditDoc && isEditable(f.name) ? [{ label: canWrite ? 'Abrir para editar' : 'Abrir (solo lectura)', icon: <Pencil size={16} />, onClick: () => void editFile(f) }] : []),
+      ...(previewKind(f.name) ? [{ label: 'Vista previa', icon: <Eye size={16} />, onClick: () => setViewing(f.id) }] : []),
       { label: 'Descargar', icon: <Download size={16} />, onClick: () => void downloadFile(f) },
     ]
     if (canTouch(f.uploaderId)) {
@@ -456,16 +479,18 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
   }
 
   for (const f of shownFiles) {
-    const Icon = iconFor(f.name)
+    const [Icon, tone] = kindOf(f.name)
     const d = dl[f.id]
     const canView = !!previewKind(f.name)
+    const canOpen = !!onEditDoc && isEditable(f.name)
+    const open = () => (canOpen ? void editFile(f) : setViewing(f.id))
     const pct = d && d.total > 0 ? Math.min(100, Math.round((d.loaded / d.total) * 100)) : 0
     rows.push(
-      <div key={`f-${f.id}`} className={`fitem ${d ? 'busy' : ''} ${canView ? 'viewable' : ''}`}
-        {...(canView ? { role: 'button', tabIndex: 0, 'aria-label': `Ver ${f.name}`, onClick: () => setViewing(f.id), onKeyDown: activate(() => setViewing(f.id)) } : {})}
+      <div key={`f-${f.id}`} className={`fitem ${d ? 'busy' : ''} ${canView || canOpen ? 'viewable' : ''}`}
+        {...(canView || canOpen ? { role: 'button', tabIndex: 0, 'aria-label': `${canOpen ? (canWrite ? 'Abrir para editar' : 'Abrir') : 'Ver'} ${f.name}`, onClick: open, onKeyDown: activate(open) } : {})}
         draggable={canTouch(f.uploaderId)}
         onDragStart={(e) => { e.dataTransfer.setData(NORA_MIME, f.id); e.dataTransfer.effectAllowed = 'move' }}>
-        <span className={`ficon tn-${TONES.get(Icon) ?? 'gray'}`}>
+        <span className={`ficon tn-${tone}`}>
           <Icon size={22} />
           {d && <ProgressRing percent={d.loaded > 0 ? pct : null} />}
         </span>
@@ -483,11 +508,6 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
           </span>
         </span>
         <span className="factions">
-          {canWrite && onEditDoc && isEditable(f.name) && !d && (
-            <button className="icon-btn sm" title="Editar con otras personas" aria-label={`Editar ${f.name}`} disabled={!!opening} onClick={(e) => { e.stopPropagation(); void editFile(f) }}>
-              {opening === f.id ? <Loader2 className="spin-icon" size={16} /> : <Pencil size={16} />}
-            </button>
-          )}
           {canView && !d && (
             <button className="icon-btn sm" title="Ver" aria-label={`Ver ${f.name}`} onClick={(e) => { e.stopPropagation(); setViewing(f.id) }}>
               <Eye size={16} />
@@ -521,6 +541,10 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
             <button className="btn primary sm" onClick={onPick}><Upload size={15} /> Subir</button>
             <button className="btn sm" onClick={onPickFolder}><FolderUp size={15} /> Subir carpeta</button>
             <button className="btn sm" onClick={() => { setCreating((c) => !c); setFolderName('') }}><FolderPlus size={15} /> Nueva carpeta</button>
+            {onEditDoc && (
+              <Menu label="Crear documento" trigger={<span className="btn sm">{newBusy ? <Loader2 size={15} className="spin-icon" /> : <FilePlus2 size={15} />} Nuevo <ChevronDown size={14} /></span>}
+                items={NEW_KINDS.map((k) => ({ label: k.label, icon: <k.icon size={16} />, onClick: () => void createDoc(k) }))} />
+            )}
           </>
         )}
         <span className="grow" />

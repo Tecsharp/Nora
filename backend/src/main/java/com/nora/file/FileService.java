@@ -113,6 +113,16 @@ public class FileService {
         return dto;
     }
 
+    /** Cambia el nombre de un archivo sin comprobar autoría (lo usa el editor colaborativo, donde varias personas editan el mismo archivo). */
+    @Transactional
+    public FileDto rename(UUID roomId, UUID fileId, String name) {
+        RoomFile f = find(roomId, fileId);
+        f.setOriginalName(sanitize(name));
+        FileDto dto = FileDto.of(files.saveAndFlush(f));
+        events.publishEvent(new RoomEvent(roomId, "file.updated", dto));
+        return dto;
+    }
+
     /** Borra del almacén y de la base de datos los archivos de las carpetas dadas. Devuelve sus ids. */
     @Transactional
     public List<UUID> deleteInFolders(UUID roomId, java.util.Collection<UUID> folderIds) {

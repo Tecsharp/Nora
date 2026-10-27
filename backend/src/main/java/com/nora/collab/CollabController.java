@@ -41,14 +41,14 @@ public class CollabController {
     @ResponseStatus(HttpStatus.CREATED)
     public DocDto create(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @Valid @RequestBody CreateRequest req) {
         Room room = rooms.requireWriter(p.userId(), p.role(), code);
-        return collab.create(room, p.userId(), req.kind(), req.name());
+        return collab.create(room, p.userId(), req.kind(), req.name(), req.folderId());
     }
 
     /** Abre un archivo de oficina de la sala para editarlo (lo convierte la primera vez). */
     @PostMapping("/from-file/{fileId}")
     public DocDto fromFile(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable UUID fileId) {
-        Room room = rooms.requireWriter(p.userId(), p.role(), code);
-        return collab.fromFile(room, p.userId(), fileId);
+        Room room = rooms.requireMember(p.userId(), code);
+        return collab.fromFile(room, p.userId(), p.role(), fileId);
     }
 
     @GetMapping("/{id}")
@@ -118,13 +118,13 @@ public class CollabController {
                 .body(collab.versionSnapshot(room, id, versionId));
     }
 
-    /** Convierte el contenido del editor (JSON/HTML nativo) y lo devuelve, o lo guarda en la sala (save=overwrite|new). */
+    /** Convierte el contenido del editor (JSON/HTML nativo) y lo devuelve, o lo guarda en la sala (save=file|new). */
     @PostMapping("/{id}/export")
     public ResponseEntity<?> export(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable UUID id,
-                                    @RequestParam String format, @RequestParam(defaultValue = "none") String save,
-                                    @RequestParam(defaultValue = "0") int active, HttpServletRequest request) throws IOException {
+                                    @RequestParam(required = false) String format, @RequestParam(defaultValue = "none") String save,
+                                    @RequestParam(defaultValue = "0") int active, @RequestParam(defaultValue = "0") long seq, HttpServletRequest request) throws IOException {
         Room room = rooms.requireMember(p.userId(), code);
-        var r = collab.export(room, id, p.userId(), p.role(), format, save, active, readBody(request, 40 * 1024 * 1024));
+        var r = collab.export(room, id, p.userId(), p.role(), format, save, active, seq, readBody(request, 40 * 1024 * 1024));
         if (r.saved() != null) return ResponseEntity.ok(r.saved());
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(r.mime())).contentLength(r.data().length)
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(r.filename(), java.nio.charset.StandardCharsets.UTF_8).build().toString())

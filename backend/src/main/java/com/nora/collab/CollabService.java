@@ -111,26 +111,39 @@ public class CollabService {
         return dto(d, repo.creatorName(d.createdBy()), rooms.canWrite(room, userId, sys));
     }
 
-    @Transactional
-    public DocDto create(Room room, UUID userId, Kind kind, String name) {
+    private static final Map<Kind, String> DEFAULT_EXT = Map.of(Kind.DOC, "docx", Kind.SHEET, "xlsx", Kind.SLIDES, "pptx");
+
+    /** Crea un documento nuevo: nace ya como archivo de la sala (en la carpeta indicada), así todos lo ven en Archivos y lo abren con un clic. */
+    public DocDto create(Room room, UUID userId, Kind kind, String name, UUID folderId) {
         if (kind == null) throw ApiException.badRequest("Indica el tipo de documento");
         String seed = switch (kind) { case DOC -> BLANK_DOC; case SHEET -> BLANK_SHEET; case SLIDES -> BLANK_SLIDES; };
+        String title = clean(name);
+        String ext = DEFAULT_EXT.get(kind);
+        byte[] blank = converter.export(kind.name(), ext, utf8(seed), 0); // lento: fuera de transacción
+        FileDto file = files.saveGenerated(room.getId(), userId, title + "." + ext, MIME.get(ext), blank, folderId);
         UUID id = UUID.randomUUID();
-        repo.insert(id, room.getId(), kind.name(), clean(name), userId, null, null, seed);
+        repo.insert(id, room.getId(), kind.name(), title, userId, file.id(), ext, seed);
+        repo.markSaved(id, 0, userId);
         return created(room, id);
     }
 
     /** Abre un archivo de oficina de la sala para editarlo: lo convierte una sola vez y lo deja listo para sembrar. */
-    public DocDto fromFile(Room room, UUID userId, UUID fileId) {
+    public DocDto fromFile(Room room, UUID userId, Role sys, UUID fileId) {
         FileDto file = files.info(room.getId(), fileId);
         String ext = file.name().contains(".") ? file.name().substring(file.name().lastIndexOf('.') + 1).toLowerCase() : "";
         Kind kind = KIND_OF_EXT.get(ext);
         if (kind == null) throw ApiException.badRequest("Este tipo de archivo no se puede editar");
         var existing = repo.findBySource(room.getId(), fileId);
-        if (existing.isPresent()) return dto(existing.get(), repo.creatorName(existing.get().createdBy()), true);
+        boolean canWrite = rooms.canWrite(room, userId, sys);
+        String base = file.name().contains(".") ? file.name().substring(0, file.name().lastIndexOf('.')) : file.name();
+        if (existing.isPresent()) {
+            DocRow d = existing.get();
+            if (!d.name().equals(clean(base))) repo.rename(d.id(), clean(base)); // el nombre del archivo manda
+            return dto(repo.find(d.id()).orElseThrow(), repo.creatorName(d.createdBy()), canWrite);
+        }
+        if (!canWrite) throw ApiException.forbidden("Aún no se ha abierto para editar: pide a alguien con permiso de edición que lo abra primero");
         if (file.sizeBytes() > MAX_NATIVE_BYTES) throw new ApiException(HttpStatus.PAYLOAD_TOO_LARGE, "El archivo es demasiado grande para editarlo");
         String seed = converter.importFile(files.readAll(room.getId(), fileId), ext); // lento: fuera de transacción
-        String base = file.name().contains(".") ? file.name().substring(0, file.name().lastIndexOf('.')) : file.name();
         UUID id = UUID.randomUUID();
         try {
             repo.insert(id, room.getId(), kind.name(), clean(base), userId, fileId, ext, seed);
@@ -151,7 +164,13 @@ public class CollabService {
     public DocDto rename(Room room, UUID docId, UUID userId, Role sys, String name) {
         DocRow d = docIn(room, docId);
         if (!d.createdBy().equals(userId) && !rooms.canModerate(room, userId, sys)) throw ApiException.forbidden("No puedes renombrar este documento");
-        repo.rename(docId, clean(name));
+        String title = clean(name);
+        repo.rename(docId, title);
+        if (d.sourceFileId() != null && d.sourceExt() != null) {
+            try {
+                files.rename(room.getId(), d.sourceFileId(), title + "." + d.sourceExt()); // el documento y su archivo se llaman igual
+            } catch (ApiException ignored) { /* el archivo ya no existe */ }
+        }
         DocDto dto = dto(repo.find(docId).orElseThrow(), repo.creatorName(d.createdBy()), true);
         events.publishEvent(new RoomEvent(room.getId(), "doc.renamed", dto));
         return dto;
@@ -163,6 +182,18 @@ public class CollabService {
         if (!d.createdBy().equals(userId) && !rooms.canModerate(room, userId, sys)) throw ApiException.forbidden("No puedes borrar este documento");
         repo.delete(docId);
         events.publishEvent(new RoomEvent(room.getId(), "doc.deleted", Map.of("id", docId)));
+    }
+
+    /** Si se borra el archivo (o su carpeta), el documento colaborativo que lo editaba deja de tener sentido. */
+    @org.springframework.transaction.event.TransactionalEventListener(phase = org.springframework.transaction.event.TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    void onRoomEvent(RoomEvent e) {
+        java.util.Collection<UUID> fileIds = List.of();
+        if ("file.deleted".equals(e.type()) && e.data() instanceof Map<?, ?> m && m.get("id") instanceof UUID id) fileIds = List.of(id);
+        else if ("folder.deleted".equals(e.type()) && e.data() instanceof Map<?, ?> m && m.get("files") instanceof List<?> l) fileIds = l.stream().filter(UUID.class::isInstance).map(UUID.class::cast).toList();
+        for (UUID docId : repo.idsBySource(e.roomId(), fileIds)) {
+            repo.delete(docId);
+            events.publishEvent(new RoomEvent(e.roomId(), "doc.deleted", Map.of("id", docId)));
+        }
     }
 
     // ---- estado y siembra ----
@@ -235,24 +266,31 @@ public class CollabService {
      * Convierte el contenido enviado por el editor (formato nativo) al formato pedido.
      * save: none = solo devolverlo; overwrite = sustituir el archivo original; new = guardarlo como archivo nuevo.
      */
-    public ExportResult export(Room room, UUID docId, UUID userId, Role sys, String format, String save, int active, byte[] nativeJson) {
+    public ExportResult export(Room room, UUID docId, UUID userId, Role sys, String format, String save, int active, long seq, byte[] nativeJson) {
         DocRow d = docIn(room, docId);
         Kind kind = Kind.valueOf(d.kind());
+        boolean toFile = "file".equals(save);
+        if (toFile) format = d.sourceExt() != null && EXPORT_FORMATS.get(kind).contains(d.sourceExt()) ? d.sourceExt() : DEFAULT_EXT.get(kind);
         if (!EXPORT_FORMATS.get(kind).contains(format)) throw ApiException.badRequest("Formato no admitido para este tipo de documento");
         if (nativeJson.length == 0 || nativeJson.length > MAX_NATIVE_BYTES) throw ApiException.badRequest("Contenido no válido");
         boolean writes = !"none".equals(save);
         if (writes && !rooms.canWrite(room, userId, sys)) throw ApiException.forbidden("Tu rol en esta sala es de solo lectura");
-        if ("overwrite".equals(save)) {
-            if (d.sourceFileId() == null) throw ApiException.badRequest("Este documento no viene de un archivo: guárdalo como archivo nuevo");
-            if (!format.equals(d.sourceExt())) throw ApiException.badRequest("Para sobrescribir el original usa su mismo formato (" + d.sourceExt() + ")");
-        }
         byte[] out = converter.export(kind.name(), format, nativeJson, active);
         String filename = d.name().replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]", "_") + "." + format;
         String mime = MIME.getOrDefault(format, "application/octet-stream");
         if (!writes) return new ExportResult(out, filename, mime, null);
         FileDto saved;
-        if ("overwrite".equals(save)) {
-            saved = files.replaceContent(room.getId(), d.sourceFileId(), out);
+        if (toFile) {
+            boolean same = d.sourceFileId() != null && format.equals(d.sourceExt()) && fileExists(room, d.sourceFileId());
+            if (same) {
+                saved = files.replaceContent(room.getId(), d.sourceFileId(), out);
+            } else { // formato antiguo (.doc, .xls, .ppt, .tsv…) o archivo desaparecido: se guarda como archivo nuevo y el documento pasa a usarlo
+                UUID folder = d.sourceFileId() == null ? null : sourceFolder(room, d.sourceFileId());
+                saved = files.saveGenerated(room.getId(), userId, filename, mime, out, folder);
+                repo.relink(docId, saved.id(), format);
+            }
+            repo.markSaved(docId, seq, userId);
+            events.publishEvent(new RoomEvent(room.getId(), "doc.saved", dto(repo.find(docId).orElseThrow(), repo.creatorName(d.createdBy()), true)));
         } else if ("new".equals(save)) {
             UUID folder = d.sourceFileId() == null ? null : sourceFolder(room, d.sourceFileId());
             saved = files.saveGenerated(room.getId(), userId, filename, mime, out, folder);
@@ -260,6 +298,15 @@ public class CollabService {
             throw ApiException.badRequest("Modo de guardado no válido");
         }
         return new ExportResult(null, filename, mime, saved);
+    }
+
+    private boolean fileExists(Room room, UUID fileId) {
+        try {
+            files.info(room.getId(), fileId);
+            return true;
+        } catch (ApiException e) {
+            return false;
+        }
     }
 
     private UUID sourceFolder(Room room, UUID fileId) {
@@ -283,7 +330,8 @@ public class CollabService {
     }
 
     private DocDto dto(DocRow d, String creatorName, boolean canEdit) {
-        return new DocDto(d.id(), d.kind(), d.name(), d.createdBy(), creatorName, d.createdAt(), d.updatedAt(), d.sourceFileId(), d.sourceExt(), canEdit);
+        return new DocDto(d.id(), d.kind(), d.name(), d.createdBy(), creatorName, d.createdAt(), d.updatedAt(), d.sourceFileId(), d.sourceExt(), canEdit,
+                d.seq(), d.savedSeq(), d.savedAt(), d.savedBy() == null ? null : repo.creatorName(d.savedBy()));
     }
 
     static byte[] utf8(String s) {

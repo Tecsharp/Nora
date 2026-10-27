@@ -11,12 +11,13 @@ public final class CollabDtos {
 
     public enum Kind { DOC, SHEET, SLIDES }
 
-    public record CreateRequest(Kind kind, @NotBlank(message = "El nombre es obligatorio") @Size(max = 120, message = "Máximo 120 caracteres") String name) {}
+    public record CreateRequest(Kind kind, @NotBlank(message = "El nombre es obligatorio") @Size(max = 120, message = "Máximo 120 caracteres") String name, UUID folderId) {}
 
     public record RenameRequest(@NotBlank(message = "El nombre es obligatorio") @Size(max = 120, message = "Máximo 120 caracteres") String name) {}
 
     public record DocDto(UUID id, String kind, String name, UUID createdBy, String createdByName, Instant createdAt, Instant updatedAt,
-                         UUID sourceFileId, String sourceExt, boolean canEdit) {}
+                         UUID sourceFileId, String sourceExt, boolean canEdit,
+                         long seq, long savedSeq, Instant savedAt, String savedByName) {}
 
     public record UpdateDto(long seq, String data) {}
 
