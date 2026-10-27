@@ -49,4 +49,5 @@ public class RoomNote {
     public Instant getCreatedAt() { return createdAt; }
     public UUID getFolderId() { return folderId; }
     public void setFolderId(UUID folderId) { this.folderId = folderId; }
+    public void setContent(String content) { this.content = content; }
 }

@@ -96,16 +96,24 @@ public class NoteController {
         if (!n.getAuthorId().equals(p.userId()) && !room.getOwnerId().equals(p.userId()) && p.role() != Role.ADMIN) {
             throw ApiException.forbidden("No puedes modificar este elemento");
         }
-        UUID folderId = null;
-        if (body.get("folderId") != null) {
-            try {
-                folderId = UUID.fromString(String.valueOf(body.get("folderId")));
-            } catch (IllegalArgumentException e) {
-                throw ApiException.badRequest("Categoría no válida");
+        // Solo se tocan los campos presentes: "folderId" mueve de categoría y "content" edita el texto
+        if (body.containsKey("folderId")) {
+            UUID folderId = null;
+            if (body.get("folderId") != null) {
+                try {
+                    folderId = UUID.fromString(String.valueOf(body.get("folderId")));
+                } catch (IllegalArgumentException e) {
+                    throw ApiException.badRequest("Categoría no válida");
+                }
             }
+            folders.requireIn(room.getId(), RoomFolder.Kind.valueOf(n.getKind().name()), folderId);
+            n.setFolderId(folderId);
         }
-        folders.requireIn(room.getId(), RoomFolder.Kind.valueOf(n.getKind().name()), folderId);
-        n.setFolderId(folderId);
+        if (body.containsKey("content")) {
+            if (!(body.get("content") instanceof String text) || text.isBlank()) throw ApiException.badRequest("El contenido es obligatorio");
+            if (text.length() > 20000) throw ApiException.badRequest("Máximo 20000 caracteres");
+            n.setContent(text);
+        }
         String name = users.findById(n.getAuthorId()).map(u -> u.getDisplayName()).orElse("?");
         NoteDto dto = new NoteDto(n.getId(), n.getContent(), n.getAuthorId(), name, n.getCreatedAt(), n.getFolderId());
         events.publishEvent(new RoomEvent(room.getId(), "note.updated", Map.of("kind", n.getKind(), "note", dto)));

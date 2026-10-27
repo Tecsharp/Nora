@@ -5,6 +5,7 @@ import { useAuth } from '../auth'
 import { useRealtime } from '../realtime'
 import { useToast } from '../toast'
 import Menu, { type MenuItem } from './Menu'
+import Modal from './Modal'
 import Tabs from './Tabs'
 
 interface Note {
@@ -47,6 +48,10 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
   const [adding, setAdding] = useState(false)
   const [catName, setCatName] = useState('')
   const [renaming, setRenaming] = useState(false)
+  const [editing, setEditing] = useState<Note | null>(null)
+  const [draft, setDraft] = useState('')
+  const [draftCat, setDraftCat] = useState('')
+  const [saving, setSaving] = useState(false)
   const path = `/rooms/${code}/notes`
   const catPath = `/rooms/${code}/folders?kind=${kind}`
   const isStaff = room.isOwner || user?.role === 'ADMIN'
@@ -153,6 +158,32 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
     }
   }
 
+  function open(n: Note) {
+    setEditing(n)
+    setDraft(n.content)
+    setDraftCat(n.folderId ?? '')
+    setError('')
+  }
+
+  async function save() {
+    if (!editing) return
+    setSaving(true)
+    try {
+      const body: Record<string, unknown> = {}
+      if (draft !== editing.content) body.content = draft
+      if ((draftCat || null) !== editing.folderId) body.folderId = draftCat || null
+      if (Object.keys(body).length > 0) {
+        const updated = await api<Note>(`${path}/${editing.id}`, 'PATCH', body)
+        setItems((all) => all.map((x) => (x.id === updated.id ? updated : x)))
+      }
+      setEditing(null)
+    } catch (err) {
+      fail(err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function copy(n: Note) {
     await navigator.clipboard?.writeText(n.content).catch(() => {})
     toast('Copiado al portapapeles', 'success')
@@ -162,6 +193,7 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
     const items: MenuItem[] = []
     if (copyable) items.push({ label: 'Copiar', icon: <Copy size={16} />, onClick: () => void copy(n) })
     if (canTouch(n.authorId)) {
+      items.push({ label: 'Editar', icon: <Pencil size={16} />, onClick: () => open(n) })
       items.push({ heading: 'Mover a' })
       if (n.folderId) items.push({ label: 'Sin categoría', icon: <FolderInput size={16} />, onClick: () => void move(n, null) })
       for (const c of cats) if (c.id !== n.folderId) items.push({ label: c.name, icon: <FolderInput size={16} />, onClick: () => void move(n, c.id) })
@@ -242,14 +274,15 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
         ) : (
           <div key={`${filter}-${query}`} className="note-grid swap">
             {shown.map((n) => (
-              <article key={n.id} className="note-card">
-                <p className="pre">{n.content}</p>
+              <article key={n.id} className="note-card" role="button" tabIndex={0} aria-label="Abrir"
+                onClick={() => open(n)} onKeyDown={(e) => { if (e.key === 'Enter') open(n) }}>
+                <p className="pre note-text">{n.content}</p>
                 <div className="row spread nowrap">
                   <span className="muted small truncate">
                     {n.authorName} · {new Date(n.createdAt).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                     {filter === ALL && catName2(n.folderId) ? ` · ${catName2(n.folderId)}` : ''}
                   </span>
-                  <div className="row nowrap" style={{ gap: 2 }}>
+                  <div className="row nowrap" style={{ gap: 2 }} onClick={(e) => e.stopPropagation()}>
                     {copyable && (
                       <button className="icon-btn sm" aria-label="Copiar" title="Copiar" onClick={() => void copy(n)}><Copy size={15} /></button>
                     )}
@@ -261,6 +294,34 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
           </div>
         )}
       </div>
+
+      {editing && (
+        <Modal title={canTouch(editing.authorId) ? 'Editar' : 'Contenido'} onClose={() => setEditing(null)}
+          footer={
+            <>
+              {copyable && <button className="btn ghost" onClick={() => void copy(editing)}><Copy size={15} /> Copiar</button>}
+              <span className="grow" />
+              <button className="btn ghost" onClick={() => setEditing(null)}>{canTouch(editing.authorId) ? 'Cancelar' : 'Cerrar'}</button>
+              {canTouch(editing.authorId) && (
+                <button className="btn primary" disabled={saving || !draft.trim()} onClick={save}>{saving ? 'Guardando…' : 'Guardar'}</button>
+              )}
+            </>
+          }>
+          <textarea rows={12} maxLength={20000} aria-label="Contenido" value={draft} readOnly={!canTouch(editing.authorId)}
+            onChange={(e) => setDraft(e.target.value)} style={{ minHeight: 220 }} autoFocus />
+          {canTouch(editing.authorId) && (
+            <label>
+              Categoría
+              <select value={draftCat} onChange={(e) => setDraftCat(e.target.value)}>
+                <option value="">Sin categoría</option>
+                {cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </label>
+          )}
+          <span className="muted small">{editing.authorName} · {new Date(editing.createdAt).toLocaleString()}</span>
+          {error && <p className="error small" role="alert">{error}</p>}
+        </Modal>
+      )}
     </div>
   )
 }
