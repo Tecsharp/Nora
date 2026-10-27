@@ -19,5 +19,5 @@ public record AppProperties(
 
     public record Defaults(long storageQuotaMb, long maxFileMb, int maxRoomMinutes, int maxActiveRooms, int maxParticipants) {}
 
-    public record Storage(String endpoint, String accessKey, String secretKey, String bucket) {}
+    public record Storage(String dir) {}
 }

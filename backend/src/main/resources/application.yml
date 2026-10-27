@@ -54,7 +54,4 @@ app:
     max-active-rooms: ${NORA_DEFAULT_MAX_ROOMS:5}
     max-participants: ${NORA_DEFAULT_MAX_PARTICIPANTS:25}
   storage:
-    endpoint: ${NORA_MINIO_ENDPOINT:http://minio:9000}
-    access-key: ${NORA_MINIO_ACCESS_KEY}
-    secret-key: ${NORA_MINIO_SECRET_KEY}
-    bucket: ${NORA_MINIO_BUCKET:nora-files}
+    dir: ${NORA_STORAGE_DIR:/data/files}

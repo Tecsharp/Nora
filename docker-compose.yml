@@ -24,30 +24,15 @@ services:
     networks: [internal]
     cap_add: [CHOWN, SETUID, SETGID, FOWNER, DAC_OVERRIDE]
 
-  minio:
-    <<: *hardening
-    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
-    command: server /data
-    environment:
-      MINIO_ROOT_USER: "${NORA_MINIO_ACCESS_KEY:?Falta .env, ejecuta ./setup.sh}"
-      MINIO_ROOT_PASSWORD: "${NORA_MINIO_SECRET_KEY:?Falta .env, ejecuta ./setup.sh}"
-    volumes:
-      - nora_files:/data
-    networks: [internal]   # sin puertos publicados y sin salida a Internet: solo la API llega aquí
-
   backend:
     <<: *hardening
     build: ./backend
     depends_on:
       db: { condition: service_healthy }
-      minio: { condition: service_started }
     environment:
       NORA_DB_HOST: db
       NORA_DB_PASSWORD: ${NORA_DB_PASSWORD}
       NORA_JWT_SECRET: "${NORA_JWT_SECRET:?Falta .env, ejecuta ./setup.sh}"
-      NORA_MINIO_ENDPOINT: http://minio:9000
-      NORA_MINIO_ACCESS_KEY: ${NORA_MINIO_ACCESS_KEY}
-      NORA_MINIO_SECRET_KEY: ${NORA_MINIO_SECRET_KEY}
       NORA_ADMIN_EMAIL: ${NORA_ADMIN_EMAIL:-}
       NORA_ADMIN_PASSWORD: ${NORA_ADMIN_PASSWORD:-}
       NORA_ALLOWED_ORIGINS: ${NORA_ALLOWED_ORIGINS:-}
@@ -58,6 +43,8 @@ services:
       NORA_DEFAULT_ROOM_MINUTES: ${NORA_DEFAULT_ROOM_MINUTES:-120}
       NORA_DEFAULT_MAX_ROOMS: ${NORA_DEFAULT_MAX_ROOMS:-5}
       NORA_DEFAULT_MAX_PARTICIPANTS: ${NORA_DEFAULT_MAX_PARTICIPANTS:-25}
+    volumes:
+      - nora_files:/data/files   # solo el backend monta este volumen; no hay otro acceso a los archivos
     read_only: true
     tmpfs:
       - /tmp:size=1g

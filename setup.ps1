@@ -11,8 +11,6 @@ if (-not (Test-Path .env)) {
   $text = Get-Content .env.example -Raw
   $text = $text -replace '(?m)^NORA_DB_PASSWORD=.*', "NORA_DB_PASSWORD=$(New-Secret 32)"
   $text = $text -replace '(?m)^NORA_JWT_SECRET=.*', "NORA_JWT_SECRET=$(New-Secret 64)"
-  $text = $text -replace '(?m)^NORA_MINIO_ACCESS_KEY=.*', "NORA_MINIO_ACCESS_KEY=nora$(New-Secret 8)"
-  $text = $text -replace '(?m)^NORA_MINIO_SECRET_KEY=.*', "NORA_MINIO_SECRET_KEY=$(New-Secret 40)"
   $text = $text -replace '(?m)^NORA_ADMIN_PASSWORD=.*', "NORA_ADMIN_PASSWORD=$admin"
   Set-Content .env $text -NoNewline
   Write-Host "Creado .env con secretos aleatorios."
