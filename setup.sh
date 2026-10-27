@@ -29,6 +29,7 @@ ensure() {
 }
 ensure NORA_GARAGE_RPC_SECRET "$(hex 64)"
 ensure NORA_GARAGE_ADMIN_TOKEN "$(rand 48)"
+ensure NORA_CONVERTER_TOKEN "$(rand 40)"
 
 docker compose up -d --build
 PORT="$(grep -E '^NORA_PORT=' .env | cut -d= -f2 | cut -d' ' -f1)"

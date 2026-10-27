@@ -55,6 +55,9 @@ app:
     max-room-minutes: ${NORA_DEFAULT_ROOM_MINUTES:120}
     max-active-rooms: ${NORA_DEFAULT_MAX_ROOMS:5}
     max-participants: ${NORA_DEFAULT_MAX_PARTICIPANTS:25}
+  converter:
+    url: ${NORA_CONVERTER_URL:http://converter:3100}
+    token: ${NORA_CONVERTER_TOKEN:}
   storage:
     endpoint: ${NORA_GARAGE_ENDPOINT:http://garage:3900}
     admin-endpoint: ${NORA_GARAGE_ADMIN_ENDPOINT:http://garage:3903}

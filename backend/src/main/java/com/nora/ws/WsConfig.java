@@ -39,7 +39,7 @@ public class WsConfig implements WebSocketConfigurer {
     @Bean
     ServletServerContainerFactoryBean webSocketContainer() {
         var c = new ServletServerContainerFactoryBean();
-        c.setMaxTextMessageBufferSize(16 * 1024);
+        c.setMaxTextMessageBufferSize(2 * 1024 * 1024); // cambios de documentos (con imágenes) en base64
         c.setMaxBinaryMessageBufferSize(1024);
         // Los clientes envían un ping cada 25 s; una conexión muda (p. ej. un túnel caído) se libera sola.
         c.setMaxSessionIdleTimeout(90_000L);

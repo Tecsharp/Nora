@@ -122,6 +122,69 @@ public class FileService {
         return doomed.stream().map(RoomFile::getId).toList();
     }
 
+    /** Contenido completo de un archivo (para convertirlo). */
+    @Transactional(readOnly = true)
+    public byte[] readAll(UUID roomId, UUID fileId) {
+        RoomFile f = find(roomId, fileId);
+        try (InputStream in = storage.get(f.getObjectKey())) {
+            return in.readAllBytes();
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudo leer el archivo", e);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public FileDto info(UUID roomId, UUID fileId) {
+        return FileDto.of(find(roomId, fileId));
+    }
+
+    /** Sobrescribe el contenido de un archivo existente (guardado desde el editor). El espacio se cuenta a quien lo subió. */
+    @Transactional
+    public FileDto replaceContent(UUID roomId, UUID fileId, byte[] data) {
+        RoomFile f = find(roomId, fileId);
+        User owner = users.findById(f.getUploaderId()).orElseThrow(() -> ApiException.notFound("Usuario no encontrado"));
+        if (owner.getMaxFileSizeBytes() != null && data.length > owner.getMaxFileSizeBytes()) {
+            throw new ApiException(HttpStatus.PAYLOAD_TOO_LARGE, "El archivo supera el límite por archivo de su propietario");
+        }
+        if (owner.getStorageQuotaBytes() != null && usedBytes(owner.getId()) - f.getSizeBytes() + data.length > owner.getStorageQuotaBytes()) {
+            throw new ApiException(HttpStatus.INSUFFICIENT_STORAGE, "El propietario del archivo ha agotado su espacio de almacenamiento");
+        }
+        try (InputStream in = new java.io.ByteArrayInputStream(data)) {
+            storage.put(f.getObjectKey(), in, data.length);
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudo guardar el archivo", e);
+        }
+        f.setSizeBytes(data.length);
+        FileDto dto = FileDto.of(files.saveAndFlush(f));
+        events.publishEvent(new RoomEvent(roomId, "file.updated", dto));
+        return dto;
+    }
+
+    /** Guarda un archivo generado por el servidor (exportación del editor) como archivo nuevo de la sala. */
+    @Transactional
+    public FileDto saveGenerated(UUID roomId, UUID userId, String name, String contentType, byte[] data, UUID folderId) {
+        User user = users.findById(userId).orElseThrow(() -> ApiException.notFound("Usuario no encontrado"));
+        if (user.getMaxFileSizeBytes() != null && data.length > user.getMaxFileSizeBytes()) {
+            throw new ApiException(HttpStatus.PAYLOAD_TOO_LARGE, "El archivo supera tu límite de " + humanSize(user.getMaxFileSizeBytes()));
+        }
+        if (user.getStorageQuotaBytes() != null && usedBytes(userId) + data.length > user.getStorageQuotaBytes()) {
+            throw new ApiException(HttpStatus.INSUFFICIENT_STORAGE, "Has agotado tu espacio de almacenamiento");
+        }
+        RoomFile entity = new RoomFile(roomId, userId, sanitize(name), contentType, data.length);
+        entity.setFolderId(folderId);
+        try (InputStream in = new java.io.ByteArrayInputStream(data)) {
+            storage.put(entity.getObjectKey(), in, data.length);
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudo guardar el archivo", e);
+        }
+        try {
+            return added(files.saveAndFlush(entity));
+        } catch (RuntimeException e) {
+            cleaner.schedule(entity.getObjectKey());
+            throw e;
+        }
+    }
+
     /** Registra un archivo cuyo contenido ya está en el almacén (subida reanudable completada). */
     @Transactional
     public FileDto register(RoomFile entity) {

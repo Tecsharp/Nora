@@ -294,6 +294,12 @@ public class RoomService {
         return room;
     }
 
+    /** ¿Puede editar? (todos menos los lectores). */
+    @Transactional(readOnly = true)
+    public boolean canWrite(Room room, UUID userId, Role sysRole) {
+        return sysRole == Role.ADMIN || room.getOwnerId().equals(userId) || memberRole(room, userId) != RoomRole.VIEWER;
+    }
+
     /** Propietario, administrador del sistema o moderador de la sala: pueden gestionar el contenido de otros. */
     @Transactional(readOnly = true)
     public boolean canModerate(Room room, UUID userId, Role sysRole) {

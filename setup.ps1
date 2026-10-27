@@ -30,6 +30,7 @@ function Ensure-Var([string]$name, [string]$value) {
 }
 Ensure-Var 'NORA_GARAGE_RPC_SECRET' (-join ((1..64) | ForEach-Object { '{0:x}' -f (Get-Random -Maximum 16) }))
 Ensure-Var 'NORA_GARAGE_ADMIN_TOKEN' (New-Secret 48)
+Ensure-Var 'NORA_CONVERTER_TOKEN' (New-Secret 40)
 
 docker compose up -d --build
 if ($LASTEXITCODE -ne 0) {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import {
-  ChevronRight, Download, X, File, FileArchive, FileAudio, FileCode, FileImage, FileText, FileVideo, Folder, FolderInput, FolderPlus, FolderUp, Eye,
+  ChevronRight, Download, X, File, FileArchive, FileAudio, FileCode, FileImage, FileText, FileVideo, Folder, FolderInput, FolderPlus, FolderUp, Eye, Loader2,
   House, LayoutGrid, List, Pencil, Search, Trash2, Upload,
 } from 'lucide-react'
 import { api, ApiError, downloadWithProgress, formatBytes, type DownloadHandle, type Room } from '../api'
@@ -11,7 +11,8 @@ import { collectFromEntries, collectFromFiles, entriesFromDrop, type Collected }
 import { useRealtime } from '../realtime'
 import { useToast } from '../toast'
 import { fingerprintOf } from '../uploader'
-import { previewKind } from '../preview'
+import { isEditable, previewKind } from '../preview'
+import type { DocInfo } from '../collab/DocEditor'
 import { fileFromHandle, isActive, loadInterrupted, pruneStaleHandles, uploads, useUploads, type PendingUpload } from '../uploadManager'
 import ProgressRing from './ProgressRing'
 import FileViewer from './FileViewer'
@@ -74,7 +75,7 @@ const TONES = new Map<typeof File, string>([
 const when = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 
-export default function FilesTool({ room }: { room: Room }) {
+export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?: (d: DocInfo) => void }) {
   const { user } = useAuth()
   const toast = useToast()
   const mine = useUploads().filter((i) => i.code === room.code)
@@ -93,6 +94,7 @@ export default function FilesTool({ room }: { room: Room }) {
   const [moving, setMoving] = useState<FileItem | null>(null)
   const [dropTarget, setDropTarget] = useState<string | 'root' | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [opening, setOpening] = useState<string | null>(null)
   const [viewing, setViewing] = useState<string | null>(null)
   const [dl, setDl] = useState<Record<string, { loaded: number; total: number }>>({})
   const dlHandles = useRef(new Map<string, DownloadHandle>())
@@ -330,6 +332,20 @@ export default function FilesTool({ room }: { room: Room }) {
     }
   }
 
+  /** Abre un archivo de oficina en el editor colaborativo (la primera vez lo convierte en el servidor). */
+  async function editFile(f: FileItem) {
+    if (opening || !onEditDoc) return
+    setOpening(f.id)
+    setError('')
+    try {
+      onEditDoc(await api<DocInfo>(`/rooms/${room.code}/docs/from-file/${f.id}`, 'POST'))
+    } catch (e) {
+      setError(`«${f.name}»: ${e instanceof ApiError ? e.message : 'no se pudo abrir para editar'}`)
+    } finally {
+      setOpening(null)
+    }
+  }
+
   /** La descarga solo se inicia desde el botón. Muestra el progreso sobre el icono y se puede cancelar. */
   function downloadFile(f: FileItem) {
     if (dlHandles.current.has(f.id)) return
@@ -395,6 +411,7 @@ export default function FilesTool({ room }: { room: Room }) {
 
   function fileMenu(f: FileItem): MenuItem[] {
     const items: MenuItem[] = [
+      ...(canWrite && onEditDoc && isEditable(f.name) ? [{ label: 'Editar', icon: <Pencil size={16} />, onClick: () => void editFile(f) }] : []),
       ...(previewKind(f.name) ? [{ label: 'Ver', icon: <Eye size={16} />, onClick: () => setViewing(f.id) }] : []),
       { label: 'Descargar', icon: <Download size={16} />, onClick: () => void downloadFile(f) },
     ]
@@ -466,6 +483,11 @@ export default function FilesTool({ room }: { room: Room }) {
           </span>
         </span>
         <span className="factions">
+          {canWrite && onEditDoc && isEditable(f.name) && !d && (
+            <button className="icon-btn sm" title="Editar con otras personas" aria-label={`Editar ${f.name}`} disabled={!!opening} onClick={(e) => { e.stopPropagation(); void editFile(f) }}>
+              {opening === f.id ? <Loader2 className="spin-icon" size={16} /> : <Pencil size={16} />}
+            </button>
+          )}
           {canView && !d && (
             <button className="icon-btn sm" title="Ver" aria-label={`Ver ${f.name}`} onClick={(e) => { e.stopPropagation(); setViewing(f.id) }}>
               <Eye size={16} />

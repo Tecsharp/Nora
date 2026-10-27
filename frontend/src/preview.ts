@@ -13,6 +13,10 @@ const TEXT = new Set([
 /** Tamaño máximo para previsualizar (por encima, se ofrece descargar). */
 export const PREVIEW_LIMIT: Record<PreviewKind, number> = { image: 40 * 1024 * 1024, pdf: 100 * 1024 * 1024, text: 2 * 1024 * 1024 }
 
+/** Archivos de oficina que se pueden abrir para editar entre varias personas. */
+export const EDITABLE = new Set(['docx', 'odt', 'doc', 'rtf', 'xlsx', 'ods', 'xls', 'csv', 'tsv', 'pptx', 'odp', 'ppt'])
+export const isEditable = (name: string) => EDITABLE.has(ext(name))
+
 const ext = (name: string) => name.split('.').pop()?.toLowerCase() ?? ''
 
 /** Qué visor corresponde al archivo. Los vídeos (y el resto) no se previsualizan: se descargan. */

@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState, type ComponentType } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Suspense, lazy, useCallback, useEffect, useState, type ComponentType } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  ArrowLeft, Check, Pencil, Settings, UserCheck, X, Clapperboard, Clipboard, ClipboardList, Clock, Copy, FolderOpen, Hash, Monitor, PenTool, Plus, ShieldCheck,
+  ArrowLeft, Check, Pencil, Settings, UserCheck, X, Clapperboard, Clipboard, ClipboardList, Clock, Copy, FilePenLine, FolderOpen, Hash, Monitor, PenTool, Plus, ShieldCheck,
   SquareCheckBig, Trash2, Zap, type LucideProps,
 } from 'lucide-react'
 import { api, ApiError, type JoinRequest, type Room } from '../api'
@@ -13,7 +13,10 @@ import ExpiryDialog from '../components/ExpiryDialog'
 import RoomSettingsDialog from '../components/RoomSettingsDialog'
 import Menu from '../components/Menu'
 import Modal from '../components/Modal'
+import DocsTool from '../components/DocsTool'
 import FilesTool from '../components/FilesTool'
+import type { DocInfo } from '../collab/DocEditor'
+import { canWrite as canWriteIn } from '../roles'
 import NotesTool from '../components/NotesTool'
 import { ASSIGNABLE, ROLE_HINT, ROLE_LABEL, type RoomRole } from '../roles'
 import { remaining } from '../time'
@@ -32,6 +35,7 @@ interface Tool {
 
 const TOOLS: Tool[] = [
   { id: 'files', label: 'Archivos', icon: FolderOpen, ready: true, tone: 'blue' },
+  { id: 'docs', label: 'Documentos', icon: FilePenLine, ready: true, tone: 'violet' },
   { id: 'board', label: 'Pizarra', icon: PenTool, ready: false },
   { id: 'clipboard', label: 'Portapapeles', icon: Clipboard, ready: true, tone: 'amber' },
   { id: 'notes', label: 'Notas', icon: ClipboardList, ready: true, tone: 'rose' },
@@ -42,6 +46,8 @@ const TOOLS: Tool[] = [
   { id: 'more', label: 'Más herramientas', icon: Plus, ready: false },
 ]
 
+const DocEditor = lazy(() => import('../collab/DocEditor'))
+
 export default function RoomPage() {
   const { code = '' } = useParams()
   const { user } = useAuth()
@@ -51,6 +57,8 @@ export default function RoomPage() {
   const [active, setActive] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [adjusting, setAdjusting] = useState(false)
+  const [editingDoc, setEditingDoc] = useState<DocInfo | null>(null)
+  const [params, setParams] = useSearchParams()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [requests, setRequests] = useState<JoinRequest[]>([])
   const [online, setOnline] = useState<Set<string>>(new Set())
@@ -162,6 +170,22 @@ export default function RoomPage() {
       loadRequests()
     }
   }
+
+  const openDoc = useCallback((d: DocInfo) => {
+    setActive(null)
+    setEditingDoc(d)
+    setParams((p) => { p.set('doc', d.id); return p }, { replace: true })
+  }, [setParams])
+  const closeDoc = useCallback(() => {
+    setEditingDoc(null)
+    setParams((p) => { p.delete('doc'); return p }, { replace: true })
+  }, [setParams])
+  // Enlace directo a un documento (?doc=…)
+  const wantedDoc = params.get('doc')
+  useEffect(() => {
+    if (!wantedDoc || editingDoc?.id === wantedDoc) return
+    api<DocInfo>(`/rooms/${code}/docs/${wantedDoc}`).then(setEditingDoc).catch(() => closeDoc())
+  }, [wantedDoc, code, editingDoc?.id, closeDoc])
 
   async function assignRole(userId: string, role: RoomRole) {
     try {
@@ -307,6 +331,12 @@ export default function RoomPage() {
         </span>
       </footer>
 
+      {editingDoc && (
+        <Suspense fallback={null}>
+          <DocEditor code={room.code} doc={editingDoc} canWrite={canWriteIn(room, user)} onClose={closeDoc} />
+        </Suspense>
+      )}
+
       {settingsOpen && <RoomSettingsDialog room={room} onClose={() => setSettingsOpen(false)} onSaved={(r) => setRoom(r)} />}
 
       {adjusting && (
@@ -316,7 +346,8 @@ export default function RoomPage() {
 
       {tool && (
         <Modal title={tool.label} icon={<tool.icon size={20} />} wide={tool.ready} flush={tool.ready} onClose={() => setActive(null)}>
-          {tool.id === 'files' && <FilesTool room={room} />}
+          {tool.id === 'files' && <FilesTool room={room} onEditDoc={openDoc} />}
+          {tool.id === 'docs' && <DocsTool room={room} onOpen={openDoc} />}
           {tool.id === 'notes' && <NotesTool room={room} kind="NOTE" placeholder="Escribe una nota para la sala…" />}
           {tool.id === 'clipboard' && <NotesTool room={room} kind="CLIPBOARD" placeholder="Pega aquí el texto que quieres compartir…" copyable />}
           {!tool.ready && (
