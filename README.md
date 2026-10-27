@@ -46,11 +46,14 @@ Navegador ──► gateway (nginx, único puerto publicado)
 
 ### Acceso desde otros equipos y Cloudflare Tunnel
 
-Por defecto el gateway solo escucha en `127.0.0.1` (`NORA_BIND`), así que únicamente se ve desde la propia máquina. Según cómo quieras entrar:
+Por defecto el gateway escucha en todas las interfaces (`NORA_BIND=0.0.0.0`), así que Nora es accesible por `http://IP-DEL-SERVIDOR:29817` desde tu red. Si solo quieres usarlo desde la propia máquina, pon `NORA_BIND=127.0.0.1` en `.env` y ejecuta `docker compose up -d`.
 
-- **Por IP:puerto desde la red**: en `.env` pon `NORA_BIND=0.0.0.0` y recrea con `docker compose up -d`. Entra por `http://IP:29817`.
-- **Cloudflare Tunnel con `cloudflared` instalado en el host**: apunta el servicio a `http://localhost:29817` (el `127.0.0.1` por defecto basta).
-- **Cloudflare Tunnel con `cloudflared` en un contenedor**: dentro de ese contenedor `localhost` no es el host. Usa `NORA_BIND=0.0.0.0` y apunta a `http://IP-DEL-HOST:29817`, o conecta el contenedor a la red `nora_edge` y apunta a `http://gateway:8080`.
+Con Cloudflare Tunnel:
+
+- **`cloudflared` instalado en el host**: apunta el servicio a `http://localhost:29817`.
+- **`cloudflared` en un contenedor**: dentro de él `localhost` no es el host. Apunta a `http://IP-DEL-SERVIDOR:29817`, o conecta el contenedor a la red `nora_edge` y apunta a `http://gateway:8080`.
+
+Si lo expones a Internet, hazlo detrás de HTTPS (el túnel ya lo aporta) y valora desactivar el registro público con `NORA_ALLOW_REGISTRATION=false`.
 
 El gateway respeta `X-Forwarded-Proto` y `X-Forwarded-Host`, por lo que el login funciona tras HTTPS, y la cookie de sesión se marca `Secure` automáticamente cuando se entra por HTTPS.
 
