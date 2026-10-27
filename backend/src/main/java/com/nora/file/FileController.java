@@ -37,7 +37,7 @@ public class FileController {
     @PatchMapping("/{fileId}")
     public FileDto update(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable UUID fileId,
                           @RequestBody java.util.Map<String, Object> body) {
-        Room room = rooms.requireMember(p.userId(), code);
+        Room room = rooms.requireWriter(p.userId(), p.role(), code);
         boolean move = body.containsKey("folderId");
         UUID folderId = null;
         if (move && body.get("folderId") != null) {
@@ -53,7 +53,7 @@ public class FileController {
             if (s.isBlank() || s.length() > 255) throw com.nora.common.ApiException.badRequest("Nombre no válido");
             name = s;
         }
-        return files.update(room.getId(), fileId, p.userId(), p.role(), room.getOwnerId(), move, folderId, name);
+        return files.update(room.getId(), fileId, p.userId(), rooms.canModerate(room, p.userId(), p.role()), move, folderId, name);
     }
 
     @GetMapping
@@ -66,7 +66,7 @@ public class FileController {
     @ResponseStatus(HttpStatus.CREATED)
     public FileDto upload(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code,
                           @RequestParam("file") MultipartFile file, @RequestParam(required = false) UUID folderId) {
-        Room room = rooms.requireMember(p.userId(), code);
+        Room room = rooms.requireWriter(p.userId(), p.role(), code);
         folders.requireIn(room.getId(), RoomFolder.Kind.FILE, folderId);
         return files.upload(room.getId(), p.userId(), file, folderId);
     }
@@ -95,7 +95,7 @@ public class FileController {
     @DeleteMapping("/{fileId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable UUID fileId) {
-        Room room = rooms.requireMember(p.userId(), code);
-        files.delete(room.getId(), fileId, p.userId(), p.role(), room.getOwnerId());
+        Room room = rooms.requireWriter(p.userId(), p.role(), code);
+        files.delete(room.getId(), fileId, p.userId(), rooms.canModerate(room, p.userId(), p.role()));
     }
 }

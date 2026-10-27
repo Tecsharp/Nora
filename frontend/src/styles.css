@@ -458,3 +458,10 @@ table.table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 @media (max-width: 420px) { .quick-grid { grid-template-columns: repeat(2, 1fr); } }
 .room-card-wrap { position: relative; }
 .room-card-act { position: absolute; right: 10px; bottom: 10px; }
+
+/* Roles de la sala */
+.person .who { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.role-tag { font-size: 0.72rem; color: var(--subtle); }
+.role-tag.strong { color: var(--accent-text); }
+.person .menu { min-width: 280px; }
+.room-hero { position: relative; z-index: 3; }

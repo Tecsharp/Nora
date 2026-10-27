@@ -44,6 +44,10 @@ public class RoomMember {
     @Column(name = "last_seen_at", nullable = false)
     private Instant lastSeenAt = Instant.now();
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private RoomRole role = RoomRole.MEMBER;
+
     protected RoomMember() {}
 
     public RoomMember(UUID roomId, UUID userId) {
@@ -55,5 +59,7 @@ public class RoomMember {
     public UUID getUserId() { return userId; }
     public Instant getJoinedAt() { return joinedAt; }
     public Instant getLastSeenAt() { return lastSeenAt; }
+    public RoomRole getRole() { return role; }
+    public void setRole(RoomRole role) { this.role = role; }
     public void touch() { this.lastSeenAt = Instant.now(); }
 }

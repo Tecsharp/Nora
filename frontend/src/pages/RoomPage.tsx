@@ -10,9 +10,11 @@ import { rt, useRealtime, useRtStatus } from '../realtime'
 import { useToast } from '../toast'
 import Avatar from '../components/Avatar'
 import ExpiryDialog from '../components/ExpiryDialog'
+import Menu from '../components/Menu'
 import Modal from '../components/Modal'
 import FilesTool from '../components/FilesTool'
 import NotesTool from '../components/NotesTool'
+import { ASSIGNABLE, ROLE_HINT, ROLE_LABEL, type RoomRole } from '../roles'
 import { remaining } from '../time'
 import { setFilesOpen } from '../ui'
 import { resumeInterrupted } from '../uploadManager'
@@ -114,6 +116,14 @@ export default function RoomPage() {
   })
   useRealtime('room.expiring', (d: { minutesLeft: number }) =>
     toast(d.minutesLeft <= 1 ? 'La sala expira en menos de 1 minuto' : `La sala expira en ${d.minutesLeft} minutos`, 'warning'))
+  useRealtime('member.updated', (d: { userId: string; displayName: string; role: RoomRole }) => {
+    setRoom((r) => r && {
+      ...r,
+      role: d.userId === user?.id ? d.role : r.role,
+      participants: r.participants.map((x) => (x.userId === d.userId ? { ...x, role: d.role } : x)),
+    })
+    if (d.userId === user?.id) toast(`Tu rol en la sala ahora es: ${ROLE_LABEL[d.role]} (${ROLE_HINT[d.role].toLowerCase()})`, 'info')
+  })
   useRealtime('room.closed', (d: { reason: string }) => {
     toast(d.reason === 'expired' ? 'La sala ha expirado y se han borrado sus archivos' : 'La sala ha sido cerrada', 'warning')
     navigate('/')
@@ -126,6 +136,15 @@ export default function RoomPage() {
     await navigator.clipboard?.writeText(code).catch(() => {})
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
+  }
+
+  async function assignRole(userId: string, role: RoomRole) {
+    try {
+      await api(`/rooms/${code}/members/${userId}`, 'PATCH', { role })
+      setRoom((r) => (r ? { ...r, participants: r.participants.map((x) => (x.userId === userId ? { ...x, role } : x)) } : r))
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : 'No se pudo cambiar el rol', 'error')
+    }
   }
 
   async function closeRoom() {
@@ -147,6 +166,7 @@ export default function RoomPage() {
   const expired = room.expiresAt !== null && new Date(room.expiresAt).getTime() <= Date.now()
   const tool = TOOLS.find((t) => t.id === active)
   const secure = window.location.protocol === 'https:'
+  const canAssign = room.isOwner || user?.role === 'ADMIN'
 
   return (
     <div className="room">
@@ -190,14 +210,27 @@ export default function RoomPage() {
             <span className="badge green"><i /> {onlineCount} {onlineCount === 1 ? 'conectado' : 'conectados'}</span>
           </div>
           <div className="avatars">
-            {room.participants.slice(0, 10).map((p) => (
+            {room.participants.slice(0, 24).map((p) => (
               <span key={p.userId} className={`person ${online.has(p.userId) ? '' : 'off'}`}
                 title={`${p.displayName}${online.has(p.userId) ? '' : ' (desconectado)'}`}>
                 <Avatar name={p.displayName} online={online.has(p.userId)} />
-                <span className="truncate">{p.displayName}</span>
+                <span className="who">
+                  <span className="truncate">{p.displayName}</span>
+                  <span className={`role-tag ${p.role === 'OWNER' || p.role === 'MODERATOR' ? 'strong' : ''}`}>{ROLE_LABEL[p.role]}</span>
+                </span>
+                {canAssign && p.role !== 'OWNER' && (
+                  <Menu label={`Cambiar el rol de ${p.displayName}`} items={[
+                    { heading: 'Rol en la sala' },
+                    ...ASSIGNABLE.map((r) => ({
+                      label: `${ROLE_LABEL[r]} · ${ROLE_HINT[r]}`,
+                      icon: r === p.role ? <Check size={16} /> : <span style={{ width: 16 }} />,
+                      onClick: () => void assignRole(p.userId, r),
+                    })),
+                  ]} />
+                )}
               </span>
             ))}
-            {room.participants.length > 10 && <span className="person muted">+{room.participants.length - 10} más</span>}
+            {room.participants.length > 24 && <span className="person muted">+{room.participants.length - 24} más</span>}
           </div>
         </section>
       </div>

@@ -30,7 +30,7 @@ public class UploadController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public UploadDto create(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @Valid @RequestBody CreateRequest req) {
-        Room room = rooms.requireMember(p.userId(), code);
+        Room room = rooms.requireWriter(p.userId(), p.role(), code);
         return uploads.create(room.getId(), p.userId(), req);
     }
 
@@ -50,13 +50,13 @@ public class UploadController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void part(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable UUID id,
                      @PathVariable int number, HttpServletRequest request) throws IOException {
-        Room room = rooms.requireMember(p.userId(), code);
+        Room room = rooms.requireWriter(p.userId(), p.role(), code);
         uploads.putPart(room.getId(), p.userId(), id, number, request.getInputStream());
     }
 
     @PostMapping("/{id}/complete")
     public FileService.FileDto complete(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable UUID id) {
-        Room room = rooms.requireMember(p.userId(), code);
+        Room room = rooms.requireWriter(p.userId(), p.role(), code);
         return uploads.complete(room.getId(), p.userId(), id);
     }
 

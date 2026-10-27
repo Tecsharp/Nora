@@ -176,6 +176,43 @@ public class RoomService {
         return room;
     }
 
+    /** Igual que requireMember, pero rechaza a quien solo tiene el rol de lector. */
+    @Transactional(readOnly = true)
+    public Room requireWriter(UUID userId, Role sysRole, String code) {
+        Room room = requireMember(userId, code);
+        if (sysRole != Role.ADMIN && !room.getOwnerId().equals(userId) && memberRole(room, userId) == RoomRole.VIEWER) {
+            throw ApiException.forbidden("Tu rol en esta sala es de solo lectura");
+        }
+        return room;
+    }
+
+    /** Propietario, administrador del sistema o moderador de la sala: pueden gestionar el contenido de otros. */
+    @Transactional(readOnly = true)
+    public boolean canModerate(Room room, UUID userId, Role sysRole) {
+        return sysRole == Role.ADMIN || room.getOwnerId().equals(userId) || memberRole(room, userId) == RoomRole.MODERATOR;
+    }
+
+    private RoomRole memberRole(Room room, UUID userId) {
+        return members.findById(new RoomMember.Key(room.getId(), userId)).map(RoomMember::getRole).orElse(RoomRole.MEMBER);
+    }
+
+    /** El propietario (o un administrador) asigna el rol de otro participante. */
+    @Transactional
+    public ParticipantDto setMemberRole(UUID actorId, Role sysRole, String code, UUID targetId, RoomRole role) {
+        Room room = requireMember(actorId, code);
+        if (!room.getOwnerId().equals(actorId) && sysRole != Role.ADMIN) {
+            throw ApiException.forbidden("Solo el propietario puede asignar roles");
+        }
+        if (room.getOwnerId().equals(targetId)) throw ApiException.badRequest("El propietario no puede cambiar de rol");
+        RoomMember m = members.findById(new RoomMember.Key(room.getId(), targetId))
+                .orElseThrow(() -> ApiException.notFound("Esa persona no participa en la sala"));
+        m.setRole(role);
+        members.save(m);
+        String name = user(targetId).getDisplayName();
+        events.publishEvent(new RoomEvent(room.getId(), "member.updated", Map.of("userId", targetId, "displayName", name, "role", role.name())));
+        return new ParticipantDto(targetId, name, presence.isOnline(room.getId(), targetId), false, role.name());
+    }
+
     private Room openRoom(String code) {
         Room room = rooms.findByCode(normalize(code)).orElseThrow(() -> ApiException.notFound("Sala no encontrada"));
         if (room.isExpired()) throw new ApiException(org.springframework.http.HttpStatus.GONE, "La sala ha expirado");
@@ -194,10 +231,12 @@ public class RoomService {
                 .filter(m -> byId.containsKey(m.getUserId()))
                 .sorted((a, b) -> a.getJoinedAt().compareTo(b.getJoinedAt()))
                 .map(m -> new ParticipantDto(m.getUserId(), byId.get(m.getUserId()).getDisplayName(),
-                        presence.isOnline(room.getId(), m.getUserId()), m.getUserId().equals(room.getOwnerId())))
+                        presence.isOnline(room.getId(), m.getUserId()), m.getUserId().equals(room.getOwnerId()),
+                        m.getUserId().equals(room.getOwnerId()) ? "OWNER" : m.getRole().name()))
                 .toList();
+        String myRole = parts.stream().filter(p -> p.userId().equals(viewer)).map(ParticipantDto::role).findFirst().orElse("MEMBER");
         return new RoomDto(room.getId(), room.getCode(), room.getName(), room.getCreatedAt(), room.getExpiresAt(),
-                room.getOwnerId(), room.getOwnerId().equals(viewer), parts);
+                room.getOwnerId(), room.getOwnerId().equals(viewer), myRole, parts);
     }
 
     private User user(UUID id) {

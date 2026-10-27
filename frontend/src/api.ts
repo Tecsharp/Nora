@@ -1,3 +1,5 @@
+import type { RoomRole } from './roles'
+
 export interface Limits {
   storageQuotaBytes: number | null
   maxFileSizeBytes: number | null
@@ -21,6 +23,7 @@ export interface Participant {
   displayName: string
   online: boolean
   owner: boolean
+  role: RoomRole
 }
 
 export interface Room {
@@ -31,6 +34,8 @@ export interface Room {
   expiresAt: string | null
   ownerId: string
   isOwner: boolean
+  /** Rol de la persona que consulta la sala */
+  role: RoomRole
   participants: Participant[]
 }
 

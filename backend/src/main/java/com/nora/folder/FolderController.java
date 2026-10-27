@@ -41,21 +41,21 @@ public class FolderController {
     @ResponseStatus(HttpStatus.CREATED)
     public FolderDto create(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code,
                             @RequestParam(defaultValue = "FILE") RoomFolder.Kind kind, @Valid @RequestBody CreateRequest req) {
-        Room room = rooms.requireMember(p.userId(), code);
+        Room room = rooms.requireWriter(p.userId(), p.role(), code);
         return folders.create(room.getId(), p.userId(), kind, req.parentId(), req.name());
     }
 
     @PatchMapping("/{id}")
     public FolderDto rename(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable UUID id,
                             @Valid @RequestBody RenameRequest req) {
-        Room room = rooms.requireMember(p.userId(), code);
-        return folders.rename(room.getId(), id, req.name());
+        Room room = rooms.requireWriter(p.userId(), p.role(), code);
+        return folders.rename(room.getId(), id, p.userId(), rooms.canModerate(room, p.userId(), p.role()), req.name());
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable UUID id) {
-        Room room = rooms.requireMember(p.userId(), code);
-        folders.delete(room.getId(), id, p.userId(), p.role(), room.getOwnerId());
+        Room room = rooms.requireWriter(p.userId(), p.role(), code);
+        folders.delete(room.getId(), id, p.userId(), rooms.canModerate(room, p.userId(), p.role()));
     }
 }

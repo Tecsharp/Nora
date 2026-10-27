@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { Check, Copy, FolderInput, Pencil, Plus, Search, StickyNote, Trash2, X } from 'lucide-react'
 import { api, ApiError, type Room } from '../api'
 import { useAuth } from '../auth'
+import { canWrite as canWriteIn, isStaff as isStaffIn } from '../roles'
 import { useRealtime } from '../realtime'
 import { useToast } from '../toast'
 import Menu, { type MenuItem } from './Menu'
@@ -54,8 +55,9 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
   const [saving, setSaving] = useState(false)
   const path = `/rooms/${code}/notes`
   const catPath = `/rooms/${code}/folders?kind=${kind}`
-  const isStaff = room.isOwner || user?.role === 'ADMIN'
-  const canTouch = (ownerId: string) => ownerId === user?.id || isStaff
+  const isStaff = isStaffIn(room, user)
+  const canWrite = canWriteIn(room, user)
+  const canTouch = (ownerId: string) => canWrite && (ownerId === user?.id || isStaff)
 
   const load = useCallback(() => {
     api<Note[]>(`${path}?kind=${kind}`).then(setItems).catch(() => {})
@@ -209,7 +211,8 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
 
   return (
     <div className="explorer">
-      <form className="composer" onSubmit={add}>
+      {!canWrite && <p className="callout small" style={{ margin: '12px 16px 0' }}>Tu rol en esta sala es de <strong>lector</strong>: puedes ver y copiar, pero no añadir ni modificar.</p>}
+      {canWrite && <form className="composer" onSubmit={add}>
         <textarea rows={3} maxLength={20000} required placeholder={placeholder} aria-label="Contenido" value={text} onChange={(e) => setText(e.target.value)} />
         <div className="row spread">
           <label className="check" style={{ color: 'var(--muted)' }}>
@@ -221,7 +224,7 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
           </label>
           <button className="btn primary sm" disabled={!text.trim()}><Plus size={15} /> Añadir</button>
         </div>
-      </form>
+      </form>}
 
       <div className="ex-toolbar">
         <div className="grow" style={{ minWidth: 0 }}>
@@ -232,7 +235,7 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
               ...cats.map((c) => ({ id: c.id, label: c.name, count: countOf(c.id) })),
             ]} />
         </div>
-        <button className="btn sm" onClick={() => { setAdding((a) => !a); setRenaming(false); setCatName('') }}><Plus size={15} /> Categoría</button>
+        {canWrite && <button className="btn sm" onClick={() => { setAdding((a) => !a); setRenaming(false); setCatName('') }}><Plus size={15} /> Categoría</button>}
       </div>
 
       {adding && (

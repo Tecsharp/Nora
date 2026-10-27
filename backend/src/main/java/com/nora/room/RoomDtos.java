@@ -25,10 +25,12 @@ public final class RoomDtos {
     public record JoinRoomRequest(
             @NotBlank @Size(max = 12) @Pattern(regexp = "^[A-Za-z0-9-]+$", message = "Código no válido") String code) {}
 
-    public record ParticipantDto(UUID userId, String displayName, boolean online, boolean owner) {}
+    public record ParticipantDto(UUID userId, String displayName, boolean online, boolean owner, String role) {}
+
+    public record RoleRequest(@jakarta.validation.constraints.NotNull(message = "Indica el rol") RoomRole role) {}
 
     public record RoomDto(UUID id, String code, String name, Instant createdAt, Instant expiresAt,
-                          UUID ownerId, boolean isOwner, List<ParticipantDto> participants) {}
+                          UUID ownerId, boolean isOwner, String role, List<ParticipantDto> participants) {}
 
     public record RoomSummary(String code, String name, Instant expiresAt, boolean isOwner) {}
 }
