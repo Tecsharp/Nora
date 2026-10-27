@@ -3,6 +3,9 @@ package com.nora.file;
 import com.google.common.collect.HashMultimap;
 import com.nora.config.AppProperties;
 import io.minio.GetObjectArgs;
+import io.minio.ListObjectsArgs;
+import io.minio.Result;
+import io.minio.messages.Item;
 import io.minio.MinioAsyncClient;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
@@ -86,11 +89,13 @@ public class ObjectStorage {
         synchronized (this) {
             if (client == null) {
                 var creds = new GarageBootstrap(cfg).run();
+                // Con Garage caído las llamadas deben fallar pronto, no quedarse minutos esperando
+                var http = io.minio.http.HttpUtils.newDefaultHttpClient(15_000, 120_000, 120_000);
                 var async = MinioAsyncClient.builder().endpoint(cfg.endpoint()).region(cfg.region())
-                        .credentials(creds.accessKey(), creds.secretKey()).build();
+                        .credentials(creds.accessKey(), creds.secretKey()).httpClient(http).build();
                 multipart = new MultipartClient(async);
                 client = MinioClient.builder().endpoint(cfg.endpoint()).region(cfg.region())
-                        .credentials(creds.accessKey(), creds.secretKey()).build();
+                        .credentials(creds.accessKey(), creds.secretKey()).httpClient(http).build();
                 log.info("Almacenamiento Garage listo (bucket '{}')", cfg.bucket());
             }
             return client;
@@ -109,6 +114,25 @@ public class ObjectStorage {
 
     public InputStream get(String key) throws Exception {
         return client().getObject(GetObjectArgs.builder().bucket(cfg.bucket()).object(key).build());
+    }
+
+    /** Objeto guardado, tal como lo ve Garage. */
+    public record StoredObject(String key, long size, java.time.Instant lastModified) {}
+
+    /** Lista los objetos del bucket bajo un prefijo (recorre todas las páginas). */
+    public List<StoredObject> list(String prefix) throws Exception {
+        List<StoredObject> out = new java.util.ArrayList<>();
+        for (Result<Item> r : client().listObjects(ListObjectsArgs.builder().bucket(cfg.bucket()).prefix(prefix).recursive(true).build())) {
+            Item i = r.get();
+            if (i.isDir()) continue;
+            out.add(new StoredObject(i.objectName(), i.size(), i.lastModified() == null ? java.time.Instant.EPOCH : i.lastModified().toInstant()));
+        }
+        return out;
+    }
+
+    /** Borra un objeto y propaga el error (a diferencia de delete, que solo lo registra). Borrar uno inexistente no falla. */
+    public void deleteNow(String key) throws Exception {
+        client().removeObject(RemoveObjectArgs.builder().bucket(cfg.bucket()).object(key).build());
     }
 
     public void delete(String key) {

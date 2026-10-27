@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowLeft, ChevronLeft, ChevronRight, Search, Shield } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, HardDrive, RefreshCw, Search, Shield } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { api, ApiError, formatBytes, type Limits, type User } from '../api'
 import { useAuth } from '../auth'
@@ -9,6 +9,67 @@ import Modal from '../components/Modal'
 interface Row {
   user: User
   storageUsedBytes: number
+}
+
+interface StorageStats {
+  available: boolean
+  objects: number
+  bytes: number
+  dbFiles: number
+  pendingDeletions: number
+  error: string | null
+}
+
+/** Estado de Garage y limpieza manual de objetos huérfanos. */
+function StorageCard() {
+  const [stats, setStats] = useState<StorageStats | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  const load = useCallback(() => {
+    api<StorageStats>('/admin/storage').then(setStats).catch(() => setStats(null))
+  }, [])
+  useEffect(load, [load])
+
+  async function sweep() {
+    setBusy(true)
+    setMsg('')
+    try {
+      const r = await api<{ scanned: number; orphans: number; deleted: number; failed: number }>('/admin/storage/sweep', 'POST')
+      setMsg(r.orphans === 0 ? `Todo en orden: ${r.scanned} objetos revisados, ninguno huérfano.` : `${r.deleted} de ${r.orphans} objetos huérfanos eliminados${r.failed ? ` (${r.failed} fallaron)` : ''}.`)
+      load()
+    } catch (err) {
+      setMsg(err instanceof ApiError ? err.message : 'No se pudo completar la limpieza')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="card stack tight">
+      <div className="section-title" style={{ marginBottom: 0 }}>
+        <h3 className="row"><HardDrive size={18} /> Almacenamiento (Garage)</h3>
+        <div className="row">
+          <button className="icon-btn" aria-label="Actualizar" onClick={load}><RefreshCw size={16} /></button>
+          <button className="btn sm" disabled={busy} onClick={sweep}>{busy ? 'Limpiando…' : 'Revisar y limpiar huérfanos'}</button>
+        </div>
+      </div>
+      {!stats ? (
+        <p className="muted small">Cargando…</p>
+      ) : !stats.available ? (
+        <p className="error small">Garage no responde: {stats.error}. Los borrados quedan pendientes ({stats.pendingDeletions}) y se reintentan solos.</p>
+      ) : (
+        <div className="stat-grid">
+          <div className="stat"><b>{stats.objects}</b><span className="muted small">Objetos en Garage</span></div>
+          <div className="stat"><b>{formatBytes(stats.bytes)}</b><span className="muted small">Ocupado</span></div>
+          <div className="stat"><b>{stats.dbFiles}</b><span className="muted small">Archivos en la base de datos</span></div>
+          <div className="stat"><b>{stats.pendingDeletions}</b><span className="muted small">Borrados pendientes</span></div>
+        </div>
+      )}
+      {msg && <p className="small muted" role="status">{msg}</p>}
+      <p className="muted small">Al borrar un archivo, una carpeta o una sala, el objeto se elimina de Garage; si Garage no responde, queda pendiente y se reintenta cada 2 minutos. Cada 6 horas se concilia el almacén con la base de datos y se borran los huérfanos de más de 1 hora.</p>
+    </section>
+  )
 }
 
 interface Page {
@@ -159,6 +220,8 @@ export default function Admin() {
         <h1 className="row"><Shield size={26} /> Usuarios</h1>
         <p>{data.total} {data.total === 1 ? 'cuenta' : 'cuentas'} · toca una fila para editar sus límites.</p>
       </div>
+
+      <StorageCard />
 
       <div className="row">
         <div className="input-icon grow" style={{ maxWidth: 360 }}>

@@ -39,7 +39,7 @@ Navegador ──► gateway (nginx, único puerto publicado)
 
 - **Autenticación propia** (registro + login): contraseñas con BCrypt (coste 12), política de contraseñas, bloqueo temporal tras 5 intentos fallidos, mensajes que no revelan si el email existe.
 - **Sesiones**: access token JWT de 15 min (en memoria del navegador) + refresh token opaco en cookie `HttpOnly; SameSite=Strict`, guardado hasheado y **rotado en cada uso**; si se reutiliza uno ya rotado se cierran todas las sesiones del usuario.
-- **Archivos**: Garage solo es accesible desde el backend por la red interna. Cada descarga pasa por la API, que comprueba que el usuario participa en la sala; siempre se sirven como adjunto (`nosniff`), sin enlaces directos. Al expirar o cerrarse una sala se borran todos sus archivos.
+- **Archivos**: Garage solo es accesible desde el backend por la red interna. Cada descarga pasa por la API, que comprueba que el usuario participa en la sala; siempre se sirven como adjunto (`nosniff`), sin enlaces directos. Al expirar o cerrarse una sala se borran todos sus archivos (ver «Limpieza del almacén»).
 - **Contenedores**: sistema de ficheros de solo lectura, `cap_drop: ALL`, `no-new-privileges`, usuarios sin privilegios, red `internal` para datos.
 - **CORS**: por defecto solo mismo origen (el gateway). Para otros orígenes: `NORA_ALLOWED_ORIGINS=https://app.ejemplo.com`.
 - **HTTPS**: el stack escucha en HTTP (por defecto solo en `127.0.0.1`). En producción pon delante un proxy con TLS y define `NORA_COOKIE_SECURE=true` y `NORA_BIND=0.0.0.0`.
@@ -82,6 +82,17 @@ Los permisos se comprueban en el servidor (un lector recibe 403 al intentar subi
 ### Visor de documentos
 
 Al hacer clic en un archivo (o con el botón del ojo) se abre un visor con navegación entre los documentos de la carpeta (flechas del teclado o en pantalla): **imágenes** (JPG, PNG, GIF, WebP, AVIF, SVG…), **PDF** (con zoom, dibujado con pdf.js en el navegador) y **texto/código** (se muestra como texto plano, nunca se ejecuta). Todo se lee por la API autenticada y se muestra con URLs `blob:` locales; la CSP del gateway solo añade `blob:` para imágenes y workers. Los **vídeos no se previsualizan, solo se descargan**: reproducirlos exigiría transcodificarlos en el servidor (ffmpeg), algo que Nora no incluye por ahora.
+
+### Limpieza del almacén (Garage)
+
+Los objetos de Garage siempre acaban borrándose:
+
+1. Al borrar un archivo, una carpeta o una sala, el objeto se anota en una tabla de borrados pendientes (`storage_tombstones`) **en la misma transacción** que quita la fila de la base de datos, y se borra justo después de confirmarla. Si Garage no responde en ese momento, la petición no se bloquea y el borrado queda pendiente.
+2. Una tarea reintenta los pendientes cada 2 minutos hasta que Garage los borre.
+3. Cada 6 horas se concilia el bucket con la base de datos y se eliminan los **huérfanos** (objetos sin archivo asociado) con más de 60 minutos (`nora.storage.orphan-grace-minutes`), margen para no tocar subidas recién terminadas.
+4. Las salas expiradas las destruye una tarea cada minuto (con todos sus objetos).
+
+En **Admin → Almacenamiento (Garage)** se ve cuántos objetos y bytes hay en Garage frente a los archivos de la base de datos, los borrados pendientes, y hay un botón para lanzar la limpieza a mano (`GET /api/admin/storage`, `POST /api/admin/storage/sweep`). Para comprobarlo de punta a punta en tu instalación: `NORA_ADMIN_EMAIL=… NORA_ADMIN_PASSWORD=… node scripts/verify-garage-cleanup.mjs` (sube archivos, los borra de todas las formas, hace expirar una sala, apaga Garage unos segundos y crea un huérfano, comprobando cada vez el contenido real del bucket). Nota: Garage libera el espacio físico en disco en segundo plano, por lo que el uso de disco puede tardar en bajar aunque los objetos ya no existan.
 
 ### Acceso desde otros equipos y Cloudflare Tunnel
 
