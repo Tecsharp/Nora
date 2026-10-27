@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Copy, Trash2 } from 'lucide-react'
 import { api, ApiError } from '../api'
+import { useRealtime } from '../realtime'
 
 interface Note {
   id: string
@@ -25,17 +26,25 @@ export default function NotesTool({ code, kind, placeholder, copyable }: Props) 
   const load = useCallback(() => api<Note[]>(`${path}?kind=${kind}`).then(setItems).catch(() => {}), [path, kind])
   useEffect(() => {
     load()
-    const t = setInterval(load, 8_000)
+    const t = setInterval(load, 60_000) // respaldo; los cambios llegan por WebSocket
     return () => clearInterval(t)
   }, [load])
+
+  useRealtime('reconnected', load)
+  useRealtime('note.added', (d: { kind: string; note: Note }) => {
+    if (d.kind === kind) setItems((all) => (all.some((n) => n.id === d.note.id) ? all : [d.note, ...all]))
+  })
+  useRealtime('note.deleted', (d: { kind: string; id: string }) => {
+    if (d.kind === kind) setItems((all) => all.filter((n) => n.id !== d.id))
+  })
 
   async function add(e: FormEvent) {
     e.preventDefault()
     setError('')
     try {
-      await api(`${path}?kind=${kind}`, 'POST', { content: text })
+      const note = await api<Note>(`${path}?kind=${kind}`, 'POST', { content: text })
       setText('')
-      load()
+      setItems((all) => (all.some((n) => n.id === note.id) ? all : [note, ...all]))
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error al guardar')
     }
@@ -63,7 +72,6 @@ export default function NotesTool({ code, kind, placeholder, copyable }: Props) 
                 <button className="icon-btn danger" aria-label="Borrar" title="Borrar"
                   onClick={async () => {
                     await api(`${path}/${n.id}`, 'DELETE').catch((e) => setError(e.message))
-                    load()
                   }}>
                   <Trash2 size={16} />
                 </button>

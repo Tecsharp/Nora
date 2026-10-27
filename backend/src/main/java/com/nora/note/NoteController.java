@@ -15,6 +15,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import com.nora.ws.RoomEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -36,11 +38,13 @@ public class NoteController {
     private final RoomNoteRepository notes;
     private final RoomService rooms;
     private final UserRepository users;
+    private final ApplicationEventPublisher events;
 
-    public NoteController(RoomNoteRepository notes, RoomService rooms, UserRepository users) {
+    public NoteController(RoomNoteRepository notes, RoomService rooms, UserRepository users, ApplicationEventPublisher events) {
         this.notes = notes;
         this.rooms = rooms;
         this.users = users;
+        this.events = events;
     }
 
     @GetMapping
@@ -67,7 +71,9 @@ public class NoteController {
         }
         RoomNote n = notes.save(new RoomNote(room.getId(), p.userId(), kind, req.content()));
         String name = users.findById(p.userId()).map(u -> u.getDisplayName()).orElse("?");
-        return new NoteDto(n.getId(), n.getContent(), n.getAuthorId(), name, n.getCreatedAt());
+        NoteDto dto = new NoteDto(n.getId(), n.getContent(), n.getAuthorId(), name, n.getCreatedAt());
+        events.publishEvent(new RoomEvent(room.getId(), "note.added", Map.of("kind", kind, "note", dto)));
+        return dto;
     }
 
     @DeleteMapping("/{id}")
@@ -81,5 +87,6 @@ public class NoteController {
             throw ApiException.forbidden("No puedes borrar este elemento");
         }
         notes.delete(n);
+        events.publishEvent(new RoomEvent(room.getId(), "note.deleted", Map.of("kind", n.getKind(), "id", n.getId())));
     }
 }

@@ -6,7 +6,10 @@ import com.nora.user.User;
 import com.nora.user.UserRepository;
 import java.io.InputStream;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import com.nora.ws.RoomEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,11 +29,13 @@ public class FileService {
     private final RoomFileRepository files;
     private final ObjectStorage storage;
     private final UserRepository users;
+    private final ApplicationEventPublisher events;
 
-    public FileService(RoomFileRepository files, ObjectStorage storage, UserRepository users) {
+    public FileService(RoomFileRepository files, ObjectStorage storage, UserRepository users, ApplicationEventPublisher events) {
         this.files = files;
         this.storage = storage;
         this.users = users;
+        this.events = events;
     }
 
     public long usedBytes(UUID userId) {
@@ -63,7 +68,7 @@ public class FileService {
             throw new IllegalStateException("No se pudo guardar el archivo", e);
         }
         try {
-            return FileDto.of(files.saveAndFlush(entity));
+            return added(files.saveAndFlush(entity));
         } catch (RuntimeException e) {
             storage.delete(entity.getObjectKey());
             throw e;
@@ -88,6 +93,19 @@ public class FileService {
         }
         files.delete(f);
         storage.delete(f.getObjectKey());
+        events.publishEvent(new RoomEvent(roomId, "file.deleted", Map.of("id", f.getId())));
+    }
+
+    /** Registra un archivo cuyo contenido ya está en el almacén (subida reanudable completada). */
+    @Transactional
+    public FileDto register(RoomFile entity) {
+        return added(files.saveAndFlush(entity));
+    }
+
+    private FileDto added(RoomFile saved) {
+        FileDto dto = FileDto.of(saved);
+        events.publishEvent(new RoomEvent(saved.getRoomId(), "file.added", dto));
+        return dto;
     }
 
     @Transactional
@@ -104,7 +122,7 @@ public class FileService {
     }
 
     /** Elimina rutas, caracteres de control y limita la longitud del nombre original. */
-    static String sanitize(String name) {
+    public static String sanitize(String name) {
         if (name == null || name.isBlank()) return "archivo";
         String n = name.replace('\\', '/');
         n = n.substring(n.lastIndexOf('/') + 1).replaceAll("[\\p{Cntrl}]", "").trim();

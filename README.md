@@ -44,6 +44,16 @@ Navegador ──► gateway (nginx, único puerto publicado)
 - **CORS**: por defecto solo mismo origen (el gateway). Para otros orígenes: `NORA_ALLOWED_ORIGINS=https://app.ejemplo.com`.
 - **HTTPS**: el stack escucha en HTTP (por defecto solo en `127.0.0.1`). En producción pon delante un proxy con TLS y define `NORA_COOKIE_SECURE=true` y `NORA_BIND=0.0.0.0`.
 
+### Tiempo real (WebSocket)
+
+Una única conexión `/ws` por pestaña, autenticada con un **ticket de un solo uso** (30 s) que se pide a `POST /api/ws/ticket`: el JWT nunca va en la URL. Se valida el origen igual que CORS, hay límite de conexiones y de mensajes, y las conexiones mudas se cierran a los 90 s (el cliente envía un ping cada 25 s y reconecta solo con espera exponencial).
+
+Eventos de sala: quién está conectado (`presence`, `joined`), nuevos miembros (`member.joined`), archivos (`file.added`, `file.deleted`), notas y portapapeles (`note.added`, `note.deleted`), progreso de subidas ajenas (`upload.progress`, `upload.done`, `upload.aborted`), avisos de expiración a 5 y 1 minuto (`room.expiring`) y cierre de sala (`room.closed`). Eventos de cuenta: `account.updated` (el admin cambió tus límites) y `account.disabled`. Los eventos se emiten **después de confirmar la transacción** de base de datos, así que nadie recibe un aviso de algo que luego se revierte. Si se pierde la conexión, al reconectar la interfaz recarga lo que se perdió.
+
+### Subidas reanudables
+
+Los archivos se suben por trozos de 8 MiB con multipart de S3 (`POST /api/rooms/{code}/uploads`, `PUT …/parts/{n}`, `POST …/complete`). El servidor guarda qué trozos llegaron: si se corta internet, se cierra la pestaña o se reinicia el navegador, al volver a elegir el mismo archivo solo se envían los que faltan. El cliente sube 3 trozos en paralelo, reintenta con espera, se pausa sin conexión y detecta conexiones colgadas (20 s sin avance). Muestra porcentaje, velocidad y tiempo restante; el resto de la sala ve el avance en vivo. Las subidas abandonadas se limpian a las 24 h. Al ir en trozos pequeños, también funcionan detrás de Cloudflare, que limita cada petición a 100 MB en el plan gratuito.
+
 ### Acceso desde otros equipos y Cloudflare Tunnel
 
 Por defecto el gateway escucha en todas las interfaces (`NORA_BIND=0.0.0.0`), así que Nora es accesible por `http://IP-DEL-SERVIDOR:29817` desde tu red. Si solo quieres usarlo desde la propia máquina, pon `NORA_BIND=127.0.0.1` en `.env` y ejecuta `docker compose up -d`.
@@ -73,4 +83,4 @@ cd frontend && npm install && npm run dev
 
 ## Estado
 
-Herramientas operativas: **Archivos**, **Notas**, **Portapapeles**. Pizarra, Media Review, Asistencia, Votaciones y Acciones aparecen como «Próximamente». La presencia de participantes se calcula por latido (cada 10 s); WebSockets quedan como mejora futura.
+Herramientas operativas: **Archivos**, **Notas**, **Portapapeles**. Pizarra, Media Review, Asistencia, Votaciones y Acciones aparecen como «Próximamente». La presencia y los eventos de la sala van por WebSocket.

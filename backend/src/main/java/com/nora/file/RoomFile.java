@@ -43,6 +43,13 @@ public class RoomFile {
         this.objectKey = "rooms/" + roomId + "/" + id;
     }
 
+    /** Para archivos cuya clave de objeto ya se reservó al iniciar una subida reanudable. */
+    public RoomFile(UUID id, UUID roomId, UUID uploaderId, String originalName, String contentType, long sizeBytes) {
+        this(roomId, uploaderId, originalName, contentType, sizeBytes);
+        this.id = id;
+        this.objectKey = "rooms/" + roomId + "/" + id;
+    }
+
     public UUID getId() { return id; }
     public UUID getRoomId() { return roomId; }
     public UUID getUploaderId() { return uploaderId; }

@@ -6,6 +6,8 @@ import {
 } from 'lucide-react'
 import { api, ApiError, type Room } from '../api'
 import { useAuth } from '../auth'
+import { rt, useRealtime, useRtStatus } from '../realtime'
+import { useToast } from '../toast'
 import Brand from '../components/Brand'
 import FilesTool from '../components/FilesTool'
 import NotesTool from '../components/NotesTool'
@@ -43,11 +45,17 @@ export default function RoomPage() {
   const [error, setError] = useState('')
   const [active, setActive] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [online, setOnline] = useState<Set<string>>(new Set())
+  const toast = useToast()
+  const status = useRtStatus()
   const [, tick] = useState(0)
 
   const load = useCallback(async () => {
     try {
-      setRoom(await api<Room>(`/rooms/${code}`))
+      const r = await api<Room>(`/rooms/${code}`)
+      setRoom(r)
+      // Sin WebSocket la presencia viene de la API; con WebSocket la mantienen los eventos.
+      if (rt.status !== 'open') setOnline(new Set(r.participants.filter((p) => p.online).map((p) => p.userId)))
       setError('')
     } catch (err) {
       if (err instanceof ApiError && (err.status === 404 || err.status === 410 || err.status === 403)) {
@@ -57,16 +65,51 @@ export default function RoomPage() {
     }
   }, [code])
 
-  // Cada petición actúa como latido de presencia; la cuenta atrás se refresca cada segundo.
+  // La sala se recibe por REST una vez; después los cambios llegan por WebSocket.
+  // Si no hay conexión en vivo se refresca cada 15 s como respaldo.
   useEffect(() => {
     load()
-    const poll = setInterval(load, 10_000)
-    const clock = setInterval(() => tick((n) => n + 1), 1000)
-    return () => {
-      clearInterval(poll)
-      clearInterval(clock)
+    rt.join(code)
+    return () => rt.leave()
+  }, [code, load])
+
+  useEffect(() => {
+    if (status === 'open') rt.join(code) // al (re)conectar se vuelve a entrar en la sala
+    else {
+      const poll = setInterval(load, 15_000)
+      return () => clearInterval(poll)
     }
-  }, [load])
+  }, [status, code, load])
+
+  useEffect(() => {
+    const clock = setInterval(() => tick((n) => n + 1), 1000)
+    return () => clearInterval(clock)
+  }, [])
+
+  useRealtime('joined', (d: { online: string[] }) => setOnline(new Set(d.online)))
+  useRealtime('reconnected', load)
+  useRealtime('presence', (d: { userId: string; displayName: string; online: boolean }) => {
+    setOnline((s) => {
+      const next = new Set(s)
+      if (d.online) next.add(d.userId)
+      else next.delete(d.userId)
+      return next
+    })
+    if (d.userId !== user?.id) toast(`${d.displayName} ${d.online ? 'se ha conectado' : 'se ha desconectado'}`, 'info')
+  })
+  useRealtime('member.joined', (d: { displayName: string }) => {
+    toast(`${d.displayName} se ha unido a la sala`, 'success')
+    load()
+  })
+  useRealtime('room.expiring', (d: { minutesLeft: number }) =>
+    toast(d.minutesLeft <= 1 ? 'La sala expira en menos de 1 minuto' : `La sala expira en ${d.minutesLeft} minutos`, 'warning'))
+  useRealtime('room.closed', (d: { reason: string }) => {
+    toast(d.reason === 'expired' ? 'La sala ha expirado y se han borrado sus archivos' : 'La sala ha sido cerrada', 'warning')
+    navigate('/')
+  })
+  useRealtime('error', (d: { status?: number; message: string }) => {
+    if (d.status) setError(d.message)
+  })
 
   async function copy() {
     await navigator.clipboard?.writeText(code).catch(() => {})
@@ -89,7 +132,7 @@ export default function RoomPage() {
     )
   }
 
-  const online = room.participants.filter((p) => p.online)
+  const onlineCount = room.participants.filter((p) => online.has(p.userId)).length
   const expired = room.expiresAt !== null && new Date(room.expiresAt).getTime() <= Date.now()
   const tool = TOOLS.find((t) => t.id === active)
   const secure = window.location.protocol === 'https:'
@@ -109,12 +152,12 @@ export default function RoomPage() {
           <p className="muted">Código: {room.code} · {remaining(room.expiresAt)}</p>
           <div className="avatars">
             {room.participants.slice(0, 8).map((p) => (
-              <span key={p.userId} className={`avatar ${p.online ? 'on' : ''}`} title={`${p.displayName}${p.online ? '' : ' (desconectado)'}`}>
+              <span key={p.userId} className={`avatar ${online.has(p.userId) ? 'on' : ''}`} title={`${p.displayName}${online.has(p.userId) ? '' : ' (desconectado)'}`}>
                 {initials(p.displayName)}
               </span>
             ))}
             <span className="muted">
-              {online.length} {online.length === 1 ? 'participante conectado' : 'participantes conectados'}
+              {onlineCount} {onlineCount === 1 ? 'participante conectado' : 'participantes conectados'}
             </span>
           </div>
         </div>
@@ -145,7 +188,9 @@ export default function RoomPage() {
         <span className={secure ? 'ok' : 'muted'}>
           <ShieldCheck size={18} /> {secure ? 'Conexión cifrada' : 'Conexión local (HTTP)'}
         </span>
-        <span className="muted">{room.participants.length} en la sala</span>
+        <span className={status === 'open' ? 'ok' : 'muted'}>
+          <i className={`live ${status}`} /> {status === 'open' ? 'En vivo' : status === 'connecting' ? 'Conectando…' : 'Sin conexión en vivo'} · {room.participants.length} en la sala
+        </span>
       </footer>
 
       {tool && (

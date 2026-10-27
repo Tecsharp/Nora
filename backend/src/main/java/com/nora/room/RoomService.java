@@ -2,6 +2,10 @@ package com.nora.room;
 
 import com.nora.common.ApiException;
 import com.nora.file.FileService;
+import com.nora.upload.UploadService;
+import com.nora.ws.PresenceService;
+import com.nora.ws.RoomEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import com.nora.room.RoomDtos.*;
 import com.nora.user.Role;
 import com.nora.user.User;
@@ -28,20 +32,26 @@ public class RoomService {
     private static final Logger log = LoggerFactory.getLogger(RoomService.class);
     /** Sin caracteres ambiguos (0/O, 1/I). */
     private static final String ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
-    private static final Duration ONLINE_WINDOW = Duration.ofSeconds(40);
     private static final int DEFAULT_MINUTES = 120;
 
     private final RoomRepository rooms;
     private final RoomMemberRepository members;
     private final UserRepository users;
     private final FileService files;
+    private final UploadService uploads;
+    private final PresenceService presence;
+    private final ApplicationEventPublisher events;
     private final SecureRandom random = new SecureRandom();
 
-    public RoomService(RoomRepository rooms, RoomMemberRepository members, UserRepository users, FileService files) {
+    public RoomService(RoomRepository rooms, RoomMemberRepository members, UserRepository users, FileService files,
+                       UploadService uploads, PresenceService presence, ApplicationEventPublisher events) {
         this.rooms = rooms;
         this.members = members;
         this.users = users;
         this.files = files;
+        this.uploads = uploads;
+        this.presence = presence;
+        this.events = events;
     }
 
     @Transactional
@@ -94,19 +104,16 @@ public class RoomService {
                 throw ApiException.forbidden("La sala está llena");
             }
             members.save(new RoomMember(room.getId(), userId));
+            events.publishEvent(new RoomEvent(room.getId(), "member.joined",
+                    Map.of("userId", userId, "displayName", user(userId).getDisplayName())));
         }
         return get(userId, code);
     }
 
-    /** Devuelve la sala y registra la presencia del usuario (latido). */
-    @Transactional
+    /** Devuelve la sala; la presencia ("conectado") la aporta el WebSocket. */
+    @Transactional(readOnly = true)
     public RoomDto get(UUID userId, String code) {
-        Room room = requireMember(userId, code);
-        members.findById(new RoomMember.Key(room.getId(), userId)).ifPresent(m -> {
-            m.touch();
-            members.save(m);
-        });
-        return toDto(room, userId);
+        return toDto(requireMember(userId, code), userId);
     }
 
     @Transactional(readOnly = true)
@@ -122,7 +129,7 @@ public class RoomService {
         if (!room.getOwnerId().equals(userId) && role != Role.ADMIN) {
             throw ApiException.forbidden("Solo el propietario puede cerrar la sala");
         }
-        destroy(room);
+        destroy(room, "closed");
     }
 
     /** Sala abierta (no expirada) en la que el usuario participa. */
@@ -149,12 +156,11 @@ public class RoomService {
         List<RoomMember> ms = members.findByRoomId(room.getId());
         Map<UUID, User> byId = users.findAllById(ms.stream().map(RoomMember::getUserId).toList()).stream()
                 .collect(Collectors.toMap(User::getId, Function.identity()));
-        Instant threshold = Instant.now().minus(ONLINE_WINDOW);
         List<ParticipantDto> parts = ms.stream()
                 .filter(m -> byId.containsKey(m.getUserId()))
                 .sorted((a, b) -> a.getJoinedAt().compareTo(b.getJoinedAt()))
                 .map(m -> new ParticipantDto(m.getUserId(), byId.get(m.getUserId()).getDisplayName(),
-                        m.getLastSeenAt().isAfter(threshold), m.getUserId().equals(room.getOwnerId())))
+                        presence.isOnline(room.getId(), m.getUserId()), m.getUserId().equals(room.getOwnerId())))
                 .toList();
         return new RoomDto(room.getId(), room.getCode(), room.getName(), room.getCreatedAt(), room.getExpiresAt(),
                 room.getOwnerId(), room.getOwnerId().equals(viewer), parts);
@@ -164,9 +170,11 @@ public class RoomService {
         return users.findById(id).orElseThrow(() -> ApiException.notFound("Usuario no encontrado"));
     }
 
-    private void destroy(Room room) {
+    private void destroy(Room room, String reason) {
         files.deleteAllForRoom(room.getId());
+        uploads.abortAllForRoom(room.getId());
         rooms.delete(room);
+        events.publishEvent(new RoomEvent(room.getId(), "room.closed", Map.of("reason", reason, "name", room.getName())));
     }
 
     /** Las salas expiradas se destruyen junto con todos sus archivos. */
@@ -175,7 +183,7 @@ public class RoomService {
     public void purgeExpired() {
         for (Room room : rooms.findExpired(Instant.now())) {
             try {
-                destroy(room);
+                destroy(room, "expired");
                 log.info("Sala expirada eliminada: {}", room.getCode());
             } catch (Exception e) {
                 log.error("No se pudo eliminar la sala expirada {}", room.getCode(), e);

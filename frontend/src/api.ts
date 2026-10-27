@@ -59,6 +59,10 @@ export function setAccessToken(token: string | null) {
   accessToken = token
 }
 
+export function getAccessToken(): string | null {
+  return accessToken
+}
+
 export function setSessionLostHandler(fn: () => void) {
   onSessionLost = fn
 }
@@ -115,14 +119,6 @@ export async function api<T = unknown>(path: string, method = 'GET', body?: unkn
   return res.status === 204 ? (undefined as T) : res.json()
 }
 
-export async function upload<T>(path: string, file: File): Promise<T> {
-  const form = new FormData()
-  form.append('file', file)
-  const res = await raw(path, { method: 'POST', body: form })
-  if (!res.ok) return fail(res)
-  return res.json()
-}
-
 export async function download(path: string, filename: string) {
   const res = await raw(path)
   if (!res.ok) return fail(res)
@@ -134,6 +130,18 @@ export async function download(path: string, filename: string) {
   a.click()
   a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 10_000)
+}
+
+export function formatSpeed(bytesPerSecond: number): string {
+  return `${formatBytes(Math.round(bytesPerSecond))}/s`
+}
+
+export function formatEta(seconds: number | null): string {
+  if (seconds === null || !Number.isFinite(seconds)) return '—'
+  const s = Math.max(0, Math.round(seconds))
+  if (s < 60) return `${s} s`
+  if (s < 3600) return `${Math.floor(s / 60)} min ${s % 60} s`
+  return `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min`
 }
 
 export function formatBytes(bytes: number | null | undefined): string {
