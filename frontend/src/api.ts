@@ -133,7 +133,9 @@ export async function download(path: string, filename: string) {
 }
 
 export function formatSpeed(bytesPerSecond: number): string {
-  return `${formatBytes(Math.round(bytesPerSecond))}/s`
+  if (bytesPerSecond < 1024) return '0 KB/s' // por debajo de 1 KB/s se considera parado
+  if (bytesPerSecond < 1024 * 1024) return `${Math.round(bytesPerSecond / 1024)} KB/s`
+  return `${(bytesPerSecond / 1024 / 1024).toFixed(1)} MB/s`
 }
 
 export function formatEta(seconds: number | null): string {

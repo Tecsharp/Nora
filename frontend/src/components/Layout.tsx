@@ -1,7 +1,9 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { LogOut, Shield } from 'lucide-react'
 import { useAuth } from '../auth'
+import { uploads } from '../uploadManager'
 import Brand from './Brand'
+import UploadDock from './UploadDock'
 
 export default function Layout() {
   const { user, logout } = useAuth()
@@ -29,6 +31,7 @@ export default function Layout() {
             <button
               className="btn ghost"
               onClick={async () => {
+                await uploads.cancelAll() // sin sesión no se podrían terminar
                 await logout()
                 navigate('/login')
               }}
@@ -41,6 +44,7 @@ export default function Layout() {
       <main>
         <Outlet />
       </main>
+      <UploadDock />
     </div>
   )
 }

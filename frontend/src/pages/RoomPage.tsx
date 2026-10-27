@@ -12,6 +12,7 @@ import Brand from '../components/Brand'
 import FilesTool from '../components/FilesTool'
 import NotesTool from '../components/NotesTool'
 import { remaining } from '../time'
+import { resumeInterrupted } from '../uploadManager'
 
 type Icon = ComponentType<LucideProps>
 
@@ -70,6 +71,7 @@ export default function RoomPage() {
   useEffect(() => {
     load()
     rt.join(code)
+    void resumeInterrupted(code) // reanuda solas las subidas cortadas cuyo archivo sigue accesible
     return () => rt.leave()
   }, [code, load])
 

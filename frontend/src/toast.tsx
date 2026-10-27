@@ -8,6 +8,10 @@ interface Toast {
   message: string
 }
 
+/** Permite avisar desde fuera de React (p. ej. el gestor de subidas). */
+let sink: (message: string, level?: ToastLevel) => void = () => {}
+export const notifyToast = (message: string, level?: ToastLevel) => sink(message, level)
+
 const Ctx = createContext<(message: string, level?: ToastLevel) => void>(() => {})
 export const useToast = () => useContext(Ctx)
 
@@ -20,6 +24,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setToasts((t) => [...t.slice(-4), { id, level, message }])
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), level === 'error' || level === 'warning' ? 8000 : 4500)
   }, [])
+
+  sink = push
 
   return (
     <Ctx.Provider value={push}>

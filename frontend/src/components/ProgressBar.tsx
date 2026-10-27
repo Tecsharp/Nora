@@ -2,6 +2,7 @@ import { formatBytes, formatEta, formatSpeed } from '../api'
 import type { UploadProgress } from '../uploader'
 
 const LABEL: Record<UploadProgress['state'], string> = {
+  queued: 'En cola',
   preparing: 'Preparando…',
   uploading: 'Subiendo',
   waiting: 'En espera',
@@ -11,7 +12,7 @@ const LABEL: Record<UploadProgress['state'], string> = {
   canceled: 'Cancelado',
 }
 
-export default function ProgressBar({ p }: { p: UploadProgress }) {
+export default function ProgressBar({ p, hideSpeed }: { p: UploadProgress; hideSpeed?: boolean }) {
   const pct = p.total ? Math.min(100, Math.round((p.loaded / p.total) * 100)) : 0
   return (
     <div className="progress">
@@ -29,9 +30,10 @@ export default function ProgressBar({ p }: { p: UploadProgress }) {
         <span>
           {p.message ?? LABEL[p.state]} · {pct}% ({formatBytes(p.loaded)} / {formatBytes(p.total)})
         </span>
-        {p.state === 'uploading' && p.speed > 0 && (
+        {!hideSpeed && (p.state === 'uploading' || p.state === 'waiting') && (
           <span>
-            {formatSpeed(p.speed)} · quedan {formatEta(p.eta)}
+            {formatSpeed(p.speed)}
+            {p.state === 'uploading' && ` · quedan ${formatEta(p.eta)}`}
           </span>
         )}
       </div>

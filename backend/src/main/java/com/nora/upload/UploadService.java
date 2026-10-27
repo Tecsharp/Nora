@@ -194,6 +194,6 @@ public class UploadService {
             received.add(new PartInfo(p.getPartNumber(), p.getSizeBytes()));
             bytes += p.getSizeBytes();
         }
-        return new UploadDto(s.getId(), s.getName(), s.getSizeBytes(), s.getPartSize(), s.partCount(), received, bytes);
+        return new UploadDto(s.getId(), s.getName(), s.getFingerprint(), s.getSizeBytes(), s.getPartSize(), s.partCount(), received, bytes);
     }
 }

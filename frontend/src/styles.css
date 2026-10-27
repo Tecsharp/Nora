@@ -121,3 +121,10 @@ input:focus, select:focus, textarea:focus, .btn:focus-visible, .tool:focus-visib
 .bar.error i { background: var(--danger); }
 .bar.canceled i { background: #666; }
 .progress-meta { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+/* Panel de subidas en segundo plano */
+.dock { position: fixed; left: 16px; bottom: 16px; z-index: 40; width: min(380px, calc(100vw - 32px)); max-height: 60vh; overflow: auto; background: #0b0b0b; border: 1px solid var(--border); border-radius: 16px; padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 8px 32px rgba(0,0,0,.6); }
+.dock-head { display: flex; justify-content: space-between; align-items: center; font-size: .9rem; }
+.dock-item { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--border); }
+.small-btn { padding: 4px 10px; font-size: .8rem; }
+@media (max-width: 720px) { .dock { left: 8px; right: 8px; width: auto; bottom: 8px; } .toasts { bottom: 90px; } }

@@ -18,6 +18,6 @@ public final class UploadDtos {
 
     public record PartInfo(int number, int size) {}
 
-    public record UploadDto(UUID id, String name, long size, int partSize, int partCount,
+    public record UploadDto(UUID id, String name, String fingerprint, long size, int partSize, int partCount,
                             List<PartInfo> received, long receivedBytes) {}
 }
