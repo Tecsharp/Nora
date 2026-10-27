@@ -20,5 +20,20 @@ if (-not (Test-Path .env)) {
   Write-Host "Administrador: admin@nora.local / $admin"
 }
 
+# Si ya existía un .env de una versión anterior, se añaden solo las variables que falten.
+function Ensure-Var([string]$name, [string]$value) {
+  if (Select-String -Path .env -Pattern "^$name=.+" -Quiet) { return }
+  $lines = @(Get-Content .env | Where-Object { $_ -notmatch "^$name=" })
+  $lines += "$name=$value"
+  Set-Content .env $lines
+  Write-Host "Añadido $name a .env"
+}
+Ensure-Var 'NORA_GARAGE_RPC_SECRET' (-join ((1..64) | ForEach-Object { '{0:x}' -f (Get-Random -Maximum 16) }))
+Ensure-Var 'NORA_GARAGE_ADMIN_TOKEN' (New-Secret 48)
+
 docker compose up -d --build
+if ($LASTEXITCODE -ne 0) {
+  Write-Host "Error al levantar Nora (revisa los mensajes de arriba)." -ForegroundColor Red
+  exit $LASTEXITCODE
+}
 Write-Host "Nora en http://localhost:8080"

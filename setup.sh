@@ -19,6 +19,17 @@ if [ ! -f .env ]; then
   echo "Administrador: admin@nora.local / $ADMIN_PASS"
 fi
 
+# Si ya existía un .env de una versión anterior, se añaden solo las variables que falten.
+ensure() {
+  grep -Eq "^$1=.+" .env && return 0
+  [ -n "$(tail -c1 .env)" ] && echo >> .env
+  sed -i.bak "/^$1=/d" .env && rm -f .env.bak
+  echo "$1=$2" >> .env
+  echo "Añadido $1 a .env"
+}
+ensure NORA_GARAGE_RPC_SECRET "$(hex 64)"
+ensure NORA_GARAGE_ADMIN_TOKEN "$(rand 48)"
+
 docker compose up -d --build
 PORT="$(grep -E '^NORA_PORT=' .env | cut -d= -f2 | cut -d' ' -f1)"
 echo "Nora en http://localhost:${PORT:-8080}"
