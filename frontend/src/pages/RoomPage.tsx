@@ -2,7 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useState, type ComponentType } 
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, Check, Pencil, UserX, Settings, UserCheck, X, Clapperboard, ClipboardList, Clock, Copy, FolderOpen, Hash, Monitor, PenTool, Plus, ShieldCheck,
-  SquareCheckBig, Trash2, MessageSquare, KanbanSquare, CalendarDays, Link2, type LucideProps,
+  SquareCheckBig, Trash2, MessageSquare, KanbanSquare, CalendarDays, Link2, Timer, type LucideProps,
 } from 'lucide-react'
 import { api, ApiError, type JoinRequest, type Room } from '../api'
 import { useAuth } from '../auth'
@@ -28,6 +28,8 @@ import PollsTool from '../tools/PollsTool'
 import MediaReviewTool from '../tools/MediaReviewTool'
 import CalendarTool, { useCalendarWatch } from '../tools/CalendarTool'
 import LinksTool from '../tools/LinksTool'
+import FocusTool from '../tools/FocusTool'
+import { fmt as fmtFocus, useFocus } from '../tools/useFocus'
 import { ASSIGNABLE, ROLE_HINT, ROLE_LABEL, type RoomRole } from '../roles'
 import { remaining } from '../time'
 import { setFilesOpen } from '../ui'
@@ -51,6 +53,7 @@ const TOOLS: Tool[] = [
   { id: 'media', label: 'Media Review', icon: Clapperboard, ready: true, tone: 'rose' },
   { id: 'calendar', label: 'Calendario', icon: CalendarDays, ready: true, tone: 'green' },
   { id: 'links', label: 'Enlaces', icon: Link2, ready: true, tone: 'cyan' },
+  { id: 'focus', label: 'Foco', icon: Timer, ready: true, tone: 'violet' },
   { id: 'attendance', label: 'Asistencia', icon: Monitor, ready: true, tone: 'amber' },
   { id: 'polls', label: 'Votaciones', icon: SquareCheckBig, ready: true, tone: 'teal' },
   { id: 'actions', label: 'Acciones', icon: KanbanSquare, ready: true, tone: 'orange' },
@@ -78,6 +81,7 @@ export default function RoomPage() {
   const [online, setOnline] = useState<Set<string>>(new Set())
   const [chatUnread, setChatUnread] = useState(0)
   const calendar = useCalendarWatch(code, user?.id)
+  const focus = useFocus(code)
   const toast = useToast()
   const dialogs = useDialogs()
   const status = useRtStatus()
@@ -374,6 +378,7 @@ export default function RoomPage() {
                 <span>{t.label}</span>
                 {!t.ready && <small>Próximamente</small>}
               </span>
+              {t.id === 'focus' && focus.state.status === 'running' && <span className="tool-badge info mono" title="Temporizador en marcha">{fmtFocus(focus.remaining)}</span>}
               {t.id === 'calendar' && calendar.today > 0 && <span className="tool-badge info" aria-label={`${calendar.today} eventos hoy`} title="Eventos de hoy">{calendar.today}</span>}
               {t.id === 'chat' && chatUnread > 0 && <span className="tool-badge" aria-label={`${chatUnread} mensajes sin leer`}>{chatUnread > 99 ? '99+' : chatUnread}</span>}
             </button>
@@ -408,6 +413,7 @@ export default function RoomPage() {
           {tool.id === 'files' && <FilesTool room={room} onEditDoc={openDoc} />}
           {tool.id === 'board' && <BoardsTool room={room} onOpen={openDoc} />}
           {tool.id === 'attendance' && <AssistTool room={room} online={online} />}
+          {tool.id === 'focus' && <FocusTool room={room} focus={focus} />}
           {tool.id === 'links' && <LinksTool room={room} />}
           {tool.id === 'calendar' && <CalendarTool room={room} />}
           {tool.id === 'media' && <MediaReviewTool room={room} />}

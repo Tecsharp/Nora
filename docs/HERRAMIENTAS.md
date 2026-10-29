@@ -52,3 +52,10 @@ Las horas se guardan sin zona (hora local de quien las ve), pensado para equipos
 
 Marcadores compartidos de la sala: **pega una dirección y Enter** (se normaliza, se evita el duplicado) o «Con detalles…» para título, descripción y etiquetas. Tarjetas con inicial de color por dominio (no se consultan iconos de Internet), **fijar arriba**, filtro por etiqueta y búsqueda,
 copiar y abrir en pestaña nueva (`noopener noreferrer`). El servidor solo admite `http(s)`. Cualquier escritor puede fijar; editar y quitar es de quien lo añadió o de quien modera.
+
+## Foco (Pomodoro compartido)
+
+Un **temporizador único para toda la sala** (Foco 25 · Descanso corto 5 · Descanso largo 15 cada 4 pomodoros; duraciones y «empezar el siguiente solo» configurables). Todas las personas que escriben pueden empezar, pausar, reiniciar o saltar; los lectores lo ven.
+El estado vive **en memoria del servidor** (`LiveService`) y se difunde como `live.changed`; el servidor es la única fuente de la hora y cada navegador calcula lo que falta con su desfase de reloj, así que todos ven lo mismo aunque tengan el reloj mal puesto. Al terminar cada periodo el servidor avanza solo y cada navegador **avisa
+con un mensaje y un sonido** (generado con WebAudio, sin archivos; se puede apagar) aunque la herramienta esté cerrada; el **título de la pestaña** y la insignia de la herramienta muestran el tiempo mientras corre.
+Cada persona puede **unirse al grupo de foco** con una frase de en qué trabaja; si se desconecta de la sala deja de contar. Si el servidor se reinicia, el temporizador vuelve a empezar.

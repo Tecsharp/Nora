@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nora.assist.AssistService;
 import com.nora.collab.CollabWs;
+import com.nora.live.LiveService;
 import com.nora.common.ApiException;
 import com.nora.room.Room;
 import com.nora.room.RoomService;
@@ -69,9 +70,11 @@ public class NoraWebSocketHandler extends TextWebSocketHandler implements Assist
     private final UploadService uploads;
     private final CollabWs collab;
     private final AssistService assist;
+    private final LiveService live;
 
-    public NoraWebSocketHandler(ObjectMapper json, @Lazy RoomService rooms, PresenceService presence, @Lazy UploadService uploads, @Lazy CollabWs collab, @Lazy AssistService assist) {
+    public NoraWebSocketHandler(ObjectMapper json, @Lazy RoomService rooms, PresenceService presence, @Lazy UploadService uploads, @Lazy CollabWs collab, @Lazy AssistService assist, @Lazy LiveService live) {
         this.collab = collab;
+        this.live = live;
         this.assist = assist;
         assist.setHub(this);
         this.json = json;
@@ -236,6 +239,7 @@ public class NoraWebSocketHandler extends TextWebSocketHandler implements Assist
         assist.peerGone(conn);
         if (presence.leave(roomId, conn.userId, conn.id())) {
             assist.userLeftRoom(roomId, conn.userId);
+            live.userLeft(roomId, conn.userId);
             sendToRoom(roomId, "presence",
                     Map.of("userId", conn.userId, "displayName", conn.displayName, "online", false));
         }

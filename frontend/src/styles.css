@@ -1199,3 +1199,35 @@ label.kb-search { display: flex; flex-direction: row; align-items: center; }
 .lk-actions { display: flex; align-items: flex-start; gap: 2px; flex: none; opacity: 0.55; transition: opacity 0.12s; } .lk-card:hover .lk-actions, .lk-card:focus-within .lk-actions { opacity: 1; }
 .lk-pin { color: #e0a528; margin: 8px 4px 0 0; }
 .kb-label { border: 0; font-family: inherit; } button.kb-label { cursor: pointer; }
+
+/* ---- Foco (temporizador compartido) ---- */
+.fc { --fc: #7c6af7; flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 300px; overflow-y: auto; }
+.fc.rest { --fc: #22c55e; }
+.fc-main { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 24px 20px; min-width: 0; }
+.fc-dial { position: relative; width: min(300px, 70vw); aspect-ratio: 1; }
+.fc-dial svg { width: 100%; height: 100%; }
+.fc-track { fill: none; stroke: var(--surface-3); stroke-width: 12; }
+.fc-prog { fill: none; stroke: var(--fc); stroke-width: 12; stroke-linecap: round; transition: stroke-dashoffset 0.3s linear, stroke 0.3s; }
+.fc.on .fc-prog { filter: drop-shadow(0 0 8px color-mix(in oklab, var(--fc) 60%, transparent)); }
+.fc-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.fc-time { font: 700 3.4rem/1 var(--mono); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.fc-state { color: var(--fc); font-weight: 700; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.fc-cycle { display: flex; gap: 6px; margin-top: 6px; } .fc-cycle i { width: 9px; height: 9px; border-radius: 50%; background: var(--surface-3); } .fc-cycle i.done { background: var(--fc); }
+.fc-buttons { display: flex; align-items: center; gap: 14px; }
+.fc-go { min-width: 150px; min-height: 50px; border-radius: 999px; font-size: 1rem; background: var(--fc); }
+.fc-tip { max-width: 360px; margin: 0; }
+.fc-foot { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.fc-cfg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 14px; border-radius: 16px; background: var(--surface-2); width: min(420px, 100%); align-items: end; }
+.fc-cfg .check, .fc-cfg .btn { grid-column: 1 / -1; }
+.fc-side { display: flex; flex-direction: column; gap: 12px; padding: 20px 16px; border-left: 1px solid var(--hairline); min-height: 0; }
+.fc-side h4 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+.fc-me { display: flex; flex-direction: column; gap: 8px; }
+.fc-members { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
+.fc-members li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 14px; background: var(--surface-2); }
+.fc-members li.live { box-shadow: inset 0 0 0 1px var(--fc); animation: fcpulse 2.4s ease-in-out infinite; }
+@keyframes fcpulse { 50% { background: color-mix(in oklab, var(--fc) 10%, var(--surface-2)); } }
+.fc-who { display: flex; flex-direction: column; min-width: 0; } .fc-who small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fc-none { background: none !important; padding: 8px 2px !important; }
+@media (max-width: 760px) { .fc { grid-template-columns: 1fr; } .fc-side { border-left: 0; border-top: 1px solid var(--hairline); } .fc-time { font-size: 2.8rem; } }
+.tool-badge.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.fc-members { flex: 1; } .fc-members li { flex: none; min-height: 50px; }
