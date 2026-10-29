@@ -100,7 +100,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
   }
 
   const load = useCallback(() => api<BoardItem[]>(`/rooms/${room.code}/docs`).then((all) => setBoards(all.filter((d) => d.kind === 'BOARD'))).catch(() => setBoards([])), [room.code])
-  const loadFolders = useCallback(() => api<FolderItem[]>(`/rooms/${room.code}/folders?kind=BOARD`).then(setFolders).catch(() => {}), [room.code])
+  const loadFolders = useCallback(() => api<FolderItem[]>(`/rooms/${room.code}/folders?kind=FILE`).then(setFolders).catch(() => {}), [room.code])
   useEffect(() => void load(), [load])
   useEffect(() => void loadFolders(), [loadFolders])
   useRealtime('reconnected', () => { void load(); void loadFolders() })
@@ -108,14 +108,17 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
   useRealtime('doc.renamed', (d: BoardItem) => setBoards((all) => all?.map((x) => (x.id === d.id ? { ...x, name: d.name, updatedAt: d.updatedAt } : x)) ?? all))
   useRealtime('doc.thumb', (d: BoardItem) => setBoards((all) => all?.map((x) => (x.id === d.id ? { ...x, thumbAt: d.thumbAt, updatedAt: d.updatedAt } : x)) ?? all))
   useRealtime('doc.moved', (d: BoardItem) => setBoards((all) => all?.map((x) => (x.id === d.id ? { ...x, folderId: d.folderId } : x)) ?? all))
+  // mover o renombrar el archivo .excalidraw desde Archivos cambia también la pizarra
+  useRealtime('file.updated', (f: { id: string; name: string; folderId: string | null }) =>
+    setBoards((all) => all?.map((x) => (x.sourceFileId === f.id ? { ...x, folderId: f.folderId ?? null } : x)) ?? all))
   useRealtime('doc.deleted', (d: { id: string }) => {
     setBoards((all) => all?.filter((x) => x.id !== d.id) ?? all)
     setSel((s) => (s.has(d.id) ? new Set([...s].filter((x) => x !== d.id)) : s))
   })
-  useRealtime('folder.added', (f: FolderItem & { kind: string }) => f.kind === 'BOARD' && setFolders((all) => (all.some((x) => x.id === f.id) ? all : [...all, f])))
-  useRealtime('folder.updated', (f: FolderItem & { kind: string }) => f.kind === 'BOARD' && setFolders((all) => all.map((x) => (x.id === f.id ? f : x))))
+  useRealtime('folder.added', (f: FolderItem & { kind: string }) => f.kind === 'FILE' && setFolders((all) => (all.some((x) => x.id === f.id) ? all : [...all, f])))
+  useRealtime('folder.updated', (f: FolderItem & { kind: string }) => f.kind === 'FILE' && setFolders((all) => all.map((x) => (x.id === f.id ? f : x))))
   useRealtime('folder.deleted', (d: { kind: string; ids: string[] }) => {
-    if (d.kind !== 'BOARD') return
+    if (d.kind !== 'FILE') return
     setFolders((all) => all.filter((x) => !d.ids.includes(x.id)))
     setBoards((all) => all?.filter((b) => !b.folderId || !d.ids.includes(b.folderId)) ?? all)
     setCurrent((c) => (c && d.ids.includes(c) ? null : c))
@@ -210,7 +213,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
   async function createFolder(e: FormEvent) {
     e.preventDefault()
     try {
-      const f = await api<FolderItem>(`/rooms/${room.code}/folders?kind=BOARD`, 'POST', { name: folderName, parentId: current })
+      const f = await api<FolderItem>(`/rooms/${room.code}/folders?kind=FILE`, 'POST', { name: folderName, parentId: current })
       setFolders((all) => (all.some((x) => x.id === f.id) ? all : [...all, f]))
       setCreating(false)
       setFolderName('')
@@ -272,11 +275,12 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
         if (!Array.isArray(parsed.elements)) throw new Error('No es un archivo de pizarra válido (.excalidraw)')
       }
       const fd = new FormData()
+      if (current) fd.append('folderId', current)
       fd.append('file', new File([blob], `${name || 'Pizarra importada'}.excalidraw`, { type: 'application/json' }))
       const up = await fetch(`/api/rooms/${room.code}/files`, { method: 'POST', headers: { Authorization: `Bearer ${getAccessToken() ?? ''}` }, body: fd })
       if (!up.ok) throw new ApiError(up.status, (await up.json().catch(() => null))?.message ?? `Error ${up.status}`)
       const f = (await up.json()) as { id: string }
-      onOpen(await api<BoardItem>(`/rooms/${room.code}/docs/from-file/${f.id}${current ? `?folderId=${current}` : ''}`, 'POST'))
+      onOpen(await api<BoardItem>(`/rooms/${room.code}/docs/from-file/${f.id}`, 'POST'))
     } catch (e) {
       toast(e instanceof Error ? e.message : 'No se pudo importar', 'error')
     } finally {
