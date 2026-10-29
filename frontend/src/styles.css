@@ -774,3 +774,10 @@ table.table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 .fitem.selected { background: var(--accent-soft); border-color: color-mix(in oklab, var(--accent) 55%, transparent); }
 .fgrid .fitem.selected { background: var(--accent-soft); }
 .marquee { position: fixed; z-index: 90; pointer-events: none; border: 1px solid var(--accent); background: color-mix(in oklab, var(--accent) 18%, transparent); border-radius: 4px; }
+
+.avatar.photo { background: var(--surface-3); overflow: visible; }
+.avatar.photo img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
+.danger-zone { border: 1px solid color-mix(in oklab, var(--red) 45%, transparent); }
+.admin-actions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 4px; }
+.btn.danger { color: var(--red); }
+.profile-link { gap: 8px; padding-left: 6px; }

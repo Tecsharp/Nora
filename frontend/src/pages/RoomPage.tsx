@@ -286,7 +286,7 @@ export default function RoomPage() {
             {room.participants.slice(0, 24).map((p) => (
               <span key={p.userId} className={`person ${online.has(p.userId) ? '' : 'off'}`}
                 title={`${p.displayName}${online.has(p.userId) ? '' : ' (desconectado)'}`}>
-                <Avatar name={p.displayName} online={online.has(p.userId)} />
+                <Avatar name={p.displayName} online={online.has(p.userId)} userId={p.userId} version={p.avatarVersion} />
                 <span className="who">
                   <span className="truncate">{p.displayName}</span>
                   <span className={`role-tag ${p.role === 'OWNER' || p.role === 'MODERATOR' ? 'strong' : ''}`}>{ROLE_LABEL[p.role]}</span>

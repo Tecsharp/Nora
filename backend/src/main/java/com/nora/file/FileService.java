@@ -207,6 +207,16 @@ public class FileService {
         return dto;
     }
 
+    /** Borrado de cuenta: los archivos que subió la persona se quitan del almacén y avisan a las salas donde estaban. */
+    @Transactional
+    public void deleteAllForUser(UUID userId) {
+        for (RoomFile f : files.findByUploaderId(userId)) {
+            cleaner.schedule(f.getObjectKey());
+            files.delete(f);
+            events.publishEvent(new RoomEvent(f.getRoomId(), "file.deleted", Map.of("id", f.getId())));
+        }
+    }
+
     @Transactional
     public void deleteAllForRoom(UUID roomId) {
         for (RoomFile f : files.findByRoomIdOrderByCreatedAtDesc(roomId)) {

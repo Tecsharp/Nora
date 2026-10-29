@@ -4,7 +4,7 @@ import { api, refreshSession, setAccessToken, setSessionLostHandler, type User }
 interface AuthState {
   user: User | null
   loading: boolean
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string, remember?: boolean) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -23,8 +23,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('nora:session', onSession)
   }, [])
 
-  const login = useCallback(async (email: string, password: string) => {
-    const res = await api<{ accessToken: string; user: User }>('/auth/login', 'POST', { email, password })
+  const login = useCallback(async (email: string, password: string, remember = false) => {
+    const res = await api<{ accessToken: string; user: User }>('/auth/login', 'POST', { email, password, remember })
     setAccessToken(res.accessToken)
     setUser(res.user)
   }, [])

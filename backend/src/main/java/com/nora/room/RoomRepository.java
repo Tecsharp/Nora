@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.Query;
 public interface RoomRepository extends JpaRepository<Room, UUID> {
     Optional<Room> findByCode(String code);
 
+    List<Room> findByOwnerId(UUID ownerId);
+
     @Query("select count(r) from Room r where r.ownerId = :ownerId and (r.expiresAt is null or r.expiresAt > :now)")
     long countActiveByOwner(UUID ownerId, Instant now);
 

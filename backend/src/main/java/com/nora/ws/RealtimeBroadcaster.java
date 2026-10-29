@@ -31,6 +31,6 @@ public class RealtimeBroadcaster {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onUser(UserEvent e) {
         handler.sendToUser(e.userId(), e.type(), e.data());
-        if ("account.disabled".equals(e.type())) handler.closeUser(e.userId());
+        if ("account.disabled".equals(e.type()) || "account.revoked".equals(e.type()) || "account.deleted".equals(e.type())) handler.closeUser(e.userId());
     }
 }

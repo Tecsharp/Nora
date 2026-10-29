@@ -324,7 +324,7 @@ public class RoomService {
         members.save(m);
         String name = user(targetId).getDisplayName();
         events.publishEvent(new RoomEvent(room.getId(), "member.updated", Map.of("userId", targetId, "displayName", name, "role", role.name())));
-        return new ParticipantDto(targetId, name, presence.isOnline(room.getId(), targetId), false, role.name());
+        return new ParticipantDto(targetId, name, presence.isOnline(room.getId(), targetId), false, role.name(), user(targetId).getAvatarVersion());
     }
 
     /** El propietario (o un administrador) expulsa a un participante: deja de ser miembro y se le corta el acceso en vivo. */
@@ -341,6 +341,16 @@ public class RoomService {
         String name = user(targetId).getDisplayName();
         events.publishEvent(new UserEvent(targetId, "member.kicked", Map.of("code", room.getCode(), "roomName", room.getName())));
         events.publishEvent(new RoomEvent(room.getId(), "member.removed", Map.of("userId", targetId, "displayName", name)));
+    }
+
+    /** Borrado de cuenta: se destruyen las salas de la persona (con sus archivos) y se la saca de las demás. */
+    @Transactional
+    public void removeAccountFromRooms(UUID userId) {
+        for (Room r : rooms.findByOwnerId(userId)) destroy(r, "closed");
+        for (RoomMember m : members.findByUserId(userId)) {
+            String name = user(userId).getDisplayName();
+            events.publishEvent(new RoomEvent(m.getRoomId(), "member.removed", Map.of("userId", userId, "displayName", name)));
+        }
     }
 
     private Room openRoom(String code) {
@@ -362,7 +372,7 @@ public class RoomService {
                 .sorted((a, b) -> a.getJoinedAt().compareTo(b.getJoinedAt()))
                 .map(m -> new ParticipantDto(m.getUserId(), byId.get(m.getUserId()).getDisplayName(),
                         presence.isOnline(room.getId(), m.getUserId()), m.getUserId().equals(room.getOwnerId()),
-                        m.getUserId().equals(room.getOwnerId()) ? "OWNER" : m.getRole().name()))
+                        m.getUserId().equals(room.getOwnerId()) ? "OWNER" : m.getRole().name(), byId.get(m.getUserId()).getAvatarVersion()))
                 .toList();
         String myRole = parts.stream().filter(p -> p.userId().equals(viewer)).map(ParticipantDto::role).findFirst().orElse("MEMBER");
         return new RoomDto(room.getId(), room.getCode(), room.getName(), room.getCreatedAt(), room.getExpiresAt(),

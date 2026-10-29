@@ -95,6 +95,13 @@ Los permisos se comprueban en el servidor (un lector recibe 403 al intentar subi
 
 **Selección múltiple:** en Archivos (y en Pizarra) se seleccionan varios elementos con la casilla de cada uno, Ctrl/⌘+clic, Mayús+clic (rango) o **arrastrando un rectángulo con el ratón** sobre un hueco. La barra de selección ofrece Descargar, **Mover a…** (cualquier carpeta o la raíz) y Borrar (con confirmación); también se pueden **arrastrar todos los seleccionados a una carpeta** o a la ruta de arriba. Esc quita la selección. Mover y borrar solo afectan a lo propio (o a todo si moderas).
 
+### Cuentas, Ajustes y administración
+
+- **Iniciar sesión**: «Recordar mi correo» (se guarda en ese navegador) y «Mantener la sesión iniciada durante un mes» (cookie de 30 días; sin marcarla, la cookie acaba al cerrar el navegador y la sesión dura `NORA_REFRESH_TTL_DAYS`).
+- **Ajustes** (clic en tu nombre arriba): foto de perfil (se recorta a 256 px y se guarda en la base de datos; `PUT /api/me/avatar`), nombre, correo (pide la contraseña), contraseña (cierra las demás sesiones), **sesiones abiertas** con su dispositivo y «cerrar las demás», y **borrar mi cuenta** (`DELETE /api/me` con la contraseña): borra sus salas con todo su contenido, lo que subió o creó en salas ajenas (también del almacén Garage), su foto, sesiones y bibliotecas. El único administrador no puede borrarse.
+- **Administración** (`/admin`): *Resumen* (cuentas, altas, actividad, sesiones, salas, archivos), *Usuarios* (buscar, **crear**, editar nombre/correo/límites/rol, **desactivar = revocar el acceso**, **cerrar sus sesiones** al instante, **enlace de un solo uso (24 h) para cambiar la contraseña** → `/reset-password?token=…`, **borrar cuenta**), *Sistema* (permitir o no el registro y límites de las cuentas nuevas, en caliente), *Bibliotecas* de la pizarra y *Almacenamiento*.
+- Cerrar sesiones o desactivar una cuenta invalida también los tokens de acceso ya emitidos y corta el WebSocket. Un token de renovación cerrado a propósito solo se rechaza; reutilizar uno ya rotado sigue cerrando todas las sesiones (posible robo).
+
 ### Visor de documentos
 
 Al hacer clic en un archivo (o con el botón del ojo) se abre un visor con navegación entre los documentos de la carpeta (flechas del teclado o en pantalla): **imágenes** (JPG, PNG, GIF, WebP, AVIF, SVG…), **PDF** (con zoom, dibujado con pdf.js en el navegador) y **texto/código** (se muestra como texto plano, nunca se ejecuta). Todo se lee por la API autenticada y se muestra con URLs `blob:` locales; la CSP del gateway solo añade `blob:` para imágenes y workers. Los **vídeos no se previsualizan, solo se descargan**: reproducirlos exigiría transcodificarlos en el servidor (ffmpeg), algo que Nora no incluye por ahora.

@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.Query;
 public interface RoomFileRepository extends JpaRepository<RoomFile, UUID> {
     List<RoomFile> findByRoomIdOrderByCreatedAtDesc(UUID roomId);
 
+    List<RoomFile> findByUploaderId(UUID userId);
+
     List<RoomFile> findByRoomIdAndFolderIdIn(UUID roomId, java.util.Collection<UUID> folderIds);
 
     @Query("select f.objectKey from RoomFile f where f.objectKey in :keys")

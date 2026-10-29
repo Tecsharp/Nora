@@ -16,6 +16,9 @@ export interface User {
   enabled: boolean
   createdAt: string
   limits: Limits
+  /** 0 = sin foto; sube con cada cambio de foto (sirve para refrescarla). */
+  avatarVersion: number
+  lastLoginAt: string | null
 }
 
 export interface Participant {
@@ -24,6 +27,7 @@ export interface Participant {
   online: boolean
   owner: boolean
   role: RoomRole
+  avatarVersion: number
 }
 
 export interface Room {
