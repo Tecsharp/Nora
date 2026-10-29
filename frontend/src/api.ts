@@ -40,7 +40,7 @@ export interface Room {
   isOwner: boolean
   /** Rol de la persona que consulta la sala */
   role: RoomRole
-  settings: { requireApproval: boolean; defaultRole: 'MEMBER' | 'VIEWER'; maxParticipants: number | null }
+  settings: { requireApproval: boolean; defaultRole: 'MEMBER' | 'VIEWER'; maxParticipants: number | null; keepWhenExpired: boolean }
   participants: Participant[]
 }
 
@@ -55,6 +55,19 @@ export interface RoomSummary {
   name: string
   expiresAt: string | null
   isOwner: boolean
+  keepWhenExpired: boolean
+  /** Expiró pero se conserva (sin sesiones en vivo); el propietario puede reactivarla. */
+  inactive: boolean
+}
+
+export interface RoomStatus {
+  code: string
+  name: string
+  expired: boolean
+  inactive: boolean
+  keepWhenExpired: boolean
+  isOwner: boolean
+  expiresAt: string | null
 }
 
 export class ApiError extends Error {

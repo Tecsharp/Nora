@@ -1278,3 +1278,4 @@ input.rng:disabled { opacity: 0.5; cursor: default; }
 .tool.pinned { box-shadow: 0 0 0 1px var(--accent), var(--shadow-sm); }
 .tool.pinned .tool-pin { color: var(--accent-text); }
 @media (hover: none) { .tool-pin { opacity: 1; } }
+.inactive-room { max-width: 560px; margin: 8vh auto; align-items: center; } .room-card-wrap.inactive .room-card { opacity: 0.85; cursor: default; } .keep-opt { padding: 12px; border-radius: 14px; background: var(--surface-2); }

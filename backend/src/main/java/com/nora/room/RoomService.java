@@ -78,6 +78,7 @@ public class RoomService {
         }
         Room room = saveWithUniqueCode(req.name().trim(), userId, expires);
         applyOptions(room, user, req.requireApproval(), req.defaultRole(), req.maxParticipants(), false);
+        room.setKeepWhenExpired(Boolean.TRUE.equals(req.keepWhenExpired()));
         rooms.save(room);
         members.save(new RoomMember(room.getId(), userId));
         return toDto(room, userId);
@@ -204,6 +205,7 @@ public class RoomService {
     public RoomDto updateSettings(UUID actorId, Role sysRole, String code, SettingsRequest req) {
         Room room = ownedRoom(actorId, sysRole, code, "Solo el propietario cambia las opciones de la sala");
         applyOptions(room, user(room.getOwnerId()), req.requireApproval(), req.defaultRole(), req.maxParticipants(), true);
+        if (req.keepWhenExpired() != null) room.setKeepWhenExpired(req.keepWhenExpired());
         rooms.save(room);
         publishUpdate(room);
         return toDto(room, actorId);
@@ -217,7 +219,7 @@ public class RoomService {
     }
 
     private static RoomSettings settings(Room room) {
-        return new RoomSettings(room.isRequireApproval(), room.getDefaultRole().name(), room.getMaxParticipants());
+        return new RoomSettings(room.isRequireApproval(), room.getDefaultRole().name(), room.getMaxParticipants(), room.isKeepWhenExpired());
     }
 
     /** Devuelve la sala; la presencia ("conectado") la aporta el WebSocket. */
@@ -228,8 +230,8 @@ public class RoomService {
 
     @Transactional(readOnly = true)
     public List<RoomSummary> mine(UUID userId) {
-        return rooms.findActiveForMember(userId, Instant.now()).stream()
-                .map(r -> new RoomSummary(r.getCode(), r.getName(), r.getExpiresAt(), r.getOwnerId().equals(userId)))
+        return rooms.findVisibleForMember(userId, Instant.now()).stream()
+                .map(r -> new RoomSummary(r.getCode(), r.getName(), r.getExpiresAt(), r.getOwnerId().equals(userId), r.isKeepWhenExpired(), r.isExpired()))
                 .toList();
     }
 
@@ -390,7 +392,54 @@ public class RoomService {
         events.publishEvent(new RoomEvent(room.getId(), "room.closed", Map.of("reason", reason, "name", room.getName())));
     }
 
-    /** Las salas expiradas se destruyen junto con todos sus archivos. */
+    /** Estado de la sala para quien participa, aunque ya haya expirado (el resto de endpoints responden «expirada»). */
+    @Transactional(readOnly = true)
+    public RoomStatus status(UUID userId, String code) {
+        Room room = rooms.findByCode(normalize(code)).orElseThrow(() -> ApiException.notFound("Sala no encontrada"));
+        if (!members.existsById(new RoomMember.Key(room.getId(), userId))) throw ApiException.forbidden("No participas en esta sala");
+        return new RoomStatus(room.getCode(), room.getName(), room.isExpired(), room.isExpired() && room.isKeepWhenExpired(), room.isKeepWhenExpired(), room.getOwnerId().equals(userId), room.getExpiresAt());
+    }
+
+    /** El propietario devuelve a la vida una sala inactiva (con una nueva duración, o sin expiración). Cuenta como sala activa de su cuenta. */
+    @Transactional
+    public RoomDto reactivate(UUID userId, Role role, String code, ReactivateRequest req) {
+        Room room = rooms.findByCode(normalize(code)).orElseThrow(() -> ApiException.notFound("Sala no encontrada"));
+        if (!room.getOwnerId().equals(userId) && role != Role.ADMIN) throw ApiException.forbidden("Solo el propietario puede reactivar la sala");
+        if (!room.isExpired()) throw ApiException.conflict("La sala ya está activa");
+        User owner = user(room.getOwnerId());
+        Instant now = Instant.now();
+        if (role != Role.ADMIN && owner.getMaxActiveRooms() != null && rooms.countActiveByOwner(owner.getId(), now) >= owner.getMaxActiveRooms()) {
+            throw ApiException.forbidden("Has alcanzado el máximo de salas activas (" + owner.getMaxActiveRooms() + ")");
+        }
+        Integer limit = role == Role.ADMIN ? null : owner.getMaxRoomMinutes();
+        int minutes = req == null || req.minutes() == null ? DEFAULT_MINUTES : req.minutes();
+        if (minutes == 0) {
+            if (limit != null) throw ApiException.forbidden("Tu cuenta no permite salas sin expiración");
+            room.setExpiresAt(null);
+        } else {
+            if (limit != null && minutes > limit) throw ApiException.forbidden("Tu cuenta permite salas de hasta " + limit + " minutos");
+            room.setExpiresAt(now.plus(Duration.ofMinutes(minutes)));
+        }
+        room.setInactiveSince(null);
+        rooms.save(room);
+        events.publishEvent(new RoomEvent(room.getId(), "room.reactivated", Map.of("name", room.getName(), "code", room.getCode())));
+        publishUpdate(room);
+        return toDto(room, userId);
+    }
+
+    /** Las salas con «mantener» que acaban de expirar pasan a inactivas: no se borra nada, pero se cierran las sesiones en vivo. */
+    @Scheduled(fixedDelay = 60_000, initialDelay = 20_000)
+    @Transactional
+    public void deactivateExpiredKept() {
+        for (Room room : rooms.findNewlyInactive(Instant.now())) {
+            room.setInactiveSince(Instant.now());
+            rooms.save(room);
+            events.publishEvent(new RoomEvent(room.getId(), "room.inactive", Map.of("name", room.getName(), "code", room.getCode())));
+            log.info("Sala conservada y dejada inactiva: {}", room.getCode());
+        }
+    }
+
+    /** Las salas expiradas (sin «mantener») se destruyen junto con todos sus archivos. */
     @Scheduled(fixedDelay = 60_000, initialDelay = 30_000)
     @Transactional
     public void purgeExpired() {

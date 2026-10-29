@@ -18,15 +18,20 @@ public final class RoomDtos {
             /** Opciones de la sala; todas son opcionales. */
             Boolean requireApproval,
             RoomRole defaultRole,
-            @Min(value = 2, message = "Mínimo 2 participantes") Integer maxParticipants) {}
+            @Min(value = 2, message = "Mínimo 2 participantes") Integer maxParticipants,
+            /** Al expirar, la sala queda inactiva en lugar de borrarse. */
+            Boolean keepWhenExpired) {}
 
     /** Cambios de las opciones de la sala (solo se tocan los campos presentes; maxParticipants 0 = sin límite propio). */
     public record SettingsRequest(
             Boolean requireApproval,
             RoomRole defaultRole,
-            @Min(value = 0, message = "No válido") Integer maxParticipants) {}
+            @Min(value = 0, message = "No válido") Integer maxParticipants,
+            Boolean keepWhenExpired) {}
 
-    public record RoomSettings(boolean requireApproval, String defaultRole, Integer maxParticipants) {}
+    public record ReactivateRequest(@Min(0) Integer minutes) {}
+
+    public record RoomSettings(boolean requireApproval, String defaultRole, Integer maxParticipants, boolean keepWhenExpired) {}
 
     public record JoinRequestDto(UUID userId, String displayName, Instant requestedAt) {}
 
@@ -52,5 +57,8 @@ public final class RoomDtos {
                           UUID ownerId, boolean isOwner, String role, RoomSettings settings,
                           List<ParticipantDto> participants) {}
 
-    public record RoomSummary(String code, String name, Instant expiresAt, boolean isOwner) {}
+    public record RoomSummary(String code, String name, Instant expiresAt, boolean isOwner, boolean keepWhenExpired, boolean inactive) {}
+
+    /** Estado de una sala aunque esté expirada (para mostrar «inactiva» o «expirada» a quien participa). */
+    public record RoomStatus(String code, String name, boolean expired, boolean inactive, boolean keepWhenExpired, boolean isOwner, Instant expiresAt) {}
 }

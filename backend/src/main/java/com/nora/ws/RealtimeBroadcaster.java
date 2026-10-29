@@ -24,7 +24,7 @@ public class RealtimeBroadcaster {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onRoom(RoomEvent e) {
         handler.sendToRoom(e.roomId(), e.type(), e.data());
-        if ("room.closed".equals(e.type())) handler.detachRoom(e.roomId());
+        if ("room.closed".equals(e.type()) || "room.inactive".equals(e.type())) handler.detachRoom(e.roomId());
         if ("member.removed".equals(e.type()) && e.data() instanceof java.util.Map<?, ?> m && m.get("userId") instanceof java.util.UUID id) handler.evict(e.roomId(), id);
     }
 

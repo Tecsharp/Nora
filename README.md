@@ -82,6 +82,11 @@ Nora puede ayudar con IA (mejorar y traducir textos, resumir, extraer tareas, cr
 interfaz: se activa a mano en el `.env` (`NORA_AI_ENABLED=true` y `NORA_DEEPSEEK_API_KEY=…`, ya vienen ahí apagadas) y `docker compose up -d`. La clave solo vive en el servidor y
 solo se envía a DeepSeek el texto que cada persona decide procesar. Detalles en [docs/IA.md](docs/IA.md).
 
+### Mantener sala (inactiva en lugar de borrarse)
+
+Por defecto, al expirar una sala se **elimina con todos sus archivos**. Al crearla (o en sus opciones) el propietario puede activar **«Mantener la sala al expirar»**: entonces no se borra nada, pero la sala pasa a **inactiva** (se cierran sus conexiones en vivo y no gasta recursos) y aparece en Inicio → «Salas inactivas».
+El propietario puede **reactivarla** con una nueva duración (cuenta como sala activa de su cuenta) o eliminarla; el resto de participantes ven que está inactiva.
+
 ### Herramientas de la sala
 
 Además de Archivos, Pizarra y Notas, cada sala tiene: **Chat** (respuestas, reacciones, @menciones, sin leer), **Tablero** (tareas con arrastrar y soltar), **Votaciones** (anónimas, cierre automático, resultados en vivo), **Media Review** (comentarios en el momento exacto de un vídeo/audio o en un punto de una imagen),

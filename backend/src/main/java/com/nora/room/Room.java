@@ -27,6 +27,12 @@ public class Room {
     @Column(name = "expires_at")
     private Instant expiresAt;
 
+    @Column(name = "keep_when_expired", nullable = false)
+    private boolean keepWhenExpired;
+
+    @Column(name = "inactive_since")
+    private Instant inactiveSince;
+
     @Column(name = "require_approval", nullable = false)
     private boolean requireApproval;
 
@@ -60,5 +66,9 @@ public class Room {
     public void setDefaultRole(RoomRole defaultRole) { this.defaultRole = defaultRole; }
     public Integer getMaxParticipants() { return maxParticipants; }
     public void setMaxParticipants(Integer maxParticipants) { this.maxParticipants = maxParticipants; }
+    public boolean isKeepWhenExpired() { return keepWhenExpired; }
+    public void setKeepWhenExpired(boolean keepWhenExpired) { this.keepWhenExpired = keepWhenExpired; }
+    public Instant getInactiveSince() { return inactiveSince; }
+    public void setInactiveSince(Instant inactiveSince) { this.inactiveSince = inactiveSince; }
     public boolean isExpired() { return expiresAt != null && expiresAt.isBefore(Instant.now()); }
 }

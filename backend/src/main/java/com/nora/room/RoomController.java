@@ -68,6 +68,16 @@ public class RoomController {
         return rooms.updateSettings(p.userId(), p.role(), code, req);
     }
 
+    @GetMapping("/{code}/status")
+    public RoomStatus status(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code) {
+        return rooms.status(p.userId(), code);
+    }
+
+    @PostMapping("/{code}/reactivate")
+    public RoomDto reactivate(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @Valid @RequestBody(required = false) ReactivateRequest req) {
+        return rooms.reactivate(p.userId(), p.role(), code, req);
+    }
+
     @GetMapping("/{code}")
     public RoomDto get(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code) {
         return rooms.get(p.userId(), code);

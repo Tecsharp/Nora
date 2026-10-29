@@ -4,7 +4,8 @@ import {
   ArrowLeft, Check, Pencil, UserX, Settings, UserCheck, X, Clapperboard, ClipboardList, Clock, Copy, FolderOpen, Hash, Monitor, PenTool, Pin, PinOff, ShieldCheck,
   SquareCheckBig, Trash2, MessageSquare, KanbanSquare, CalendarDays, Link2, Timer, Tv, type LucideProps,
 } from 'lucide-react'
-import { api, ApiError, type JoinRequest, type Room } from '../api'
+import { api, ApiError, type JoinRequest, type Room, type RoomStatus } from '../api'
+import ReactivateDialog from '../components/ReactivateDialog'
 import { useAuth } from '../auth'
 import { rt, useRealtime, useRtStatus } from '../realtime'
 import { useToast } from '../toast'
@@ -80,6 +81,8 @@ export default function RoomPage() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [requests, setRequests] = useState<JoinRequest[]>([])
   const [online, setOnline] = useState<Set<string>>(new Set())
+  const [inactive, setInactive] = useState<RoomStatus | null>(null)
+  const [reactivating, setReactivating] = useState(false)
   const [chatUnread, setChatUnread] = useState(0)
   const pinKey = `nora-pinned-tools:${user?.id ?? ''}`
   const [pinned, setPinned] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem(`nora-pinned-tools:${user?.id ?? ''}`) ?? '[]') as string[] } catch { return [] } })
@@ -108,10 +111,16 @@ export default function RoomPage() {
     try {
       const r = await api<Room>(`/rooms/${code}`)
       setRoom(r)
+      setInactive(null)
       // Sin WebSocket la presencia viene de la API; con WebSocket la mantienen los eventos.
       if (rt.status !== 'open') setOnline(new Set(r.participants.filter((p) => p.online).map((p) => p.userId)))
       setError('')
     } catch (err) {
+      if (err instanceof ApiError && err.status === 410) {
+        // ¿expiró sin más o se conserva como sala inactiva?
+        const st = await api<RoomStatus>(`/rooms/${code}/status`).catch(() => null)
+        if (st?.inactive) { setRoom(null); setInactive(st); setError(''); return }
+      }
       if (err instanceof ApiError && (err.status === 404 || err.status === 410 || err.status === 403)) {
         setRoom(null)
         setError(err.status === 410 ? 'Esta sala ha expirado.' : err.status === 403 ? 'No participas en esta sala.' : 'La sala no existe.')
@@ -197,6 +206,8 @@ export default function RoomPage() {
     navigate('/')
     void dialogs.notify({ title: 'Te han expulsado de la sala', message: <>El propietario te ha quitado de <b>{d.roomName}</b>. Si crees que es un error, pídele el código para volver a entrar.</>, tone: 'warning', icon: 'user-x' })
   })
+  useRealtime('room.inactive', (d: { code: string }) => { if (d.code === code) { toast('La sala ha expirado y queda inactiva: no se ha borrado nada', 'warning'); void load() } })
+  useRealtime('room.reactivated', (d: { code: string }) => { if (d.code === code) void load() })
   useRealtime('room.closed', (d: { reason: string }) => {
     toast(d.reason === 'expired' ? 'La sala ha expirado y se han borrado sus archivos' : 'La sala ha sido cerrada', 'warning')
     navigate('/')
@@ -269,6 +280,20 @@ export default function RoomPage() {
     if (!await dialogs.confirm({ title: '¿Cerrar la sala?', message: <>Se borrarán todos sus archivos y contenido para <b>todos los participantes</b>. No se puede deshacer.</>, confirmLabel: 'Cerrar sala', tone: 'danger', typeToConfirm: room?.name ?? undefined })) return
     await api(`/rooms/${code}`, 'DELETE')
     navigate('/')
+  }
+
+  if (!room && inactive) {
+    return (
+      <div className="card stack center-text inactive-room">
+        <span className="badge">Sala inactiva</span>
+        <h2>«{inactive.name}» está inactiva</h2>
+        <p className="muted">La sala expiró, pero se conservó: no se ha borrado nada. Mientras está inactiva no tiene conexiones en vivo (chat, tableros, reproductor…), así que no gasta recursos.</p>
+        {inactive.isOwner
+          ? <div className="row" style={{ justifyContent: 'center' }}><button className="btn primary" onClick={() => setReactivating(true)}>Reactivar la sala</button><button className="btn" onClick={() => navigate('/')}>Volver</button></div>
+          : <><p className="small">El propietario puede reactivarla cuando quiera.</p><button className="btn" onClick={() => navigate('/')}>Volver</button></>}
+        {reactivating && <ReactivateDialog code={inactive.code} name={inactive.name} onClose={() => setReactivating(false)} onDone={() => void load()} />}
+      </div>
+    )
   }
 
   if (!room) {
