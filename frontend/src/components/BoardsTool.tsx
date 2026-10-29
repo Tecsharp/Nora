@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { Check, FolderInput, Loader2, PenTool, Pencil, Plus, Trash2, Upload, X } from 'lucide-react'
+import { Check, Download, FolderInput, Loader2, PenTool, Pencil, Plus, Trash2, Upload, X } from 'lucide-react'
 import { api, ApiError, getAccessToken, type Room } from '../api'
 import { useAuth } from '../auth'
 import { useRealtime } from '../realtime'
 import { canWrite as canWriteIn, isStaff as isStaffIn } from '../roles'
 import { useToast } from '../toast'
 import type { DocInfo } from '../collab/DocEditor'
+import { renderSavedBoard } from '../collab/boardIO'
 import Menu, { type MenuItem } from './Menu'
 import Tabs from './Tabs'
 
@@ -131,17 +132,46 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
     }
   }
 
-  function menu(b: BoardItem): MenuItem[] {
-    const items: MenuItem[] = [{ label: 'Cambiar nombre', icon: <Pencil size={16} />, onClick: async () => {
+  /** Descarga una pizarra sin abrirla: el .excalidraw tal cual está guardado en la sala, o su imagen (PNG, SVG, PDF) dibujada aquí. */
+  async function downloadBoard(b: BoardItem, format: 'excalidraw' | 'png' | 'svg' | 'pdf') {
+    if (!b.sourceFileId) return toast('Esta pizarra aún no tiene archivo', 'error')
+    setBusy('Preparando descarga…')
+    try {
+      const res = await fetch(`/api/rooms/${room.code}/files/${b.sourceFileId}`, { headers: { Authorization: `Bearer ${getAccessToken() ?? ''}` } })
+      if (!res.ok) throw new Error('No se pudo leer el archivo de la pizarra')
+      const raw = await res.blob()
+      const blob = format === 'excalidraw' ? raw : await renderSavedBoard(raw, format)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${b.name}.${format}`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+    } catch (e) {
+      fail(e)
+    } finally {
+      setBusy('')
+    }
+  }
+
+  function menu(b: BoardItem, mine: boolean): MenuItem[] {
+    const items: MenuItem[] = []
+    if (mine) items.push({ label: 'Cambiar nombre', icon: <Pencil size={16} />, onClick: async () => {
       const n = window.prompt('Nuevo nombre', b.name)
       if (n?.trim()) await api(`/rooms/${room.code}/docs/${b.id}`, 'PATCH', { name: n.trim() }).catch(fail)
-    } }]
-    if (folders.length || b.folderId) {
+    } })
+    items.push({ heading: 'Descargar como' })
+    for (const [f, label] of [['excalidraw', 'Pizarra (.excalidraw)'], ['png', 'Imagen PNG'], ['svg', 'Imagen SVG'], ['pdf', 'PDF']] as const) {
+      items.push({ label, icon: <Download size={16} />, onClick: () => void downloadBoard(b, f) })
+    }
+    if (mine && (folders.length || b.folderId)) {
       items.push({ heading: 'Mover a' })
       if (b.folderId) items.push({ label: 'Sin carpeta', icon: <FolderInput size={16} />, onClick: () => void move(b, null) })
       for (const f of folders) if (f.id !== b.folderId) items.push({ label: f.name, icon: <FolderInput size={16} />, onClick: () => void move(b, f.id) })
     }
-    items.push('separator', { label: 'Borrar', icon: <Trash2 size={16} />, danger: true, onClick: async () => {
+    if (mine) items.push('separator', { label: 'Borrar', icon: <Trash2 size={16} />, danger: true, onClick: async () => {
       if (confirm(`¿Borrar la pizarra «${b.name}»? También se borra su archivo .excalidraw de la sala.`)) await api(`/rooms/${room.code}/docs/${b.id}`, 'DELETE').catch(fail)
     } })
     return items
@@ -244,7 +274,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
                 <div className="board-thumb"><Thumb code={room.code} board={b} /></div>
                 <div className="board-meta">
                   <span className="fbody"><span className="fname truncate">{b.name}</span><span className="fmeta truncate">{b.createdByName} · {when(b.updatedAt)}{filter === ALL && b.folderId ? ` · ${folders.find((f) => f.id === b.folderId)?.name ?? ''}` : ''}</span></span>
-                  {canTouch(b.createdBy) && <span onClick={(e) => e.stopPropagation()}><Menu items={menu(b)} /></span>}
+                  <span onClick={(e) => e.stopPropagation()}><Menu items={menu(b, canTouch(b.createdBy))} /></span>
                 </div>
               </div>
             ))}

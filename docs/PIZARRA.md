@@ -31,7 +31,7 @@ La herramienta **Pizarra** de cada sala es un lienzo infinito para dibujar, esqu
 | **Importar** | galería o menú «⋯» | Lee un `.excalidraw`/`.json`, un PNG o SVG con la escena incrustada o una imagen suelta. Dentro de una pizarra se elige **añadir** (aparece donde estás mirando, ya seleccionado) o **reemplazar todo**; ambas se pueden deshacer. |
 | **Historial** | cabecera | Versiones automáticas (cada 10 min) y manuales; restaurar una versión es un cambio más (todos la reciben y se puede deshacer). |
 | Abrir desde Archivos | un clic | Cualquier `.excalidraw` de la sala se abre como pizarra colaborativa. |
-| Galería | herramienta **Pizarra** | Miniaturas, nueva pizarra, importar, renombrar, mover y borrar. |
+| Galería | herramienta **Pizarra** | Miniaturas, nueva pizarra, importar, renombrar, mover y borrar. El menú «⋯» de cada tarjeta también permite **descargar** (`.excalidraw`, PNG, SVG o PDF) sin abrir la pizarra, también a los lectores; se descarga lo último guardado en su archivo (el autoguardado se hace en segundos). |
 | **Carpetas** | galería | Pestañas «Todas», «Sin carpeta» y una por carpeta, igual que las categorías de Notas: crear, renombrar y borrar carpetas (borrar una carpeta borra sus pizarras y sus archivos `.excalidraw`), mover una pizarra desde el menú «⋯» → «Mover a», y «Nueva pizarra»/«Importar» crean dentro de la carpeta que estás viendo. Todos las ven en vivo. |
 
 Una pizarra, como cualquier otro documento de Nora, **es un archivo de la sala**: «Nueva pizarra» crea `Pizarra sin título.excalidraw` en Archivos; borrar el archivo borra la pizarra y renombrar una renombra la otra.
