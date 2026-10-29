@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Download, Hand, MonitorUp, Eye, Share2, ShieldCheck, Plug } from 'lucide-react'
 import { api, type Room } from '../api'
 import { useAuth } from '../auth'
@@ -17,6 +17,12 @@ export default function AssistTool({ room, online }: { room: Room; online: Set<s
   const toast = useToast()
   const { sessions, agent, agents, ask, share } = useAssist()
   const [code, setCode] = useState<string | null>(null)
+  const [have, setHave] = useState<Record<string, boolean>>({})
+  useEffect(() => {
+    // ¿Están los instaladores en el servidor? (se dejan en agent/dist/; ver agent/README.md)
+    DOWNLOADS.forEach((d) => fetch(`/downloads/${d.file}`, { method: 'HEAD' }).then((r) => setHave((h) => ({ ...h, [d.file]: r.ok && !(r.headers.get('content-type') ?? '').includes('text/html') }))).catch(() => setHave((h) => ({ ...h, [d.file]: false }))))
+  }, [])
+  const anyMissing = DOWNLOADS.some((d) => have[d.file] === false)
   const supported = screenSharingSupported()
   const others = room.participants.filter((p) => p.userId !== user?.id)
 
@@ -75,7 +81,10 @@ export default function AssistTool({ room, online }: { room: Room; online: Set<s
           un navegador no puede hacerlo por sí solo. No hace nada hasta que aceptes cada petición de control.
         </p>
         <ol className="assist-steps small">
-          <li>Descárgalo: {DOWNLOADS.map((d, i) => <span key={d.os}>{i > 0 && ' · '}<a href={`/downloads/${d.file}`} download><Download size={12} /> {d.os}</a></span>)}</li>
+          <li>Descárgalo: {DOWNLOADS.map((d, i) => <span key={d.os}>{i > 0 && ' · '}{have[d.file] === false
+            ? <span className="muted" title="Este instalador no está en el servidor todavía"><Download size={12} /> {d.os} (no disponible)</span>
+            : <a href={`/downloads/${d.file}`} download><Download size={12} /> {d.os}</a>}</span>)}
+          {anyMissing && <small className="muted"> — quien administra Nora debe dejarlos en <code>agent/dist/</code>: bájalos de las <a href="https://github.com/Tecsharp/Nora/releases" target="_blank" rel="noopener noreferrer">Releases de GitHub</a> o compílalos con <code>agent/build.sh</code> (ver <code>agent/README.md</code>).</small>}</li>
           <li>Pulsa «Generar código» y ejecuta el programa; escribe la dirección de esta Nora y el código.</li>
           <li>Déjalo abierto. Aquí arriba verás «Conectado».</li>
         </ol>

@@ -26,14 +26,21 @@ comparte tu navegador, no el agente.
 
 ## Compilar
 
-Windows y Linux se compilan solos al construir el gateway de Nora (`docker compose up -d --build`; ver `gateway/Dockerfile`) y se ofrecen en Asistencia → «Descárgalo». El de macOS no se puede compilar desde Linux:
+Nora **no compila** el agente al construir con Docker. Tienes dos caminos:
 
-```sh
-./agent/build.sh          # deja el binario en agent/dist/ (Nora lo ofrece en /downloads/)
-```
+**A. Releases de GitHub (lo más cómodo).** Al subir una etiqueta `agent-vX.Y.Z` el flujo `.github/workflows/agent.yml` compila los tres sistemas (y firma el de Windows
+si configuraste SignPath, ver `docs/ASISTENCIA.md`) y los publica en *Releases*. Descarga los archivos y déjalos en `agent/dist/` con estos nombres
+(el gateway los sirve en `/downloads/` y Nora los ofrece en Asistencia):
+`nora-agent-windows.exe`, `nora-agent-macos`, `nora-agent-linux`.
 
-Para compilar los tres a la vez fuera de Docker usa el flujo de GitHub Actions `.github/workflows/agent.yml` y copia los artefactos a `agent/dist/` como
-`nora-agent-windows.exe`, `nora-agent-macos` y `nora-agent-linux` (lo que haya en `agent/dist/` también se sirve).
+**B. Compilar a mano** (requiere [Rust](https://rustup.rs)); el resultado ya queda en `agent/dist/` con el nombre correcto:
+
+| Sistema | Comando |
+| --- | --- |
+| Windows (PowerShell) | `.\agent\build.ps1` |
+| macOS | doble clic en `agent/build-macos.command`, o `./agent/build.sh` |
+| Linux | `./agent/build.sh` (necesita `libxkbcommon-dev`) |
+| Windows desde Linux/macOS | `./agent/build.sh windows` (necesita mingw-w64) |
 
 ## Plataformas
 

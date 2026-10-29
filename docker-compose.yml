@@ -106,18 +106,14 @@ services:
 
   gateway:
     <<: *hardening
-    build:
-      context: .
-      dockerfile: gateway/Dockerfile
-      args:
-        AGENT_WINDOWS_URL: ${NORA_AGENT_WINDOWS_URL:-}   # URL del nora-agent-windows.exe firmado de una Release (opcional)
+    build: ./gateway
     depends_on:
       backend: { condition: service_healthy }
       frontend: { condition: service_started }
     ports:
       - "${NORA_BIND:-0.0.0.0}:${NORA_PORT:-29817}:8080"
     volumes:
-      - ./agent/dist:/srv/extra/downloads:ro   # p. ej. nora-agent-macos (compilado en un Mac con agent/build.sh); ver agent/README.md
+      - ./agent/dist:/srv/downloads:ro   # agente de Asistencia: lo que compiles con agent/build.* o bajes de las Releases de GitHub (ver agent/README.md)
     read_only: true
     tmpfs:
       - /tmp

@@ -1,6 +1,0 @@
-*
-!agent/Cargo.toml
-!agent/Cargo.lock
-!agent/src
-!gateway/nginx.conf
-!gateway/proxy_api.conf
