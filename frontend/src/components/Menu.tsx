@@ -20,8 +20,13 @@ export default function Menu({ items, label = 'Más acciones', trigger }: { item
       if (e instanceof KeyboardEvent ? e.key === 'Escape' : !wrap.current?.contains(e.target as Node) && !panel.current?.contains(e.target as Node)) setOpen(false)
     }
     const away = () => setOpen(false)
+    // El menú es fijo: si la lista de debajo se desplaza y el botón se mueve de verdad, se cierra. Safari lanza eventos
+    // de scroll al abrirse (enfoque, rebote) sin que nada se mueva, y eso no debe cerrarlo.
+    const start = wrap.current?.getBoundingClientRect()
     const onScroll = (e: Event) => {
-      if (!panel.current?.contains(e.target as Node)) setOpen(false) // el menú es fijo: si algo se desplaza debajo, se cierra
+      if (e.target instanceof Node && panel.current?.contains(e.target)) return
+      const now = wrap.current?.getBoundingClientRect()
+      if (!start || !now || Math.abs(now.top - start.top) > 4 || Math.abs(now.left - start.left) > 4) setOpen(false)
     }
     document.addEventListener('mousedown', close)
     document.addEventListener('keydown', close)
