@@ -10,6 +10,7 @@ import { pickFiles, pickFolder } from '../fileHandles'
 import { collectFromEntries, collectFromFiles, entriesFromDrop, type Collected } from '../folderUpload'
 import { useRealtime } from '../realtime'
 import { useToast } from '../toast'
+import { useDialogs } from '../dialogs'
 import { fingerprintOf } from '../uploader'
 import { isEditable, previewKind } from '../preview'
 import type { DocInfo } from '../collab/DocEditor'
@@ -88,6 +89,7 @@ const when = (iso: string) =>
 export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?: (d: DocInfo) => void }) {
   const { user } = useAuth()
   const toast = useToast()
+  const dialogs = useDialogs()
   const mine = useUploads().filter((i) => i.code === room.code)
   const [files, setFiles] = useState<FileItem[]>([])
   const [folders, setFolders] = useState<FolderItem[]>([])
@@ -322,12 +324,12 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
 
   async function removeFolder(f: FolderItem) {
     const n = countIn(f.id)
-    if (!confirm(`¿Borrar la carpeta «${f.name}»${n ? ` y todo su contenido (${n} elemento${n === 1 ? '' : 's'})` : ''}? No se puede deshacer.`)) return
+    if (!await dialogs.confirm({ title: `¿Borrar la carpeta «${f.name}»?`, message: n ? <>Se borrará también todo su contenido (<b>{n} elemento{n === 1 ? '' : 's'}</b>). No se puede deshacer.</> : 'No se puede deshacer.', confirmLabel: 'Borrar carpeta', tone: 'danger' })) return
     await api(`/rooms/${room.code}/folders/${f.id}`, 'DELETE').catch(fail)
   }
 
   async function removeFile(f: FileItem) {
-    if (!confirm(`¿Borrar «${f.name}»?`)) return
+    if (!await dialogs.confirm({ title: `¿Borrar «${f.name}»?`, message: 'El archivo se eliminará de la sala para todos. No se puede deshacer.', confirmLabel: 'Borrar archivo', tone: 'danger' })) return
     await api(`/rooms/${room.code}/files/${f.id}`, 'DELETE').catch(fail)
   }
 

@@ -1,3 +1,4 @@
+import { useDialogs } from '../dialogs'
 import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type MouseEvent } from 'react'
 import * as Y from 'yjs'
 import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
@@ -51,6 +52,7 @@ interface Props { provider: CollabProvider; editable: boolean }
 interface ClipData { text: string; r: number; c: number; cells: (Cell | undefined)[][] }
 
 export default function SheetEditor({ provider, editable }: Props) {
+  const dialogs = useDialogs()
   const doc = provider.doc
   const store = useMemo(() => new SheetStore(doc), [doc])
   const evaluator = useMemo(() => new Evaluator(store), [store])
@@ -768,7 +770,7 @@ export default function SheetEditor({ provider, editable }: Props) {
                     onClick={(e) => { e.stopPropagation(); setSheetId(store.duplicateSheet(id)) }}>⧉</span>
                   {ids.length > 1 && (
                     <span className="tab-x" role="button" aria-label={`Eliminar ${store.meta(id).name}`}
-                      onClick={(e) => { e.stopPropagation(); if (confirm(`¿Eliminar la hoja «${store.meta(id).name}»?`)) store.removeSheet(id) }}><X size={12} /></span>
+                      onClick={async (e) => { e.stopPropagation(); if (await dialogs.confirm({ title: `¿Eliminar la hoja «${store.meta(id).name}»?`, message: 'Se borrarán todos sus datos.', confirmLabel: 'Eliminar hoja', tone: 'danger' })) store.removeSheet(id) }}><X size={12} /></span>
                   )}
                 </>
               )}

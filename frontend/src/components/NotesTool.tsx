@@ -5,6 +5,7 @@ import { useAuth } from '../auth'
 import { canWrite as canWriteIn, isStaff as isStaffIn } from '../roles'
 import { useRealtime } from '../realtime'
 import { useToast } from '../toast'
+import { useDialogs } from '../dialogs'
 import Menu, { type MenuItem } from './Menu'
 import Modal from './Modal'
 import Tabs from './Tabs'
@@ -38,6 +39,7 @@ const NONE = 'none'
 export default function NotesTool({ room, kind, placeholder, copyable }: Props) {
   const { user } = useAuth()
   const toast = useToast()
+  const dialogs = useDialogs()
   const code = room.code
   const [items, setItems] = useState<Note[]>([])
   const [cats, setCats] = useState<Category[]>([])
@@ -147,7 +149,7 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
   async function removeCat() {
     if (!currentCat) return
     const n = countOf(currentCat.id)
-    if (!confirm(`¿Borrar la categoría «${currentCat.name}»${n ? ` y sus ${n} elemento${n === 1 ? '' : 's'}` : ''}? No se puede deshacer.`)) return
+    if (!await dialogs.confirm({ title: `¿Borrar la categoría «${currentCat.name}»?`, message: n ? <>También se borrarán sus <b>{n} elemento{n === 1 ? '' : 's'}</b>. No se puede deshacer.</> : 'No se puede deshacer.', confirmLabel: 'Borrar categoría', tone: 'danger' })) return
     await api(`/rooms/${code}/folders/${currentCat.id}`, 'DELETE').catch(fail)
   }
 

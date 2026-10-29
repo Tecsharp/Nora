@@ -20,6 +20,7 @@ import { AuthProvider } from './auth'
 import { RealtimeProvider } from './realtime'
 import { ThemeProvider } from './theme'
 import { ToastProvider } from './toast'
+import { DialogProvider } from './dialogs'
 import './styles.css'
 
 createRoot(document.getElementById('root')!).render(
@@ -27,11 +28,13 @@ createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <ThemeProvider>
       <ToastProvider>
+        <DialogProvider>
         <AuthProvider>
           <RealtimeProvider>
             <App />
           </RealtimeProvider>
         </AuthProvider>
+        </DialogProvider>
       </ToastProvider>
       </ThemeProvider>
     </BrowserRouter>

@@ -8,6 +8,7 @@ import Avatar from '../components/Avatar'
 import Menu, { type MenuItem } from '../components/Menu'
 import { useRealtime } from '../realtime'
 import { useToast } from '../toast'
+import { useDialogs } from '../dialogs'
 import { useFullscreen } from '../fullscreen'
 import { CollabProvider, colorFor } from './provider'
 import type { BoardHandle } from './boardIO'
@@ -492,12 +493,13 @@ function ago(iso: string) {
 
 function HistoryPanel({ code, doc, provider, editable, onClose }: { code: string; doc: DocInfo; provider: CollabProvider; editable: boolean; editor: Editor | null; onClose: () => void }) {
   const toast = useToast()
+  const dialogs = useDialogs()
   const [versions, setVersions] = useState<Version[] | null>(null)
   const load = useCallback(() => api<Version[]>(`/rooms/${code}/docs/${doc.id}/versions`).then(setVersions).catch(() => setVersions([])), [code, doc.id])
   useEffect(() => void load(), [load])
 
   async function save() {
-    const label = window.prompt('Nombre de la versión (opcional)', '')
+    const label = await dialogs.prompt({ title: 'Guardar versión', message: 'Podrás volver a ella desde el historial.', label: 'Nombre de la versión (opcional)', allowEmpty: true, confirmLabel: 'Guardar versión', maxLength: 80 })
     if (label === null) return
     try {
       await provider.saveVersion(label.trim() || null)
@@ -509,7 +511,7 @@ function HistoryPanel({ code, doc, provider, editable, onClose }: { code: string
   }
 
   async function restore(v: Version) {
-    if (!confirm('¿Restaurar esta versión? El contenido actual se sustituye (antes se guarda una copia, y puedes deshacerlo).')) return
+    if (!await dialogs.confirm({ title: '¿Restaurar esta versión?', message: 'El contenido actual se sustituye. Antes se guarda una copia, y puedes deshacerlo.', confirmLabel: 'Restaurar', tone: 'warning' })) return
     try {
       await provider.saveVersion('Antes de restaurar')
       const res = await fetch(`/api/rooms/${code}/docs/${doc.id}/versions/${v.id}`, { headers: { Authorization: `Bearer ${getAccessToken() ?? ''}` } })

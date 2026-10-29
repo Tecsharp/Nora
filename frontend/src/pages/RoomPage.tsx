@@ -8,6 +8,7 @@ import { api, ApiError, type JoinRequest, type Room } from '../api'
 import { useAuth } from '../auth'
 import { rt, useRealtime, useRtStatus } from '../realtime'
 import { useToast } from '../toast'
+import { useDialogs } from '../dialogs'
 import Avatar from '../components/Avatar'
 import ExpiryDialog from '../components/ExpiryDialog'
 import RoomSettingsDialog from '../components/RoomSettingsDialog'
@@ -61,6 +62,7 @@ export default function RoomPage() {
   const [requests, setRequests] = useState<JoinRequest[]>([])
   const [online, setOnline] = useState<Set<string>>(new Set())
   const toast = useToast()
+  const dialogs = useDialogs()
   const status = useRtStatus()
   const [, tick] = useState(0)
 
@@ -194,7 +196,7 @@ export default function RoomPage() {
   }
 
   async function closeRoom() {
-    if (!confirm('¿Cerrar la sala? Se borrarán todos sus archivos y contenido.')) return
+    if (!await dialogs.confirm({ title: '¿Cerrar la sala?', message: <>Se borrarán todos sus archivos y contenido para <b>todos los participantes</b>. No se puede deshacer.</>, confirmLabel: 'Cerrar sala', tone: 'danger', typeToConfirm: room?.name ?? undefined })) return
     await api(`/rooms/${code}`, 'DELETE')
     navigate('/')
   }

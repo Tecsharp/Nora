@@ -7,6 +7,7 @@ import { useAuth } from '../auth'
 import { useRealtime } from '../realtime'
 import { canWrite as canWriteIn, isStaff as isStaffIn } from '../roles'
 import { useToast } from '../toast'
+import { useDialogs } from '../dialogs'
 import type { DocInfo } from '../collab/DocEditor'
 import { renderSavedBoard } from '../collab/boardIO'
 import Menu, { type MenuItem } from './Menu'
@@ -63,6 +64,7 @@ function Thumb({ code, board }: { code: string; board: BoardItem }) {
 export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: DocInfo) => void }) {
   const { user } = useAuth()
   const toast = useToast()
+  const dialogs = useDialogs()
   const [boards, setBoards] = useState<BoardItem[] | null>(null)
   const [folders, setFolders] = useState<FolderItem[]>([])
   const [current, setCurrent] = useState<string | null>(null)
@@ -194,7 +196,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
 
   async function removeMany(list: BoardItem[]) {
     const todo = list.filter((b) => canTouch(b.createdBy))
-    if (!todo.length || !confirm(`¿Borrar ${todo.length === 1 ? `la pizarra «${todo[0]!.name}»` : `${todo.length} pizarras`}? También se borran sus archivos .excalidraw de la sala.`)) return
+    if (!todo.length || !await dialogs.confirm({ title: todo.length === 1 ? `¿Borrar la pizarra «${todo[0]!.name}»?` : `¿Borrar ${todo.length} pizarras?`, message: 'También se borran sus archivos .excalidraw de la sala. No se puede deshacer.', confirmLabel: todo.length === 1 ? 'Borrar pizarra' : 'Borrar pizarras', tone: 'danger' })) return
     await Promise.allSettled(todo.map((b) => api(`/rooms/${room.code}/docs/${b.id}`, 'DELETE')))
     setSel(new Set())
   }
@@ -212,8 +214,8 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
   }
 
   async function renameFolder(f: FolderItem) {
-    const n = window.prompt('Nuevo nombre de la carpeta', f.name)
-    if (!n?.trim() || n.trim() === f.name) return
+    const n = await dialogs.prompt({ title: 'Cambiar nombre de la carpeta', label: 'Nombre', initial: f.name, maxLength: 60 })
+    if (!n || n === f.name) return
     try {
       const u = await api<FolderItem>(`/rooms/${room.code}/folders/${f.id}`, 'PATCH', { name: n.trim() })
       setFolders((all) => all.map((x) => (x.id === u.id ? u : x)))
@@ -229,7 +231,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
       for (const x of folders) if (x.parentId && ids.has(x.parentId) && !ids.has(x.id)) { ids.add(x.id); grew = true }
     }
     const n = (boards ?? []).filter((b) => b.folderId && ids.has(b.folderId)).length
-    if (!confirm(`¿Borrar la carpeta «${f.name}»${n ? ` y sus ${n} pizarra${n === 1 ? '' : 's'}` : ''}? No se puede deshacer.`)) return
+    if (!await dialogs.confirm({ title: `¿Borrar la carpeta «${f.name}»?`, message: n ? <>También se borrarán sus <b>{n} pizarra{n === 1 ? '' : 's'}</b>. No se puede deshacer.</> : 'No se puede deshacer.', confirmLabel: 'Borrar carpeta', tone: 'danger' })) return
     await api(`/rooms/${room.code}/folders/${f.id}`, 'DELETE').catch(fail)
   }
 
@@ -316,8 +318,8 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
     const mine = canTouch(b.createdBy)
     const items: MenuItem[] = []
     if (mine) items.push({ label: 'Cambiar nombre', icon: <Pencil size={16} />, onClick: async () => {
-      const n = window.prompt('Nuevo nombre', b.name)
-      if (n?.trim()) await api(`/rooms/${room.code}/docs/${b.id}`, 'PATCH', { name: n.trim() }).catch(fail)
+      const n = await dialogs.prompt({ title: 'Cambiar nombre de la pizarra', label: 'Nombre', initial: b.name, maxLength: 120 })
+      if (n) await api(`/rooms/${room.code}/docs/${b.id}`, 'PATCH', { name: n }).catch(fail)
     } })
     items.push({ heading: 'Descargar como' })
     for (const [f, label] of [['excalidraw', 'Pizarra (.excalidraw)'], ['png', 'Imagen PNG'], ['svg', 'Imagen SVG'], ['pdf', 'PDF']] as const) {

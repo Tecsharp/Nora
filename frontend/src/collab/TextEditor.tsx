@@ -1,3 +1,4 @@
+import { useDialogs } from '../dialogs'
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -192,6 +193,7 @@ function FindBar({ editor, editable, onClose }: { editor: Editor; editable: bool
 function TextRibbon({ editor, zoom, setZoom, outline, setOutline, onFind, onChart }: {
   editor: Editor; zoom: number; setZoom: (z: number) => void; outline: boolean; setOutline: (b: boolean) => void; onFind: () => void; onChart: () => void
 }) {
+  const dialogs = useDialogs()
   const chain = () => editor.chain().focus()
   const ts = editor.getAttributes('textStyle') as { color?: string; fontFamily?: string; fontSize?: string }
   const family = ts.fontFamily ? ts.fontFamily.split(',')[0]!.replace(/['"]/g, '').trim() : ''
@@ -214,9 +216,10 @@ function TextRibbon({ editor, zoom, setZoom, outline, setOutline, onFind, onChar
     chain().setImage({ src, alt: file.name }).run()
   }
 
-  function setLink() {
+  async function setLink() {
     const prev = editor.getAttributes('link').href as string | undefined
-    const url = window.prompt('Dirección del enlace (vacío para quitarlo)', prev ?? 'https://')
+    const url = await dialogs.prompt({ title: 'Insertar enlace', message: 'Déjalo vacío para quitar el enlace.', label: 'Dirección', initial: prev ?? 'https://', allowEmpty: true, confirmLabel: 'Aplicar',
+      validate: (v) => (v === '' || /^(https?:|mailto:)/i.test(v) ? null : 'Debe empezar por http://, https:// o mailto:') })
     if (url === null) return
     if (url.trim() === '') chain().extendMarkRange('link').unsetLink().run()
     else if (/^(https?:|mailto:)/i.test(url.trim())) chain().extendMarkRange('link').setLink({ href: url.trim() }).run()
