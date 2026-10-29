@@ -1,25 +1,23 @@
 import type { FocusTarget } from '../tools/focus'
-import { Suspense, lazy, useCallback, useEffect, useState, type ComponentType } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import {
-  ArrowLeft, Check, Pencil, UserX, Settings, UserCheck, X, Clapperboard, ClipboardList, Clock, Copy, FolderOpen, Hash, Monitor, PenTool, Pin, PinOff, ShieldCheck,
-  SquareCheckBig, Trash2, MessageSquare, KanbanSquare, CalendarDays, Link2, Timer, Tv, type LucideProps,
-} from 'lucide-react'
+import { Suspense, lazy, useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Menu as MenuIcon } from 'lucide-react'
 import { api, ApiError, type JoinRequest, type Room, type RoomStatus } from '../api'
 import ReactivateDialog from '../components/ReactivateDialog'
 import { useAuth } from '../auth'
 import { rt, useRealtime, useRtStatus } from '../realtime'
 import { useToast } from '../toast'
 import { useDialogs } from '../dialogs'
-import Avatar from '../components/Avatar'
 import ExpiryDialog from '../components/ExpiryDialog'
 import RoomSettingsDialog from '../components/RoomSettingsDialog'
-import Menu from '../components/Menu'
-import Modal from '../components/Modal'
 import FilesTool from '../components/FilesTool'
 import BoardsTool from '../components/BoardsTool'
 import type { DocInfo } from '../collab/DocEditor'
-import { canWrite as canWriteIn } from '../roles'
+import { canWrite as canWriteIn, ROLE_HINT, ROLE_LABEL, type RoomRole } from '../roles'
+import RoomNav from '../room/RoomNav'
+import RoomOverview from '../room/RoomOverview'
+import PeopleView from '../room/PeopleView'
+import { OVERVIEW, PEOPLE, TOOLS } from '../room/tools'
 import NotesTool from '../components/NotesTool'
 import { AssistProvider } from '../assist/AssistProvider'
 import AssistOverlay from '../assist/AssistOverlay'
@@ -35,38 +33,9 @@ import LinksTool from '../tools/LinksTool'
 import FocusTool from '../tools/FocusTool'
 import PlayerTool from '../tools/PlayerTool'
 import { fmt as fmtFocus, useFocus } from '../tools/useFocus'
-import { ASSIGNABLE, ROLE_HINT, ROLE_LABEL, type RoomRole } from '../roles'
-import { remaining } from '../time'
 import { setFilesOpen } from '../ui'
 import { resumeInterrupted } from '../uploadManager'
 
-type Icon = ComponentType<LucideProps>
-
-interface Tool {
-  id: string
-  label: string
-  icon: Icon
-  ready: boolean
-  tone?: string
-}
-
-const TOOLS: Tool[] = [
-  { id: 'files', label: 'Archivos', icon: FolderOpen, ready: true, tone: 'blue' },
-  { id: 'board', label: 'Pizarra', icon: PenTool, ready: true, tone: 'violet' },
-  { id: 'notes', label: 'Notas', icon: ClipboardList, ready: true, tone: 'rose' },
-  { id: 'chat', label: 'Chat', icon: MessageSquare, ready: true, tone: 'cyan' },
-  { id: 'media', label: 'Media Review', icon: Clapperboard, ready: true, tone: 'rose' },
-  { id: 'calendar', label: 'Calendario', icon: CalendarDays, ready: true, tone: 'green' },
-  { id: 'links', label: 'Enlaces', icon: Link2, ready: true, tone: 'cyan' },
-  { id: 'focus', label: 'Foco', icon: Timer, ready: true, tone: 'violet' },
-  { id: 'player', label: 'Reproductor', icon: Tv, ready: true, tone: 'red' },
-  { id: 'attendance', label: 'Asistencia', icon: Monitor, ready: true, tone: 'amber' },
-  { id: 'polls', label: 'Votaciones', icon: SquareCheckBig, ready: true, tone: 'teal' },
-  { id: 'actions', label: 'Tablero', icon: KanbanSquare, ready: true, tone: 'orange' },
-]
-
-/** Herramientas que piden más ancho (tableros, calendario…). */
-const XL_TOOLS = new Set(['actions', 'calendar', 'media', 'player', 'chat'])
 
 const DocEditor = lazy(() => import('../collab/DocEditor'))
 
@@ -76,7 +45,8 @@ export default function RoomPage() {
   const navigate = useNavigate()
   const [room, setRoom] = useState<Room | null>(null)
   const [error, setError] = useState('')
-  const [active, setActive] = useState<string | null>(null)
+  const [active, setActive] = useState<string>(OVERVIEW)
+  const [navOpen, setNavOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [adjusting, setAdjusting] = useState(false)
   const [editingDoc, setEditingDoc] = useState<DocInfo | null>(null)
@@ -303,139 +273,70 @@ export default function RoomPage() {
     )
   }
 
-  const onlineCount = room.participants.filter((p) => online.has(p.userId)).length
   const expired = room.expiresAt !== null && new Date(room.expiresAt).getTime() <= Date.now()
   const tool = TOOLS.find((t) => t.id === active)
   const secure = window.location.protocol === 'https:'
   const canAssign = room.isOwner || user?.role === 'ADMIN'
 
+  const openAt = (id: string, item?: string, file?: string) => {
+    if (id === OVERVIEW || id === PEOPLE.id) setTarget(null)
+    else setTarget({ tool: id, item, file, nonce: Date.now() })
+    setActive(id)
+    setNavOpen(false)
+  }
   const openChat = (convId?: string) => { setTarget({ tool: 'chat', conv: convId, nonce: Date.now() }); setActive('chat') }
+
+  const badges: Record<string, ReactNode> = {
+    chat: <ChatBadge />,
+    player: playing ? <span className="ws-badge info" title="Sonando"><span className="pl-eq"><i /><i /><i /></span></span> : null,
+    focus: focus.state.status === 'running' ? <span className="ws-badge info mono" title="Temporizador en marcha">{fmtFocus(focus.remaining)}</span> : null,
+    calendar: calendar.today > 0 ? <span className="ws-badge info" aria-label={`${calendar.today} eventos hoy`} title="Eventos de hoy">{calendar.today}</span> : null,
+  }
+  const title = active === OVERVIEW ? 'Resumen' : active === PEOPLE.id ? 'Personas' : tool?.label ?? ''
 
   return (
     <AssistProvider code={room.code}>
     <ChatProvider room={room} online={online} fullOpen={active === 'chat'} onOpenFull={openChat}>
-    <div className="room">
-      <header className="room-top">
-        <Link to="/" className="btn ghost sm"><ArrowLeft size={15} /> Mis salas</Link>
-        <div className="row">
-          <span className={`badge ${expired ? 'red' : 'green'}`}><i /> {expired ? 'Sala expirada' : 'Sala activa'}</span>
-          {canAssign && (
-            <button className="icon-btn" onClick={() => setSettingsOpen(true)} aria-label="Opciones de la sala" title="Opciones de la sala">
-              <Settings size={18} />
-            </button>
+    <div className={`ws ${navOpen ? 'nav-open' : ''}`}>
+      <RoomNav room={room} active={active} online={online} pinned={pinned} onTogglePin={togglePin} onSelect={openAt} badges={badges}
+        owner={canAssign} copied={copied} onCopy={copy} onExtend={() => setAdjusting(true)} onSettings={() => setSettingsOpen(true)} onClose={closeRoom}
+        connection={status} secure={secure} requests={requests.length} expired={expired} />
+      <div className="ws-scrim" onClick={() => setNavOpen(false)} />
+
+      <section className="ws-main" aria-label={title}>
+        <header className="ws-bar">
+          <button className="icon-btn ws-burger" onClick={() => setNavOpen(true)} aria-label="Abrir el menú de la sala"><MenuIcon size={20} /></button>
+          <span className="ws-bar-ico">{tool ? <tool.icon size={18} /> : active === PEOPLE.id ? <PEOPLE.icon size={18} /> : null}</span>
+          <h1 className="ws-bar-title">{title}</h1>
+          {tool && <span className="ws-bar-hint">{tool.hint}</span>}
+          <span className="spacer" />
+          {expired && <span className="badge red"><i /> Sala expirada</span>}
+        </header>
+
+        <div className={`ws-body ${active === OVERVIEW || active === PEOPLE.id ? 'scroll' : ''}`}>
+          {active === OVERVIEW && <RoomOverview room={room} owner={canAssign} requests={requests.length} onOpen={openAt} onExtend={() => setAdjusting(true)} />}
+          {active === PEOPLE.id && (
+            <PeopleView room={room} online={online} canAssign={canAssign} requests={requests} onDecide={(id, ok) => void decide(id, ok)}
+              onRole={(id, role) => void assignRole(id, role)} onExpel={(id, name) => void expel(id, name)} />
           )}
-          {(room.isOwner || user?.role === 'ADMIN') && (
-            <button className="icon-btn danger" onClick={closeRoom} aria-label="Cerrar sala" title="Cerrar sala">
-              <Trash2 size={18} />
-            </button>
-          )}
-        </div>
-      </header>
-
-      <div className="room-hero stagger">
-        <section style={{ ['--i' as string]: 0 }} aria-label="Sala">
-          <span className="eyebrow">Sala</span>
-          <h2 className="room-title">{room.name}</h2>
-          <div className="meta-row">
-            <span className="meta-pill">
-              <Hash size={16} /> <b>{room.code}</b>
-              <button className="icon-btn sm" onClick={copy} aria-label="Copiar código" title="Copiar código">
-                {copied ? <Check size={15} /> : <Copy size={15} />}
-              </button>
-            </span>
-            <span className="meta-pill">
-              <Clock size={16} /> {remaining(room.expiresAt)}
-              {(room.isOwner || user?.role === 'ADMIN') && (
-                <button className="icon-btn sm" onClick={() => setAdjusting(true)} aria-label="Cambiar la duración" title="Extender o reducir la sala">
-                  <Pencil size={14} />
-                </button>
-              )}
-            </span>
-          </div>
-        </section>
-
-        <section style={{ ['--i' as string]: 1 }} aria-label="Participantes">
-          <div className="people-head">
-            <span className="eyebrow">Participantes</span>
-            <span className="badge green"><i /> {onlineCount} {onlineCount === 1 ? 'conectado' : 'conectados'}</span>
-          </div>
-          <div className="avatars">
-            {room.participants.slice(0, 24).map((p) => (
-              <span key={p.userId} className={`person ${online.has(p.userId) ? '' : 'off'}`}
-                title={`${p.displayName}${online.has(p.userId) ? '' : ' (desconectado)'}`}>
-                <Avatar name={p.displayName} online={online.has(p.userId)} userId={p.userId} version={p.avatarVersion} />
-                <span className="who">
-                  <span className="truncate">{p.displayName}</span>
-                  <span className={`role-tag ${p.role === 'OWNER' || p.role === 'MODERATOR' ? 'strong' : ''}`}>{ROLE_LABEL[p.role]}</span>
-                </span>
-                {canAssign && p.role !== 'OWNER' && (
-                  <Menu label={`Opciones de ${p.displayName}`} items={[
-                    { heading: 'Rol en la sala' },
-                    ...ASSIGNABLE.map((r) => ({
-                      label: `${ROLE_LABEL[r]} · ${ROLE_HINT[r]}`,
-                      icon: r === p.role ? <Check size={16} /> : <span style={{ width: 16 }} />,
-                      onClick: () => void assignRole(p.userId, r),
-                    })),
-                    'separator',
-                    { label: 'Expulsar de la sala', icon: <UserX size={16} />, danger: true, onClick: () => void expel(p.userId, p.displayName) },
-                  ]} />
-                )}
-              </span>
-            ))}
-            {room.participants.length > 24 && <span className="person muted">+{room.participants.length - 24} más</span>}
-          </div>
-        </section>
-      </div>
-
-      {requests.length > 0 && (
-        <section className="card stack tight swap" style={{ marginTop: 16 }} aria-label="Solicitudes de entrada">
-          <div className="people-head">
-            <span className="eyebrow">Solicitudes de entrada</span>
-            <span className="badge blue">{requests.length}</span>
-          </div>
-          {requests.map((r) => (
-            <div key={r.userId} className="join-req">
-              <span className="row nowrap"><Avatar name={r.displayName} /><span className="truncate">{r.displayName}</span></span>
-              <span className="row nowrap">
-                <button className="btn primary sm" onClick={() => void decide(r.userId, true)}><UserCheck size={15} /> Aceptar</button>
-                <button className="btn ghost sm" onClick={() => void decide(r.userId, false)}><X size={15} /> Rechazar</button>
-              </span>
+          {playerOn && <div className="ws-tool" hidden={active !== 'player'}><PlayerTool room={room} onPlaying={setPlaying} /></div>}
+          {tool && tool.id !== 'player' && (
+            <div className="ws-tool" key={tool.id}>
+              {tool.id === 'files' && <FilesTool room={room} onEditDoc={openDoc} focus={target} />}
+              {tool.id === 'board' && <BoardsTool room={room} onOpen={openDoc} />}
+              {tool.id === 'attendance' && <AssistTool room={room} online={online} />}
+              {tool.id === 'focus' && <FocusTool room={room} focus={focus} />}
+              {tool.id === 'links' && <LinksTool room={room} focus={target} />}
+              {tool.id === 'calendar' && <CalendarTool room={room} focus={target} />}
+              {tool.id === 'media' && <MediaReviewTool room={room} focus={target} />}
+              {tool.id === 'polls' && <PollsTool room={room} focus={target} />}
+              {tool.id === 'actions' && <TasksTool room={room} focus={target} />}
+              {tool.id === 'chat' && <ChatTool focus={target} />}
+              {tool.id === 'notes' && <NotesTool room={room} kind="NOTE" placeholder="Escribe una nota para la sala…" />}
             </div>
-          ))}
-        </section>
-      )}
-
-      <div className="tools-wrap">
-        <div className="section-title"><h3>Herramientas</h3></div>
-        <div className="tools stagger">
-          {[...TOOLS].sort((a, b) => (pinned.includes(a.id) ? pinned.indexOf(a.id) : 999) - (pinned.includes(b.id) ? pinned.indexOf(b.id) : 999)).map((t, i) => (
-            <button key={t.id} className={`tool t-${t.id} ${t.ready ? '' : 'soon'} ${pinned.includes(t.id) ? 'pinned' : ''}`} style={{ ['--i' as string]: i + 2 }} onClick={() => setActive(t.id)}>
-              <span className={`ico ${t.tone ? `tinted tn-${t.tone}` : ''}`}><t.icon size={22} /></span>
-              <span className="tl">
-                <span>{t.label}</span>
-                {!t.ready && <small>Próximamente</small>}
-              </span>
-              <span className="tool-pin" role="button" tabIndex={0} aria-pressed={pinned.includes(t.id)} aria-label={pinned.includes(t.id) ? `Desfijar ${t.label}` : `Fijar ${t.label} arriba`} title={pinned.includes(t.id) ? 'Quitar de fijadas' : 'Fijar arriba'}
-                onClick={(e) => { e.stopPropagation(); togglePin(t.id) }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); togglePin(t.id) } }}>
-                {pinned.includes(t.id) ? <PinOff size={14} /> : <Pin size={14} />}
-              </span>
-              {t.id === 'player' && playing && <span className="tool-badge info" title="Sonando"><span className="pl-eq"><i /><i /><i /></span></span>}
-              {t.id === 'focus' && focus.state.status === 'running' && <span className="tool-badge info mono" title="Temporizador en marcha">{fmtFocus(focus.remaining)}</span>}
-              {t.id === 'calendar' && calendar.today > 0 && <span className="tool-badge info" aria-label={`${calendar.today} eventos hoy`} title="Eventos de hoy">{calendar.today}</span>}
-              {t.id === 'chat' && <ChatBadge />}
-            </button>
-          ))}
+          )}
         </div>
-      </div>
-
-      <footer className="room-foot">
-        <span className={secure ? 'ok' : 'muted'}>
-          <ShieldCheck size={16} /> {secure ? 'Conexión cifrada' : 'Conexión local (HTTP)'}
-        </span>
-        <span className={status === 'open' ? 'ok' : 'muted'}>
-          <i className={`live ${status}`} /> {status === 'open' ? 'En vivo' : status === 'connecting' ? 'Conectando…' : 'Sin conexión en vivo'} · {room.participants.length} en la sala
-        </span>
-      </footer>
+      </section>
 
       {editingDoc && (
         <Suspense fallback={null}>
@@ -450,34 +351,6 @@ export default function RoomPage() {
           onChanged={(expiresAt) => setRoom((r) => (r ? { ...r, expiresAt } : r))} />
       )}
 
-      {playerOn && (
-        <Modal title="Reproductor" icon={<Tv size={20} />} wide xl flush hidden={active !== 'player'} onClose={() => setActive(null)}>
-          <PlayerTool room={room} onPlaying={setPlaying} />
-        </Modal>
-      )}
-
-      {tool && tool.id !== 'player' && (
-        <Modal title={tool.label} icon={<tool.icon size={20} />} wide={tool.ready} xl={XL_TOOLS.has(tool.id)} flush={tool.ready} onClose={() => setActive(null)}>
-          {tool.id === 'files' && <FilesTool room={room} onEditDoc={openDoc} focus={target} />}
-          {tool.id === 'board' && <BoardsTool room={room} onOpen={openDoc} />}
-          {tool.id === 'attendance' && <AssistTool room={room} online={online} />}
-          {tool.id === 'focus' && <FocusTool room={room} focus={focus} />}
-          {tool.id === 'links' && <LinksTool room={room} focus={target} />}
-          {tool.id === 'calendar' && <CalendarTool room={room} focus={target} />}
-          {tool.id === 'media' && <MediaReviewTool room={room} focus={target} />}
-          {tool.id === 'polls' && <PollsTool room={room} focus={target} />}
-          {tool.id === 'actions' && <TasksTool room={room} focus={target} />}
-          {tool.id === 'chat' && <ChatTool focus={target} />}
-          {tool.id === 'notes' && <NotesTool room={room} kind="NOTE" placeholder="Escribe una nota para la sala…" />}
-          {!tool.ready && (
-            <div className="empty">
-              <tool.icon size={36} />
-              <strong>Próximamente</strong>
-              <span className="small">Esta herramienta llegará en una próxima versión.</span>
-            </div>
-          )}
-        </Modal>
-      )}
       <AssistOverlay />
       <ChatDock />
     </div>
@@ -490,5 +363,5 @@ export default function RoomPage() {
 function ChatBadge() {
   const { unread } = useChat()
   if (unread <= 0) return null
-  return <span className="tool-badge" aria-label={`${unread} mensajes sin leer`}>{unread > 99 ? '99+' : unread}</span>
+  return <span className="ws-badge hot" aria-label={`${unread} mensajes sin leer`}>{unread > 99 ? '99+' : unread}</span>
 }

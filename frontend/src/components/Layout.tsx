@@ -52,7 +52,7 @@ export default function Layout() {
           </>
         )}
       </TopBar>
-      <div className="shell">
+      <div className={`shell ${pathname.startsWith('/room/') ? 'room-shell' : ''}`}>
       <main>
         <div key={pathname} className="page-enter">
           <Outlet />

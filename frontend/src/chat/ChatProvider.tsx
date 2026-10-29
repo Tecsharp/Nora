@@ -52,7 +52,7 @@ export function ChatProvider({ room, online, fullOpen, onOpenFull, children }: {
   const storeKey = `nora-chat-dock:${code}:${uid}`
   const [dock, setDock] = useState<DockState>(() => {
     try { const s = JSON.parse(localStorage.getItem(`nora-chat-dock:${code}:${uid}`) ?? 'null') as DockState | null; if (s && Array.isArray(s.wins)) return s } catch { /* sin almacenamiento */ }
-    return { open: true, wins: [] }
+    return { open: false, wins: [] } // por defecto el panel va plegado: no tapa nada, y el contador avisa de lo que llega
   })
   const viewing = useRef(new Map<string, number>())
   const readTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>())

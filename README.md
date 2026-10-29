@@ -89,6 +89,10 @@ El propietario puede **reactivarla** con una nueva duración (cuenta como sala a
 
 ### Herramientas de la sala
 
+La sala es un **espacio de trabajo**: una barra lateral con los datos de la sala (código y tiempo restante), las herramientas agrupadas (Trabajo, Planificación, Medios y enlaces, En directo) con las **fijadas** arriba, y las personas en línea; y un área principal donde cada herramienta se abre a pantalla completa, sin ventanas encima. La pantalla de **Resumen** reúne lo tuyo (tareas asignadas, próximos eventos, votaciones sin votar, mensajes sin leer y archivos recientes) con enlace al sitio exacto, y **Personas** gestiona roles, expulsiones y solicitudes de entrada. En el móvil la barra lateral es un menú deslizante.
+
+**Archivos y Pizarra comparten carpetas:** una pizarra es un archivo `.excalidraw`, así que vive en la misma carpeta en las dos herramientas; moverla, renombrarla o crear carpetas en una se ve al instante en la otra. Las imágenes, PDF y textos que ya se han visto se guardan en una caché en memoria (se vacía al cerrar sesión), por lo que volver a abrirlos desde Archivos o Media Review no los descarga otra vez.
+
 Además de Archivos, Pizarra y Notas, cada sala tiene: **Chat** (General, grupos con ajustes y mensajes directos en tiempo real, con un dock abajo a la derecha y una vista completa tipo Telegram Web), **Tablero** (tareas con arrastrar y soltar), **Votaciones** (anónimas, cierre automático, resultados en vivo), **Media Review** (comentarios en el momento exacto de un vídeo/audio o en un punto de una imagen),
 **Calendario** (mes y agenda, respuestas «Voy», `.ics`, recordatorios), **Enlaces** (marcadores compartidos con etiquetas), **Foco** (Pomodoro compartido con grupo de enfocados), **Reproductor** (cola sincronizada de YouTube, enlaces directos y archivos de la sala, sin cortar el sonido al cerrar la ventana) y **Asistencia** (ver/controlar pantallas).
 Con la IA activa (opcional) casi todas incorporan ayuda: resumir el chat, crear tareas o eventos desde un texto, sugerir opciones de votación, resumir comentarios de revisión… Detalles y permisos en [docs/HERRAMIENTAS.md](docs/HERRAMIENTAS.md).
