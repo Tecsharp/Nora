@@ -841,3 +841,9 @@ body.no-select, body.no-select * { user-select: none !important; -webkit-user-se
 .note-card { position: relative; }
 .note-card.selected { box-shadow: 0 0 0 2px var(--accent); background: var(--accent-soft); }
 .note-card:hover .board-check, .note-card:focus-within .board-check, .note-card.selected .board-check, .sel-active .note-card .board-check { opacity: 1; }
+
+/* La pestaña SISTEMA tiene que poder desplazarse: su contenedor se limita a la altura de la barra */
+.default-sidebar .sidebar-tabs-root { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.default-sidebar [role=tabpanel] { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+.default-sidebar [role=tabpanel] .syslib { flex: 1 1 auto; height: auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.syslib-loading { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 48px 12px; font-size: 0.9rem; opacity: 0.85; }

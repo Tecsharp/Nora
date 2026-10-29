@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { exportToSvg } from '@excalidraw/excalidraw'
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
-import { ChevronDown, ChevronRight, Library } from 'lucide-react'
+import { ChevronDown, ChevronRight, Library, Loader2 } from 'lucide-react'
 import { prettyLibraryName } from './libraryNames'
 
 export interface SysItem { id: string; name?: string; elements: unknown[] }
@@ -63,12 +63,14 @@ function Group({ g, dark, onInsert }: { g: SysGroup; dark: boolean; onInsert: (i
 }
 
 /** Pestaña «SISTEMA» de la biblioteca de la pizarra: cada biblioteca del sistema por separado, plegable y con sus elementos. */
-export default function SystemLibrary({ groups, dark, onInsert }: { groups: SysGroup[]; dark: boolean; onInsert: (i: SysItem) => void }) {
+export default function SystemLibrary({ loading, groups, dark, onInsert }: { loading: boolean; groups: SysGroup[]; dark: boolean; onInsert: (i: SysItem) => void }) {
   const sorted = useMemo(() => [...groups].sort((a, b) => prettyLibraryName(a.name).localeCompare(prettyLibraryName(b.name), 'es', { numeric: true })), [groups])
   return (
     <div className="syslib">
       <h3 className="syslib-title"><Library size={16} /> SISTEMA</h3>
-      {groups.length === 0 ? <p className="syslib-empty">Todavía no hay bibliotecas del sistema.</p> : sorted.map((g) => <Group key={g.id} g={g} dark={dark} onInsert={onInsert} />)}
+      {loading ? (
+        <div className="syslib-loading" role="status"><Loader2 size={26} className="spin-icon" /><span>Cargando bibliotecas…</span></div>
+      ) : groups.length === 0 ? <p className="syslib-empty">Todavía no hay bibliotecas del sistema.</p> : sorted.map((g) => <Group key={g.id} g={g} dark={dark} onInsert={onInsert} />)}
     </div>
   )
 }

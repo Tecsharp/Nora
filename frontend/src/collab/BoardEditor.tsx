@@ -191,6 +191,7 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
 
   // ---- biblioteca: las del sistema (solo lectura, de todos) + la propia de esta persona en esta sala (se guarda en el servidor) ----
   const [sysGroups, setSysGroups] = useState<SysGroup[]>([])
+  const [sysLoading, setSysLoading] = useState(true)
   const libReady = useRef(false)
   const libSaved = useRef('')
   const libTimer = useRef<ReturnType<typeof setTimeout>>()
@@ -211,9 +212,11 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
         setSysGroups(system.map((l) => ({ id: l.id, name: l.name, items: l.items.map((i) => ({ id: i.id, name: i.name, elements: i.elements })) })))
         libSaved.current = JSON.stringify(mine.items ?? [])
         await api.updateLibrary({ libraryItems: own as never, merge: false, defaultStatus: 'unpublished' }) // las del sistema van en su propia pestaña
+        setSysLoading(false)
         libReady.current = true
         if (own.length && !mine.items?.length) saveLibrary(own)
       } catch {
+        setSysLoading(false)
         libReady.current = false // sin conexión con el servidor: se queda con lo que haya en el navegador
         const local = readLibrary()
         if (local.length) await api.updateLibrary({ libraryItems: local as never, merge: false, defaultStatus: 'unpublished' }).catch(() => undefined)
@@ -561,7 +564,7 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
           <DefaultSidebar.TabTriggers>
             <Sidebar.TabTrigger tab="sistema"><span title="Bibliotecas del sistema" aria-label="Bibliotecas del sistema" style={{ display: 'grid', placeItems: 'center' }}><LibraryIcon size={16} /></span></Sidebar.TabTrigger>
           </DefaultSidebar.TabTriggers>
-          <Sidebar.Tab tab="sistema"><SystemLibrary groups={sysGroups} dark={dark} onInsert={insertSystem} /></Sidebar.Tab>
+          <Sidebar.Tab tab="sistema"><SystemLibrary loading={sysLoading} groups={sysGroups} dark={dark} onInsert={insertSystem} /></Sidebar.Tab>
         </DefaultSidebar>
         <MainMenu>
           <MainMenu.Item icon={<Upload size={16} />} onSelect={onImportRequest}>Importar archivo…</MainMenu.Item>
