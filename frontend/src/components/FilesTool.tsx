@@ -22,6 +22,7 @@ import Menu, { type MenuItem } from './Menu'
 import Modal from './Modal'
 import Tabs from './Tabs'
 import ProgressBar from './ProgressBar'
+import { fmtDateTime } from '../dates'
 
 interface FileItem {
   id: string
@@ -84,8 +85,7 @@ const NEW_KINDS = [
   { kind: 'BOARD', label: 'Pizarra', base: 'Pizarra sin título', icon: PenTool },
 ] as const
 
-const when = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+const when = fmtDateTime
 
 export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?: (d: DocInfo) => void }) {
   const { user } = useAuth()

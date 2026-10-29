@@ -9,6 +9,7 @@ import { useDialogs } from '../dialogs'
 import { useToast } from '../toast'
 import { uploads } from '../uploadManager'
 import { useNavigate } from 'react-router-dom'
+import { fmtDate, fmtDateTime } from '../dates'
 
 interface SessionInfo {
   id: string
@@ -192,7 +193,7 @@ function Security() {
             <div key={s.id} className="join-req">
               <span className="row nowrap"><Icon size={20} /><span className="stack tight" style={{ gap: 0 }}>
                 <strong>{d.label}{s.current && <span className="badge green" style={{ marginLeft: 8 }}>Esta sesión</span>}</strong>
-                <span className="muted small">Desde {new Date(s.startedAt).toLocaleDateString()} · último uso {s.lastUsedAt ? new Date(s.lastUsedAt).toLocaleString() : '—'} · {s.remember ? 'durante un mes' : 'hasta cerrar el navegador'}</span>
+                <span className="muted small">Desde {fmtDate(s.startedAt)} · último uso {s.lastUsedAt ? fmtDateTime(s.lastUsedAt) : '—'} · {s.remember ? 'durante un mes' : 'hasta cerrar el navegador'}</span>
               </span></span>
               {!s.current && <button className="btn ghost sm" onClick={() => void closeOne(s)}>Cerrar</button>}
             </div>
@@ -242,7 +243,7 @@ function Account({ user, storageUsed }: { user: User; storageUsed: number }) {
     <div className="stack" style={{ gap: 18 }}>
       <section className="card stack tight">
         <h3>Tu cuenta</h3>
-        <p className="muted small">Alta: {new Date(user.createdAt).toLocaleDateString()} · Rol: {user.role === 'ADMIN' ? 'Administrador' : 'Usuario'}. Estos límites los fija el administrador.</p>
+        <p className="muted small">Alta: {fmtDate(user.createdAt)} · Rol: {user.role === 'ADMIN' ? 'Administrador' : 'Usuario'}. Estos límites los fija el administrador.</p>
         <div className="stat-grid">{rows.map(([k, v]) => <div key={k} className="stat"><b>{v}</b><span className="muted small">{k}</span></div>)}</div>
       </section>
       <form className="card stack danger-zone" onSubmit={remove}>

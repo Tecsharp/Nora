@@ -9,6 +9,7 @@ import Tabs from '../components/Tabs'
 import { useDialogs } from '../dialogs'
 import { useToast } from '../toast'
 import AdminLibraries from '../components/AdminLibraries'
+import { fmtDate, fmtShortMonth } from '../dates'
 
 interface Row {
   user: User
@@ -184,7 +185,7 @@ function UserEditor({ row, self, onSaved, onDeleted, onClose }: { row: Row; self
         <Avatar name={row.user.displayName} userId={row.user.id} version={row.user.avatarVersion} size={44} />
         <div>
           <div className="small">{row.user.email}</div>
-          <div className="muted small">Usado: {formatBytes(row.storageUsedBytes)} · Alta: {new Date(row.user.createdAt).toLocaleDateString()} · Último acceso: {row.user.lastLoginAt ? new Date(row.user.lastLoginAt).toLocaleString() : 'nunca'}</div>
+          <div className="muted small">Usado: {formatBytes(row.storageUsedBytes)} · Alta: {fmtDate(row.user.createdAt)} · Último acceso: {row.user.lastLoginAt ? fmtShortMonth(row.user.lastLoginAt) : 'nunca'}</div>
         </div>
       </div>
       <div className="grid-2">
@@ -435,7 +436,7 @@ export default function Admin() {
                     <td className="num">{formatBytes(r.storageUsedBytes)}</td>
                     <td className="num hide-md">{formatBytes(r.user.limits.storageQuotaBytes)}</td>
                     <td className="num hide-md">{fmt(r.user.limits.maxActiveRooms)}</td>
-                    <td className="num hide-md">{r.user.lastLoginAt ? new Date(r.user.lastLoginAt).toLocaleDateString() : '—'}</td>
+                    <td className="num hide-md">{r.user.lastLoginAt ? fmtShortMonth(r.user.lastLoginAt) : '—'}</td>
                   </tr>
                 ))}
                 {!loading && data.items.length === 0 && (

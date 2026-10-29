@@ -13,6 +13,7 @@ import { renderSavedBoard } from '../collab/boardIO'
 import Menu, { type MenuItem } from './Menu'
 import Tabs from './Tabs'
 import { useMarquee } from '../marquee'
+import { fmtDateTime } from '../dates'
 
 interface BoardItem extends DocInfo {
   createdBy: string
@@ -33,7 +34,7 @@ type Sort = 'name' | 'date'
 const VIEW_KEY = 'nora-boards-view'
 const BOARDS_MIME = 'application/x-nora-boards'
 const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name)
-const when = (iso: string) => new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+const when = fmtDateTime
 
 /** Miniatura de la pizarra: se pide con el token (no hay cabecera en <img>) y se muestra como blob. */
 function Thumb({ code, board }: { code: string; board: BoardItem }) {

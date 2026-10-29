@@ -9,6 +9,7 @@ import { useDialogs } from '../dialogs'
 import Menu, { type MenuItem } from './Menu'
 import Modal from './Modal'
 import Tabs from './Tabs'
+import { fmtDateTime } from '../dates'
 
 interface Note {
   id: string
@@ -284,7 +285,7 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
                 <p className="pre note-text">{n.content}</p>
                 <div className="row spread nowrap">
                   <span className="muted small truncate">
-                    {n.authorName} · {new Date(n.createdAt).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    {n.authorName} · {fmtDateTime(n.createdAt)}
                     {filter === ALL && catName2(n.folderId) ? ` · ${catName2(n.folderId)}` : ''}
                   </span>
                   <div className="row nowrap" style={{ gap: 2 }} onClick={(e) => e.stopPropagation()}>
@@ -323,7 +324,7 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
               </select>
             </label>
           )}
-          <span className="muted small">{editing.authorName} · {new Date(editing.createdAt).toLocaleString()}</span>
+          <span className="muted small">{editing.authorName} · {fmtDateTime(editing.createdAt)}</span>
           {error && <p className="error small" role="alert">{error}</p>}
         </Modal>
       )}

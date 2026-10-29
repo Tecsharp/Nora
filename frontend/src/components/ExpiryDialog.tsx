@@ -4,6 +4,7 @@ import { api, ApiError, type Room } from '../api'
 import { useAuth } from '../auth'
 import { remaining } from '../time'
 import Modal from './Modal'
+import { fmtDateTime } from '../dates'
 
 const QUICK = [-60, -30, -10, 10, 30, 60, 120, 360]
 const label = (m: number) => `${m > 0 ? '+' : '−'}${Math.abs(m) >= 60 ? `${Math.abs(m) / 60} h` : `${Math.abs(m)} min`}`
@@ -45,7 +46,7 @@ export default function ExpiryDialog({ code, name, expiresAt, onClose, onChanged
       <div>
         <p className="muted small">{name}</p>
         <p className="room-title" style={{ fontSize: '1.5rem', marginTop: 4 }}>{remaining(current)}</p>
-        {current && <p className="muted small">Termina el {new Date(current).toLocaleString()}</p>}
+        {current && <p className="muted small">Termina el {fmtDateTime(current)}</p>}
       </div>
 
       <div className="stack tight">
