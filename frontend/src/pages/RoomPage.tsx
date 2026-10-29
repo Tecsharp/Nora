@@ -2,7 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useState, type ComponentType } 
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, Check, Pencil, UserX, Settings, UserCheck, X, Clapperboard, ClipboardList, Clock, Copy, FolderOpen, Hash, Monitor, PenTool, Plus, ShieldCheck,
-  SquareCheckBig, Trash2, MessageSquare, KanbanSquare, CalendarDays, type LucideProps,
+  SquareCheckBig, Trash2, MessageSquare, KanbanSquare, CalendarDays, Link2, type LucideProps,
 } from 'lucide-react'
 import { api, ApiError, type JoinRequest, type Room } from '../api'
 import { useAuth } from '../auth'
@@ -27,6 +27,7 @@ import TasksTool from '../tools/TasksTool'
 import PollsTool from '../tools/PollsTool'
 import MediaReviewTool from '../tools/MediaReviewTool'
 import CalendarTool, { useCalendarWatch } from '../tools/CalendarTool'
+import LinksTool from '../tools/LinksTool'
 import { ASSIGNABLE, ROLE_HINT, ROLE_LABEL, type RoomRole } from '../roles'
 import { remaining } from '../time'
 import { setFilesOpen } from '../ui'
@@ -49,6 +50,7 @@ const TOOLS: Tool[] = [
   { id: 'chat', label: 'Chat', icon: MessageSquare, ready: true, tone: 'cyan' },
   { id: 'media', label: 'Media Review', icon: Clapperboard, ready: true, tone: 'rose' },
   { id: 'calendar', label: 'Calendario', icon: CalendarDays, ready: true, tone: 'green' },
+  { id: 'links', label: 'Enlaces', icon: Link2, ready: true, tone: 'cyan' },
   { id: 'attendance', label: 'Asistencia', icon: Monitor, ready: true, tone: 'amber' },
   { id: 'polls', label: 'Votaciones', icon: SquareCheckBig, ready: true, tone: 'teal' },
   { id: 'actions', label: 'Acciones', icon: KanbanSquare, ready: true, tone: 'orange' },
@@ -406,6 +408,7 @@ export default function RoomPage() {
           {tool.id === 'files' && <FilesTool room={room} onEditDoc={openDoc} />}
           {tool.id === 'board' && <BoardsTool room={room} onOpen={openDoc} />}
           {tool.id === 'attendance' && <AssistTool room={room} online={online} />}
+          {tool.id === 'links' && <LinksTool room={room} />}
           {tool.id === 'calendar' && <CalendarTool room={room} />}
           {tool.id === 'media' && <MediaReviewTool room={room} />}
           {tool.id === 'polls' && <PollsTool room={room} />}

@@ -47,3 +47,8 @@ Vista de **mes** (6 semanas, lunes primero, eventos con su hora y color, «+N m�
 lugar o enlace de reunión (clicable), descripción y color. Cada participante responde **Voy / Quizás / No voy** (también los lectores) y todos ven quién va, en vivo. **Exportar `.ics`** (todos o uno) para el calendario del móvil o del ordenador.
 La herramienta muestra una insignia con los **eventos de hoy** y avisa con un mensaje **10 minutos antes** de los que empiezan (salvo los que se han rechazado). Con la IA activa: **Crear desde texto** («mañana a las 17:00 reunión en la sala 2») con revisión antes de guardar.
 Las horas se guardan sin zona (hora local de quien las ve), pensado para equipos en la misma zona horaria.
+
+## Enlaces
+
+Marcadores compartidos de la sala: **pega una dirección y Enter** (se normaliza, se evita el duplicado) o «Con detalles…» para título, descripción y etiquetas. Tarjetas con inicial de color por dominio (no se consultan iconos de Internet), **fijar arriba**, filtro por etiqueta y búsqueda,
+copiar y abrir en pestaña nueva (`noopener noreferrer`). El servidor solo admite `http(s)`. Cualquier escritor puede fijar; editar y quitar es de quien lo añadió o de quien modera.
