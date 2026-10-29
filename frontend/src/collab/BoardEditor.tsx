@@ -120,6 +120,20 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
     }
   }, [store])
 
+  // Excalidraw mide dónde está el lienzo al montarse; si el contenedor aún se está animando o redimensionando mide mal y los clics
+  // (selección, mover, dibujar sobre lo existente) caen desplazados. Se vuelve a medir cuando termina y un poco después.
+  useEffect(() => {
+    if (!api) return
+    const box = root.current?.closest('.docapp') ?? root.current
+    const again = () => api.refresh()
+    const timers = [60, 300, 700, 1500].map((ms) => setTimeout(again, ms))
+    box?.addEventListener('animationend', again)
+    return () => {
+      timers.forEach(clearTimeout)
+      box?.removeEventListener('animationend', again)
+    }
+  }, [api])
+
   // ---- Yjs → escena ----
   useEffect(() => {
     if (!api) return

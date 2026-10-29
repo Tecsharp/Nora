@@ -307,6 +307,8 @@ textarea { resize: vertical; min-height: 88px; }
 .modal-body { padding: 20px; overflow: auto; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px; }
 .modal-body.flush { padding: 0; gap: 0; }
 @keyframes fade { from { opacity: 0; } }
+/* sin mover ni escalar: Excalidraw mide dónde está el lienzo al montarse, y con una animación en marcha mide mal (los clics caían unos píxeles fuera) */
+@keyframes docfade { from { opacity: 0; } }
 @keyframes pop { from { opacity: 0; transform: translateY(14px) scale(0.97); } }
 
 /* ───────── Explorador ───────── */
@@ -566,7 +568,7 @@ table.table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 .sheet-editor { position: relative; }
 /* ───────── Editor colaborativo ───────── */
 .docapp-backdrop { padding: 12px; z-index: 75; }
-.docapp { width: min(1500px, 100%); height: 100%; max-height: 100%; display: flex; flex-direction: column; background: var(--surface); border-radius: 24px; box-shadow: 0 0 0 1px var(--hairline), var(--shadow); overflow: hidden; animation: pop 0.28s var(--ease); }
+.docapp { width: min(1500px, 100%); height: 100%; max-height: 100%; display: flex; flex-direction: column; background: var(--surface); border-radius: 24px; box-shadow: 0 0 0 1px var(--hairline), var(--shadow); overflow: hidden; animation: docfade 0.2s var(--ease); }
 .docapp-head.collapsed { display: none; }
 .docapp { position: relative; }
 .docapp-handle { position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 50; display: grid; place-items: center; width: 56px; height: 18px; border: 0; border-radius: 0 0 10px 10px; background: var(--surface-2); color: var(--muted); cursor: pointer; opacity: 0.55; transition: opacity 0.15s, height 0.15s; }
