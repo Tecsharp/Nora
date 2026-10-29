@@ -1260,3 +1260,4 @@ label.kb-search { display: flex; flex-direction: row; align-items: center; }
 @keyframes pleq { 0%, 100% { height: 3px; } 50% { height: 14px; } }
 @media (max-width: 860px) { .pl { grid-template-columns: 1fr; } .pl-queue { border-left: 0; border-top: 1px solid var(--hairline); } }
 .tool-badge .pl-eq i { background: var(--accent-fg); }
+.modal-backdrop.ai-layer { z-index: 120; }

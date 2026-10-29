@@ -11,13 +11,15 @@ interface Props {
   xl?: boolean
   /** Sigue montado (p. ej. el Reproductor, para que no se corte el sonido) pero no se ve ni bloquea la página. */
   hidden?: boolean
+  /** Clase extra del fondo (p. ej. para ponerlo por encima de un editor a pantalla completa). */
+  className?: string
   flush?: boolean
   footer?: ReactNode
   children: ReactNode
 }
 
 /** Diálogo accesible: se cierra con Esc o tocando fuera, bloquea el scroll de fondo y devuelve el foco al cerrar. */
-export default function Modal({ title, icon, onClose, wide, xl, hidden, flush, footer, children }: Props) {
+export default function Modal({ title, icon, onClose, wide, xl, hidden, className, flush, footer, children }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const closeRef = useRef(onClose)
   closeRef.current = onClose
@@ -42,7 +44,7 @@ export default function Modal({ title, icon, onClose, wide, xl, hidden, flush, f
   }, [hidden])
 
   return createPortal(
-    <div className="modal-backdrop" hidden={hidden} style={hidden ? { display: 'none' } : undefined} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className={`modal-backdrop ${className ?? ''}`} hidden={hidden} style={hidden ? { display: 'none' } : undefined} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div ref={ref} className={`modal ${wide || xl ? 'wide' : ''} ${xl ? 'xl' : ''}`} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}>
         <div className="modal-head">
           <h2>

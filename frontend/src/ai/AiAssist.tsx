@@ -42,6 +42,8 @@ interface Props {
   /** Si se da, el resultado puede aplicarse al contenido (reemplazar / insertar debajo). Sin esto solo se puede copiar. */
   onApply?: (text: string, mode: ApplyMode) => void
   applyModes?: ApplyMode[]
+  /** Texto del botón principal de aplicar (por defecto «Reemplazar»). */
+  applyLabel?: string
   /** Título del resultado y etiqueta del botón (por defecto «IA»). */
   label?: string
   title?: string
@@ -54,7 +56,7 @@ interface Props {
  * Botón «IA» con su menú de acciones y la ventana donde el resultado va apareciendo en directo. Si la IA no está activada en el servidor
  * no se pinta nada.
  */
-export default function AiAssist({ actions = TEXT_ACTIONS, getText, onApply, applyModes = ['replace', 'insert'], label = 'IA', title = 'Asistente de IA', disabled, iconOnly }: Props) {
+export default function AiAssist({ actions = TEXT_ACTIONS, getText, onApply, applyModes = ['replace', 'insert'], applyLabel = 'Reemplazar', label = 'IA', title = 'Asistente de IA', disabled, iconOnly }: Props) {
   const ai = useAi()
   const toast = useToast()
   const [pending, setPending] = useState<AiAction | null>(null) // acción que pide un dato antes de ejecutarse
@@ -90,7 +92,7 @@ export default function AiAssist({ actions = TEXT_ACTIONS, getText, onApply, app
           trigger={<span className="ai-trigger" title={title}><Sparkles size={15} />{!iconOnly && <span>{label}</span>}</span>} />
       </span>
       {pending && <AskDialog action={pending} onCancel={() => setPending(null)} onOk={(v) => { const a = pending; setPending(null); void start(a, v) }} />}
-      {job && <ResultDialog job={job} title={title} onApply={onApply} applyModes={applyModes} onClose={() => setJob(null)} />}
+      {job && <ResultDialog job={job} title={title} onApply={onApply} applyModes={applyModes} applyLabel={applyLabel} onClose={() => setJob(null)} />}
     </>
   )
 }
@@ -102,7 +104,7 @@ function AskDialog({ action, onCancel, onOk }: { action: AiAction; onCancel: () 
     if (v.trim()) onOk(v.trim())
   }
   return (
-    <Modal title={action.label} icon={<Sparkles size={20} />} onClose={onCancel}>
+    <Modal title={action.label} icon={<Sparkles size={20} />} onClose={onCancel} className="ai-layer">
       <form className="stack" onSubmit={submit}>
         <label className="stack tight">
           <span className="small">{action.ask === 'language' ? 'Idioma de destino' : '¿Qué quieres que haga con el texto?'}</span>
@@ -120,7 +122,7 @@ function AskDialog({ action, onCancel, onOk }: { action: AiAction; onCancel: () 
   )
 }
 
-function ResultDialog({ job, title, onApply, applyModes, onClose }: { job: { action: AiAction; input: string; source: string }; title: string; onApply?: Props['onApply']; applyModes: ApplyMode[]; onClose: () => void }) {
+function ResultDialog({ job, title, onApply, applyModes, applyLabel, onClose }: { job: { action: AiAction; input: string; source: string }; title: string; onApply?: Props['onApply']; applyModes: ApplyMode[]; applyLabel: string; onClose: () => void }) {
   const ai = useAi()
   const toast = useToast()
   const [text, setText] = useState('')
@@ -170,7 +172,7 @@ function ResultDialog({ job, title, onApply, applyModes, onClose }: { job: { act
   }
 
   return (
-    <Modal title={title} icon={<Sparkles size={20} />} onClose={onClose} wide
+    <Modal title={title} icon={<Sparkles size={20} />} onClose={onClose} wide className="ai-layer"
       footer={
         <div className="ai-foot">
           <span className="spacer" />
@@ -179,7 +181,7 @@ function ResultDialog({ job, title, onApply, applyModes, onClose }: { job: { act
             : <button className="btn ghost" onClick={() => void run()}><RefreshCw size={14} /> Otra vez</button>}
           <button className="btn ghost" disabled={!text || running} onClick={() => void copy()}>{copied ? <Check size={14} /> : <ClipboardCopy size={14} />} {copied ? 'Copiado' : 'Copiar'}</button>
           {onApply && applyModes.includes('insert') && <button className="btn" disabled={!text || running} onClick={() => apply('insert')}><ArrowDownToLine size={14} /> Insertar debajo</button>}
-          {onApply && applyModes.includes('replace') && <button className="btn primary" disabled={!text || running} onClick={() => apply('replace')}><Replace size={14} /> Reemplazar</button>}
+          {onApply && applyModes.includes('replace') && <button className="btn primary" disabled={!text || running} onClick={() => apply('replace')}><Replace size={14} /> {applyLabel}</button>}
         </div>
       }>
       <div className="ai-result">

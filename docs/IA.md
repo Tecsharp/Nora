@@ -28,6 +28,7 @@ y `docker compose up -d`. En Administración → Ajustes se ve si está activa. 
 | Herramienta | Qué hace la IA |
 | --- | --- |
 | Notas y Documentos | Mejorar, corregir, acortar, ampliar, cambiar el tono, continuar, traducir, resumir, puntos clave, explicar, acta de reunión, instrucción libre. Actúa sobre la selección o todo el texto y puede reemplazar o insertar debajo. |
+| Hojas de cálculo | «Fórmula»: describe lo que quieres («suma de la columna A») y la IA escribe la fórmula; se pone en la celda activa. |
 | Chat | Resume la conversación (decisiones y pendientes). |
 | Acciones | Genera tareas desde un texto (notas de reunión) y la descripción + checklist de una tarea. |
 | Votaciones | Propone opciones a partir de la pregunta y resume el resultado. |

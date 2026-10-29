@@ -9,6 +9,8 @@ import { translateFormula, parseRange, rangeText } from './refs'
 import { CHART_TYPES, ChartView, type ChartSpec, type ChartType } from './chart'
 import { chartSpecOf } from './sheetCharts'
 import SheetRibbon, { type RibbonApi } from './SheetRibbon'
+import AiAssist, { type AiAction } from '../ai/AiAssist'
+import { Sigma } from 'lucide-react'
 
 const ROW_H = 26
 const HEAD_H = 26
@@ -50,6 +52,8 @@ const raw = (c?: Cell) => (!c ? '' : c.f ? `=${toLocalFormula(c.f)}` : typeof c.
 interface Props { provider: CollabProvider; editable: boolean }
 
 interface ClipData { text: string; r: number; c: number; cells: (Cell | undefined)[][] }
+
+const FORMULA_ACTIONS: AiAction[] = [{ id: 'formula', label: 'Escribir una fórmula…', task: 'sheet_formula', ask: 'instruction', icon: <Sigma size={16} /> }]
 
 export default function SheetEditor({ provider, editable }: Props) {
   const dialogs = useDialogs()
@@ -660,6 +664,23 @@ export default function SheetEditor({ provider, editable }: Props) {
       <div className="formula-bar">
         <span className="fb-ref">{addr(s.r1, s.c1)}{(s.r1 !== s.r2 || s.c1 !== s.c2) ? `:${addr(s.r2, s.c2)}` : ''}</span>
         <span className="fb-fx">ƒx</span>
+        {editable && (
+          <AiAssist actions={FORMULA_ACTIONS} label="Fórmula" title="Pedir una fórmula a la IA" applyModes={['replace']} applyLabel="Poner en la celda"
+            getText={() => {
+              // contexto para la IA: lo seleccionado (hasta 200 celdas) con sus coordenadas
+              const rows: string[] = []
+              for (let r = s.r1; r <= Math.min(s.r2, s.r1 + 40); r++) {
+                const line: string[] = []
+                for (let c = s.c1; c <= Math.min(s.c2, s.c1 + 10); c++) line.push(String(valueAt(r, c) ?? ''))
+                rows.push(`${addr(r, s.c1)}: ${line.join(' | ')}`)
+              }
+              return `Celda activa: ${addr(s.r1, s.c1)}. Selección: ${addr(s.r1, s.c1)}:${addr(s.r2, s.c2)}.\n${rows.join('\n')}`.slice(0, 4000)
+            }}
+            onApply={(out) => {
+              const f = /=[^\n`]+/.exec(out)?.[0]?.trim()
+              if (f) commit(s.r1, s.c1, f)
+            }} />
+        )}
         <input className="fb-input" aria-label="Contenido de la celda" value={formulaText} readOnly={!editable}
           onFocus={() => { if (!editing && editable) startEdit(sel.r1, sel.c1) }}
           onChange={(e) => setEditing({ r: sel.r1, c: sel.c1, text: e.target.value })}
