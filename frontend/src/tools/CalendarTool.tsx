@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, CalendarPlus, Check, ChevronLeft, ChevronRight, Download, HelpCircle, ListTodo, MapPin, Pencil, Plus, Sparkles, Trash2, Users, X } from 'lucide-react'
 import type { Room } from '../api'
 import { useAuth } from '../auth'
@@ -85,8 +85,9 @@ export default function CalendarTool({ room }: { room: Room }) {
   const { items, loading, error, create, update, remove, act } = useItems<EventData>(room.code, 'event')
   const canWrite = canWriteIn(room, user)
   const staff = isStaffIn(room, user)
-  const [cursor, setCursor] = useState(() => { const d = new Date(); d.setDate(1); return d })
-  const [view, setView] = useState<'month' | 'agenda'>('month')
+  const [cursor, setCursor] = useState(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }) // cualquier día del periodo que se mira
+  const [view, setView] = useState<'month' | 'week' | 'day' | 'agenda'>(() => { try { return (localStorage.getItem('nora-cal-view') as 'month' | 'week' | 'day' | 'agenda') || 'week' } catch { return 'week' } })
+  const changeView = (v: 'month' | 'week' | 'day' | 'agenda') => { setView(v); try { localStorage.setItem('nora-cal-view', v) } catch { /* sin almacenamiento */ } }
   const [openState, setOpen] = useState<{ id?: string; draft?: Partial<EventData>; edit: boolean } | null>(null)
   // el evento abierto se lee siempre de la lista en vivo: así las respuestas que llegan se ven al instante
   const open = openState ? { ...openState, ev: openState.id ? items.find((x) => x.id === openState.id) : undefined } : null
@@ -98,7 +99,12 @@ export default function CalendarTool({ room }: { room: Room }) {
   const cells = useMemo(() => {
     const first = monday(new Date(cursor.getFullYear(), cursor.getMonth(), 1))
     return Array.from({ length: 42 }, (_, i) => addDays(first, i))
-  }, [cursor])
+  }, [cursor.getFullYear(), cursor.getMonth()]) // eslint-disable-line react-hooks/exhaustive-deps
+  const weekDays = useMemo(() => { const m = monday(cursor); return Array.from({ length: 7 }, (_, i) => addDays(m, i)) }, [cursor])
+  const shiftBy = (dir: number) => setCursor((c) => view === 'month' || view === 'agenda' ? new Date(c.getFullYear(), c.getMonth() + dir, 1) : addDays(c, (view === 'week' ? 7 : 1) * dir))
+  const title = view === 'week'
+    ? (() => { const a = weekDays[0]!; const z = weekDays[6]!; return a.getMonth() === z.getMonth() ? `${a.getDate()} – ${z.getDate()} de ${MONTHS[z.getMonth()]}` : `${a.getDate()} ${MONTHS[a.getMonth()].slice(0, 3)} – ${z.getDate()} ${MONTHS[z.getMonth()].slice(0, 3)}` })()
+    : view === 'day' ? `${cursor.getDate()} de ${MONTHS[cursor.getMonth()]}` : MONTHS[cursor.getMonth()]
   const byDay = useMemo(() => {
     const m = new Map<string, Ev[]>()
     for (const e of items) for (const k of spans(e.data)) m.set(k, [...(m.get(k) ?? []), e])
@@ -118,15 +124,17 @@ export default function CalendarTool({ room }: { room: Room }) {
     <div className="cal">
       <div className="cal-bar">
         <div className="row">
-          <button className="icon-btn" aria-label="Mes anterior" onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))}><ChevronLeft size={18} /></button>
-          <h3 className="cal-title">{MONTHS[cursor.getMonth()]} <span>{cursor.getFullYear()}</span></h3>
-          <button className="icon-btn" aria-label="Mes siguiente" onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))}><ChevronRight size={18} /></button>
-          <button className="btn sm" onClick={() => { const d = new Date(); d.setDate(1); setCursor(d) }}>Hoy</button>
+          <button className="icon-btn" aria-label="Anterior" onClick={() => shiftBy(-1)}><ChevronLeft size={18} /></button>
+          <h3 className="cal-title">{title} <span>{cursor.getFullYear()}</span></h3>
+          <button className="icon-btn" aria-label="Siguiente" onClick={() => shiftBy(1)}><ChevronRight size={18} /></button>
+          <button className="btn sm" onClick={() => { const d = new Date(); d.setHours(0, 0, 0, 0); setCursor(d) }}>Hoy</button>
         </div>
         <span className="spacer" />
         <div className="seg" role="tablist" aria-label="Vista">
-          <button role="tab" aria-selected={view === 'month'} className={view === 'month' ? 'on' : ''} onClick={() => setView('month')}><CalendarDays size={13} /> Mes</button>
-          <button role="tab" aria-selected={view === 'agenda'} className={view === 'agenda' ? 'on' : ''} onClick={() => setView('agenda')}><ListTodo size={13} /> Agenda</button>
+          <button role="tab" aria-selected={view === 'day'} className={view === 'day' ? 'on' : ''} onClick={() => changeView('day')}>Día</button>
+          <button role="tab" aria-selected={view === 'week'} className={view === 'week' ? 'on' : ''} onClick={() => changeView('week')}>Semana</button>
+          <button role="tab" aria-selected={view === 'month'} className={view === 'month' ? 'on' : ''} onClick={() => changeView('month')}><CalendarDays size={13} /> Mes</button>
+          <button role="tab" aria-selected={view === 'agenda'} className={view === 'agenda' ? 'on' : ''} onClick={() => changeView('agenda')}><ListTodo size={13} /> Agenda</button>
         </div>
         <button className="btn sm ghost" disabled={!items.length} title="Descargar todos los eventos (.ics) para tu calendario" onClick={() => download(`${room.name}.ics`, ics(items, room.name))}><Download size={14} /> .ics</button>
         {canWrite && ai.enabled && <button className="btn ai sm" onClick={() => setAiOpen(true)}><Sparkles size={14} /> Crear desde texto</button>}
@@ -134,7 +142,11 @@ export default function CalendarTool({ room }: { room: Room }) {
       </div>
       {error && <p className="error small center-text">{error}</p>}
 
-      {view === 'month' ? (
+      {view === 'week' || view === 'day' ? (
+        <TimeGrid days={view === 'week' ? weekDays : [cursor]} byDay={byDay} todayKey={todayKey} canWrite={canWrite}
+          onOpen={(e) => setOpen({ id: e.id, edit: false })}
+          onCreate={(start, end, allDay) => setOpen({ edit: true, draft: { title: '', description: '', location: '', allDay, start, end, color: COLORS[0]! } })} />
+      ) : view === 'month' ? (
         <div className="cal-month">
           <div className="cal-week head">{WEEKDAYS.map((w) => <span key={w}>{w}</span>)}</div>
           <div className="cal-grid">
@@ -145,11 +157,11 @@ export default function CalendarTool({ room }: { room: Room }) {
                 <div key={k} className={`cal-cell ${d.getMonth() !== cursor.getMonth() ? 'out' : ''} ${k === todayKey ? 'today' : ''}`} onClick={() => canWrite && newOn(k)}>
                   <span className="cal-num">{d.getDate()}</span>
                   {evs.slice(0, 3).map((e) => (
-                    <button key={e.id} className="cal-chip" style={{ ['--c' as string]: e.data.color ?? COLORS[0] }} onClick={(ev) => { ev.stopPropagation(); setOpen({ id: e.id, edit: false }) }} title={`${e.data.title} · ${when(e.data)}`}>
+                    <button key={e.id} className={`cal-chip ${e.data.allDay ? 'allday' : ''}`} style={{ ['--c' as string]: e.data.color ?? COLORS[0] }} onClick={(ev) => { ev.stopPropagation(); setOpen({ id: e.id, edit: false }) }} title={`${e.data.title} · ${when(e.data)}`}>
                       {!e.data.allDay && day(e.data.start) === k && <b>{hhmm(e.data.start)}</b>} <span>{e.data.title}</span>
                     </button>
                   ))}
-                  {evs.length > 3 && <button className="cal-more" onClick={(ev) => { ev.stopPropagation(); setView('agenda') }}>+{evs.length - 3} más</button>}
+                  {evs.length > 3 && <button className="cal-more" onClick={(ev) => { ev.stopPropagation(); setCursor(d); changeView('day') }}>+{evs.length - 3} más</button>}
                 </div>
               )
             })}
@@ -192,6 +204,122 @@ export default function CalendarTool({ room }: { room: Room }) {
           try { await remove(open.ev.id); setOpen(null) } catch (e) { fail(e, 'No se pudo borrar') }
         }} />}
       {aiOpen && <AiEventDialog onClose={() => setAiOpen(false)} onPick={(d) => { setAiOpen(false); setOpen({ edit: true, draft: d }) }} />}
+    </div>
+  )
+}
+
+const HOUR = 52 // px por hora en la cuadrícula
+const mins = (s: string) => Number(s.slice(11, 13)) * 60 + Number(s.slice(14, 16))
+const iso = (k: string, m: number) => `${k}T${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`
+
+interface Seg { ev: Ev; from: number; to: number; lane: number; lanes: number }
+
+/** Reparte en columnas los eventos de un día que se pisan (como hace Google Calendar). */
+function layout(evs: Ev[], k: string): Seg[] {
+  const segs = evs.filter((e) => !e.data.allDay).map((e) => {
+    const from = day(e.data.start) === k ? mins(e.data.start) : 0
+    let to = day(e.data.end) === k ? mins(e.data.end) : 1440
+    if (to - from < 30) to = Math.min(1440, from + 30)
+    return { ev: e, from, to, lane: 0, lanes: 1 }
+  }).sort((a, b) => a.from - b.from || b.to - a.to)
+  let cluster: Seg[] = []
+  let clusterEnd = 0
+  const flush = () => { const n = Math.max(1, ...cluster.map((c) => c.lane + 1)); cluster.forEach((c) => { c.lanes = n }); cluster = [] }
+  for (const sg of segs) {
+    if (cluster.length && sg.from >= clusterEnd) flush()
+    const used = new Set(cluster.filter((c) => c.to > sg.from).map((c) => c.lane))
+    let lane = 0
+    while (used.has(lane)) lane++
+    sg.lane = lane
+    cluster.push(sg)
+    clusterEnd = Math.max(clusterEnd, sg.to)
+  }
+  flush()
+  return segs
+}
+
+function TimeGrid({ days, byDay, todayKey, canWrite, onOpen, onCreate }: {
+  days: Date[]; byDay: Map<string, Ev[]>; todayKey: string; canWrite: boolean; onOpen: (e: Ev) => void; onCreate: (start: string, end: string, allDay: boolean) => void
+}) {
+  const scroller = useRef<HTMLDivElement>(null)
+  const [now, setNow] = useState(() => new Date())
+  const [drag, setDrag] = useState<{ k: string; a: number; b: number } | null>(null)
+  useEffect(() => { const t = setInterval(() => setNow(new Date()), 30_000); return () => clearInterval(t) }, [])
+  // al abrir, la cuadrícula se coloca un poco antes de la hora actual (o a las 7:00 si es de madrugada)
+  useEffect(() => {
+    const m = days.some((d) => ymd(d) === todayKey) ? now.getHours() * 60 : 7 * 60
+    scroller.current?.scrollTo({ top: Math.max(0, ((m - 60) / 60) * HOUR) })
+  }, [days.length, days[0]?.getTime()]) // eslint-disable-line react-hooks/exhaustive-deps
+  const minuteAt = (e: { clientY: number }, col: HTMLElement, snap = 15) => {
+    const r = col.getBoundingClientRect()
+    return Math.max(0, Math.min(1440, Math.round(((e.clientY - r.top) / HOUR) * 60 / snap) * snap))
+  }
+  const allDay = days.flatMap((d) => (byDay.get(ymd(d)) ?? []).filter((e) => e.data.allDay))
+  const nowTop = ((now.getHours() * 60 + now.getMinutes()) / 60) * HOUR
+
+  return (
+    <div className="tg" style={{ ['--cols' as string]: days.length }}>
+      <div className="tg-scroll" ref={scroller}>
+        <div className="tg-sticky">
+      <div className="tg-head">
+          <span className="tg-gutter" />
+          {days.map((d) => (
+            <div key={ymd(d)} className={`tg-dayhead ${ymd(d) === todayKey ? 'today' : ''}`}><small>{WEEKDAYS[(d.getDay() + 6) % 7]}</small><b>{d.getDate()}</b></div>
+          ))}
+        </div>
+        {allDay.length > 0 || canWrite ? (
+          <div className="tg-allday">
+            <span className="tg-gutter small muted">Todo el día</span>
+            {days.map((d) => {
+              const k = ymd(d)
+              return (
+                <div key={k} className="tg-allcell" onClick={() => canWrite && onCreate(`${k}T00:00`, `${k}T00:00`, true)}>
+                  {(byDay.get(k) ?? []).filter((e) => e.data.allDay).map((e) => (
+                    <button key={e.id} className="cal-chip allday" style={{ ['--c' as string]: e.data.color ?? COLORS[0] }} title={`${e.data.title} · ${when(e.data)}`} onClick={(ev) => { ev.stopPropagation(); onOpen(e) }}><span>{e.data.title}</span></button>
+                  ))}
+                </div>
+              )
+            })}
+          </div>
+        ) : null}
+        </div>
+        <div className="tg-body" style={{ height: HOUR * 24 }}>
+          <div className="tg-hours">{Array.from({ length: 24 }, (_, h) => <span key={h} style={{ top: h * HOUR }}>{h === 0 ? '' : `${pad(h)}:00`}</span>)}</div>
+          {days.map((d) => {
+            const k = ymd(d)
+            const segs = layout(byDay.get(k) ?? [], k)
+            return (
+              <div key={k} className={`tg-col ${k === todayKey ? 'today' : ''}`}
+                onPointerDown={(e) => {
+                  if (!canWrite || e.button !== 0 || (e.target as HTMLElement).closest('.tg-ev')) return
+                  const a = minuteAt(e, e.currentTarget)
+                  e.currentTarget.setPointerCapture(e.pointerId)
+                  setDrag({ k, a, b: a + 30 })
+                }}
+                onPointerMove={(e) => { if (drag?.k === k) setDrag({ ...drag, b: Math.max(drag.a + 15, minuteAt(e, e.currentTarget)) }) }}
+                onPointerUp={() => {
+                  if (drag?.k === k) {
+                    const dd = drag
+                    setDrag(null)
+                    onCreate(iso(k, dd.a), iso(k, Math.min(1439, dd.b)), false)
+                  }
+                }}
+                onPointerCancel={() => setDrag(null)}>
+                {Array.from({ length: 24 }, (_, h) => <i key={h} className="tg-line" style={{ top: h * HOUR }} />)}
+                {segs.map((sg) => (
+                  <button key={sg.ev.id} className="tg-ev" style={{ ['--c' as string]: sg.ev.data.color ?? COLORS[0], top: (sg.from / 60) * HOUR, height: Math.max(20, ((sg.to - sg.from) / 60) * HOUR - 2), left: `${(sg.lane / sg.lanes) * 100}%`, width: `calc(${100 / sg.lanes}% - 3px)` }}
+                    title={`${sg.ev.data.title} · ${when(sg.ev.data)}`} onClick={(e) => { e.stopPropagation(); onOpen(sg.ev) }}>
+                    <b>{sg.ev.data.title}</b>
+                    {sg.to - sg.from >= 45 && <span>{hhmm(sg.ev.data.start)}–{hhmm(sg.ev.data.end)}</span>}
+                  </button>
+                ))}
+                {drag?.k === k && <div className="tg-ghost" style={{ top: (drag.a / 60) * HOUR, height: ((drag.b - drag.a) / 60) * HOUR }}><span>{hhmm(iso(k, drag.a))} – {hhmm(iso(k, Math.min(1439, drag.b)))}</span></div>}
+                {k === todayKey && <div className="tg-now" style={{ top: nowTop }}><i /></div>}
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }

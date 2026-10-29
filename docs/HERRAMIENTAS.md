@@ -43,7 +43,7 @@ Solo se sirven tipos de audio, vídeo e imagen raster conocidos (nunca SVG ni na
 
 ## Calendario
 
-Vista de **mes** (6 semanas, lunes primero, eventos con su hora y color, «+N más») y de **agenda** (próximos días agrupados: Hoy, Mañana…). Un clic en un día vacío crea un evento; los eventos tienen hora de inicio/fin o «todo el día»,
+Vistas de **semana** (por defecto) y **día** con la cuadrícula de **horas** (como Google Calendar: fila «Todo el día», línea roja de la hora actual, eventos que se pisan repartidos en columnas, **arrastrar sobre la cuadrícula para crear un evento con su hora**), de **mes** (6 semanas, lunes primero, «+N más») y de **agenda** (próximos días agrupados: Hoy, Mañana…). Los eventos de **todo el día** van en la fila superior y en color sólido; la vista elegida se recuerda. Un clic en un día vacío crea un evento; los eventos tienen hora de inicio/fin o «todo el día»,
 lugar o enlace de reunión (clicable), descripción y color. Cada participante responde **Voy / Quizás / No voy** (también los lectores) y todos ven quién va, en vivo. **Exportar `.ics`** (todos o uno) para el calendario del móvil o del ordenador.
 La herramienta muestra una insignia con los **eventos de hoy** y avisa con un mensaje **10 minutos antes** de los que empiezan (salvo los que se han rechazado). Con la IA activa: **Crear desde texto** («mañana a las 17:00 reunión en la sala 2») con revisión antes de guardar.
 Las horas se guardan sin zona (hora local de quien las ve), pensado para equipos en la misma zona horaria.
