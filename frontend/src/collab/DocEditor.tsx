@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import type { Editor } from '@tiptap/react'
-import { Check, ChevronDown, Copy, Download, FileText, History, Fullscreen, Loader2, Maximize2, Minimize2, PenTool, Presentation, Save, Sheet, Upload, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronUp, Copy, Download, FileText, History, Fullscreen, Loader2, Maximize2, Minimize2, PenTool, Presentation, Save, Sheet, Upload, X } from 'lucide-react'
 import { ApiError, api, getAccessToken } from '../api'
 import { useAuth } from '../auth'
 import Avatar from '../components/Avatar'
@@ -78,6 +78,20 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
       return false
     }
   })
+  const [hideBar, setHideBar] = useState(() => {
+    try {
+      return localStorage.getItem('nora-editor-bar') === 'hidden'
+    } catch {
+      return false
+    }
+  })
+  const setBar = (hidden: boolean) => {
+    setHideBar(hidden)
+    try {
+      localStorage.setItem('nora-editor-bar', hidden ? 'hidden' : 'shown')
+    } catch { /* sin almacenamiento */ }
+  }
+  const barHidden = wide && hideBar // la barra solo se oculta con la ventana ampliada
   const toggleWide = () => setWide((w) => {
     try {
       localStorage.setItem('nora-editor-wide', w ? '0' : '1')
@@ -360,7 +374,7 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
   return createPortal(
     <div className={`modal-backdrop docapp-backdrop ${wide ? 'wide' : ''}`}>
       <div className="docapp" role="dialog" aria-modal="true" aria-label={`Editor: ${name}`}>
-        <header className="docapp-head">
+        <header className={`docapp-head ${barHidden ? 'collapsed' : ''}`}>
           <span className="docapp-ico"><Icon size={20} /></span>
           <input className="docapp-name" value={name} aria-label="Nombre del documento" readOnly={!editable} maxLength={120}
             onChange={(e) => setName(e.target.value)} onBlur={(e) => void rename(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
@@ -387,6 +401,7 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
           <button className="icon-btn" aria-label={wide ? 'Volver al tamaño normal' : 'Ocupar toda la ventana'} title={wide ? 'Volver al tamaño normal' : 'Ocupar toda la ventana'} aria-pressed={wide} onClick={toggleWide}>
             {wide ? <Minimize2 size={19} /> : <Maximize2 size={19} />}
           </button>
+          {wide && <button className="icon-btn" aria-label="Ocultar la barra superior" title="Ocultar la barra superior (más espacio)" onClick={() => setBar(true)}><ChevronUp size={19} /></button>}
           {fullscreen.supported && (
             <button className="icon-btn" aria-label={fullscreen.active ? 'Salir de pantalla completa' : 'Pantalla completa'} title={fullscreen.active ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa de la pantalla'} aria-pressed={fullscreen.active}
               onClick={() => void fullscreen.toggle().catch(() => toast('Tu navegador no permitió la pantalla completa', 'error'))}>
@@ -396,6 +411,7 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
           <button className="icon-btn" aria-label="Cerrar el editor" onClick={requestClose}><X size={20} /></button>
         </header>
 
+        {barHidden && <button className="docapp-handle" aria-label="Mostrar la barra superior" title="Mostrar la barra superior" onClick={() => setBar(false)}><ChevronDown size={16} /></button>}
         <div className="docapp-body">
           <div className="docapp-main">
             {deleted ? (
