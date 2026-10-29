@@ -252,7 +252,13 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
     const placed = fresh.map((e) => ({ ...e, x: e.x + dx, y: e.y + dy }))
     api.updateScene({
       elements: [...api.getSceneElementsIncludingDeleted(), ...placed] as never,
-      appState: { selectedElementIds: Object.fromEntries(placed.map((e) => [e.id, true as const])) },
+      // Si el elemento viene agrupado, Excalidraw espera también el grupo exterior en `selectedGroupIds`; sin él la
+      // selección queda "a medias" y no se puede deseleccionar ni seleccionar otra cosa.
+      appState: {
+        selectedElementIds: Object.fromEntries(placed.map((e) => [e.id, true as const])),
+        selectedGroupIds: Object.fromEntries(placed.map((e) => e.groupIds[e.groupIds.length - 1]).filter((g): g is string => !!g).map((g) => [g, true as const])),
+        editingGroupId: null,
+      },
       captureUpdate: CaptureUpdateAction.IMMEDIATELY,
     })
   }, [api, toast])
@@ -458,6 +464,8 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
         elements: [...dead, ...fresh] as never,
         appState: {
           selectedElementIds: Object.fromEntries(fresh.map((e) => [e.id, true as const])),
+          selectedGroupIds: Object.fromEntries(fresh.map((e) => e.groupIds[e.groupIds.length - 1]).filter((g): g is string => !!g).map((g) => [g, true as const])),
+          editingGroupId: null,
           viewBackgroundColor: mode === 'replace' && restored.appState?.viewBackgroundColor ? restored.appState.viewBackgroundColor : s.viewBackgroundColor,
         },
         captureUpdate: CaptureUpdateAction.IMMEDIATELY,
