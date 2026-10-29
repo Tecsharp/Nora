@@ -1,3 +1,4 @@
+import { flash, useFocusTarget, type FocusTarget } from './focus'
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { AudioLines, Check, ClipboardCopy, Clapperboard, Film, Image as ImageIcon, MapPin, MessageSquarePlus, Pause, Pencil, Play, Rewind, FastForward, Search, Trash2, TriangleAlert, Undo2 } from 'lucide-react'
 import type { Room } from '../api'
@@ -25,7 +26,7 @@ type Comment = Item<ReviewData>
 const SUMMARY: AiAction[] = [{ id: 'sum', label: 'Resumir los cambios pendientes', task: 'review_summary' }]
 const KIND_ICON: Record<MediaKind, typeof Film> = { video: Film, audio: AudioLines, image: ImageIcon }
 
-export default function MediaReviewTool({ room }: { room: Room }) {
+export default function MediaReviewTool({ room, focus }: { room: Room; focus?: FocusTarget | null }) {
   const { user } = useAuth()
   const toast = useToast()
   const dialogs = useDialogs()
@@ -52,6 +53,13 @@ export default function MediaReviewTool({ room }: { room: Room }) {
   const file = media.find((f) => f.id === fileId) ?? null
   const kind = file ? mediaKind(file.name) : null
   useEffect(() => { if (!fileId && media[0]) setFileId(media[0].id) }, [media, fileId])
+  // desde una notificación: se elige el archivo del comentario y se resalta el comentario
+  useFocusTarget(focus, media.length > 0 || items.length > 0, (f) => {
+    const c = items.find((x) => x.id === f.item)
+    const target = f.file ?? c?.data.fileId
+    if (target) { setFileId(target); setFilter('all'); setQ('') }
+    if (c) flash(`#mr-c-${c.id}`)
+  })
 
   // dirección de reproducción firmada al elegir el archivo
   useEffect(() => {

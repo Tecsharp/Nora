@@ -1,3 +1,4 @@
+import { useFocusTarget, type FocusTarget } from './focus'
 import { useMemo, useRef, useState, type DragEvent, type FormEvent } from 'react'
 import { AlarmClock, Check, ChevronLeft, ChevronRight, CircleCheck, Circle, Flag, ListChecks, Pencil, Plus, Search, Sparkles, Trash2, X, MoveRight, AlignLeft } from 'lucide-react'
 import type { Room } from '../api'
@@ -61,7 +62,7 @@ const dueLabel = (due: string) => {
 }
 const uid = () => Math.random().toString(36).slice(2, 10)
 
-export default function TasksTool({ room }: { room: Room }) {
+export default function TasksTool({ room, focus }: { room: Room; focus?: FocusTarget | null }) {
   const { user } = useAuth()
   const toast = useToast()
   const dialogs = useDialogs()
@@ -73,6 +74,7 @@ export default function TasksTool({ room }: { room: Room }) {
   const [mine, setMine] = useState(false)
   const [prio, setPrio] = useState<'' | Priority>('')
   const [openId, setOpenId] = useState<string | null>(null)
+  useFocusTarget(focus, !loading, (f) => { if (f.item && items.some((t) => t.id === f.item)) setOpenId(f.item) })
   const [aiOpen, setAiOpen] = useState(false)
   const [adding, setAdding] = useState<Status | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)

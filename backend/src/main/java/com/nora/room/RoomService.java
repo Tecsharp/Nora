@@ -1,6 +1,7 @@
 package com.nora.room;
 
 import com.nora.common.ApiException;
+import com.nora.notify.NotificationService;
 import com.nora.file.FileService;
 import com.nora.upload.UploadService;
 import com.nora.ws.PresenceService;
@@ -43,10 +44,12 @@ public class RoomService {
     private final UploadService uploads;
     private final PresenceService presence;
     private final ApplicationEventPublisher events;
+    private final NotificationService notifications;
     private final SecureRandom random = new SecureRandom();
 
     public RoomService(RoomRepository rooms, RoomMemberRepository members, RoomJoinRequestRepository joinRequests, UserRepository users, FileService files,
-                       UploadService uploads, PresenceService presence, ApplicationEventPublisher events) {
+                       UploadService uploads, PresenceService presence, ApplicationEventPublisher events, NotificationService notifications) {
+        this.notifications = notifications;
         this.rooms = rooms;
         this.members = members;
         this.joinRequests = joinRequests;
@@ -135,6 +138,9 @@ public class RoomService {
         members.save(m);
         events.publishEvent(new RoomEvent(room.getId(), "member.joined",
                 Map.of("userId", userId, "displayName", user(userId).getDisplayName())));
+        if (!userId.equals(room.getOwnerId())) {
+            notifications.notify(room.getOwnerId(), room, "member", user(userId).getDisplayName() + " entró a la sala", "", Map.of("tool", "members"), null);
+        }
     }
 
     /** Entra con el código. Si la sala pide aprobación, deja una solicitud y avisa al propietario. */
@@ -149,6 +155,7 @@ public class RoomService {
         if (isFull(room)) throw ApiException.forbidden("La sala está llena");
         if (joinRequests.findByRoomIdAndUserId(room.getId(), userId).isEmpty()) {
             joinRequests.save(new RoomJoinRequest(room.getId(), userId));
+            notifications.notify(room.getOwnerId(), room, "join", user(userId).getDisplayName() + " quiere entrar", "Solicitud pendiente en «" + room.getName() + "»", Map.of("tool", "members"), "join:" + room.getCode());
             events.publishEvent(new UserEvent(room.getOwnerId(), "join.requested",
                     Map.of("code", room.getCode(), "roomName", room.getName(), "userId", userId, "displayName", user(userId).getDisplayName())));
         }
@@ -386,6 +393,7 @@ public class RoomService {
     }
 
     private void destroy(Room room, String reason) {
+        notifications.purgeRoom(room.getCode());
         files.deleteAllForRoom(room.getId());
         uploads.abortAllForRoom(room.getId());
         rooms.delete(room);

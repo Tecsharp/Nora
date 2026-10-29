@@ -2,6 +2,8 @@ package com.nora.item;
 
 import com.nora.auth.AuthPrincipal;
 import com.nora.common.ApiException;
+import com.nora.file.RoomFileRepository;
+import com.nora.notify.NotificationService;
 import com.nora.room.Room;
 import com.nora.room.RoomService;
 import com.nora.user.UserRepository;
@@ -38,8 +40,12 @@ public class ItemService {
     private final RoomService rooms;
     private final UserRepository users;
     private final ApplicationEventPublisher events;
+    private final NotificationService notifications;
+    private final RoomFileRepository files;
 
-    public ItemService(RoomItemRepository items, RoomService rooms, UserRepository users, ApplicationEventPublisher events) {
+    public ItemService(RoomItemRepository items, RoomService rooms, UserRepository users, ApplicationEventPublisher events, NotificationService notifications, RoomFileRepository files) {
+        this.notifications = notifications;
+        this.files = files;
         this.items = items;
         this.rooms = rooms;
         this.users = users;
@@ -76,6 +82,7 @@ public class ItemService {
         RoomItem it = new RoomItem(room.getId(), tool, p.userId(), users.findById(p.userId()).orElseThrow().getDisplayName(), clean,
                 sort != null && Double.isFinite(sort) ? sort : System.currentTimeMillis());
         items.save(it);
+        notifyCreated(room, it, p.userId());
         return publish(it, "created", p.userId());
     }
 
@@ -85,6 +92,7 @@ public class ItemService {
         Room room = rooms.requireWriter(p.userId(), p.role(), code);
         RoomItem it = items.lockById(id, room.getId(), tool).orElseThrow(() -> ApiException.notFound("Ese elemento ya no existe"));
         requireCanEdit(room, p, it);
+        Object prevAssignee = it.getData().get("assignee");
         if (data != null) {
             Map<String, Object> clean = ItemSchemas.clean(tool, data, false);
             checkRefs(room, tool, clean);
@@ -96,6 +104,7 @@ public class ItemService {
         }
         if (sort != null && Double.isFinite(sort)) it.setSort(sort);
         items.save(it);
+        if ("task".equals(tool) && it.getData().get("assignee") instanceof String a && !a.equals(prevAssignee)) notifyAssigned(room, it, a, p.userId());
         return publish(it, "updated", p.userId());
     }
 
@@ -165,6 +174,49 @@ public class ItemService {
         it.setData(d);
         items.save(it);
         return publish(it, "updated", p.userId());
+    }
+
+    // ---- avisos ----
+
+    private void notifyCreated(Room room, RoomItem it, UUID actor) {
+        String who = it.getAuthorName();
+        Map<String, Object> d = it.getData();
+        switch (it.getTool()) {
+            case "task" -> {
+                if (d.get("assignee") instanceof String a) notifyAssigned(room, it, a, actor);
+            }
+            case "poll" -> notifications.notifyRoom(room, actor, "poll", who + " creó una votación", String.valueOf(d.get("question")),
+                    link("polls", it.getId()), null);
+            case "event" -> notifications.notifyRoom(room, actor, "event", who + " agendó un evento", eventLine(d), link("calendar", it.getId()), null);
+            case "review" -> {
+                UUID file = UUID.fromString(String.valueOf(d.get("fileId")));
+                Map<String, Object> l = link("media", it.getId());
+                l.put("file", file.toString());
+                String name = d.get("fileName") instanceof String n && !n.isBlank() ? n : "un archivo";
+                files.findById(file).filter(f -> !f.getUploaderId().equals(actor)).ifPresent(f ->
+                        notifications.notify(f.getUploaderId(), room, "review", who + " comentó " + name, String.valueOf(d.get("text")), l, null));
+            }
+            default -> { }
+        }
+    }
+
+    private void notifyAssigned(Room room, RoomItem it, String assignee, UUID actor) {
+        UUID to = UUID.fromString(assignee);
+        if (to.equals(actor)) return;
+        String who = users.findById(actor).map(u -> u.getDisplayName()).orElse("Alguien");
+        notifications.notify(to, room, "task", who + " te asignó una tarea", String.valueOf(it.getData().get("title")), link("actions", it.getId()), null);
+    }
+
+    private static String eventLine(Map<String, Object> d) {
+        String start = String.valueOf(d.get("start")).replace('T', ' ');
+        return d.get("title") + " · " + start;
+    }
+
+    private static Map<String, Object> link(String tool, UUID item) {
+        Map<String, Object> l = new LinkedHashMap<>();
+        l.put("tool", tool);
+        l.put("item", item.toString());
+        return l;
     }
 
     // ---- reglas ----

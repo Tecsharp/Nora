@@ -1,3 +1,4 @@
+import { byItem, flash, useFocusTarget, type FocusTarget } from './focus'
 import { useMemo, useState, type FormEvent } from 'react'
 import { Check, Copy, ExternalLink, Link2, Pencil, Pin, PinOff, Plus, Search, Tag, Trash2, X } from 'lucide-react'
 import type { Room } from '../api'
@@ -27,7 +28,7 @@ const normalize = (raw: string): string | null => {
 const host = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, '') } catch { return url } }
 const hue = (s: string) => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h % 360 }
 
-export default function LinksTool({ room }: { room: Room }) {
+export default function LinksTool({ room, focus }: { room: Room; focus?: FocusTarget | null }) {
   const { user } = useAuth()
   const toast = useToast()
   const dialogs = useDialogs()
@@ -39,6 +40,7 @@ export default function LinksTool({ room }: { room: Room }) {
   const [quick, setQuick] = useState('')
   const [editing, setEditing] = useState<Lnk | 'new' | null>(null)
   const [adding, setAdding] = useState(false)
+  useFocusTarget(focus, !loading, (f) => { if (f.item) { setQ(''); setTag(null); flash(byItem(f.item)) } })
 
   const tags = useMemo(() => {
     const m = new Map<string, number>()
@@ -109,7 +111,7 @@ export default function LinksTool({ room }: { room: Room }) {
             const own = canWrite && (l.authorId === user?.id || staff)
             const h = host(d.url)
             return (
-              <article key={l.id} className={`lk-card ${d.pinned ? 'pinned' : ''}`}>
+              <article key={l.id} data-item-id={l.id} className={`lk-card ${d.pinned ? 'pinned' : ''}`}>
                 <span className="lk-ico" style={{ ['--h' as string]: hue(h) }} aria-hidden>{h.charAt(0).toUpperCase()}</span>
                 <div className="lk-body">
                   <a className="lk-title" href={d.url} target="_blank" rel="noopener noreferrer" title={d.url}>{d.title || h}</a>

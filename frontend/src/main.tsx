@@ -19,6 +19,7 @@ import App from './App'
 import { AuthProvider } from './auth'
 import { AiProvider } from './ai/AiProvider'
 import { RealtimeProvider } from './realtime'
+import { NotificationsProvider } from './notifications'
 import { ThemeProvider } from './theme'
 import { ToastProvider } from './toast'
 import { DialogProvider } from './dialogs'
@@ -33,7 +34,9 @@ createRoot(document.getElementById('root')!).render(
         <AuthProvider>
           <RealtimeProvider>
             <AiProvider>
-              <App />
+              <NotificationsProvider>
+                <App />
+              </NotificationsProvider>
             </AiProvider>
           </RealtimeProvider>
         </AuthProvider>

@@ -1,3 +1,4 @@
+import type { FocusTarget } from '../tools/focus'
 import { Suspense, lazy, useCallback, useEffect, useState, type ComponentType } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
@@ -250,6 +251,20 @@ export default function RoomPage() {
     setParams((p) => { p.delete('doc'); return p }, { replace: true })
   }, [setParams])
   // Enlace directo a un documento (?doc=…)
+  // Destino de una notificación (?tool=…&item=…): abre la herramienta y la deja apuntando exactamente al sitio
+  const [target, setTarget] = useState<FocusTarget | null>(null)
+  const wantedTool = params.get('tool')
+  useEffect(() => {
+    if (!wantedTool || !room) return
+    const f: FocusTarget = { tool: wantedTool, item: params.get('item') ?? undefined, file: params.get('file') ?? undefined, conv: params.get('conv') ?? undefined, msg: params.get('msg') ?? undefined, nonce: Date.now() }
+    setParams((p) => { for (const k of ['tool', 'item', 'file', 'conv', 'msg']) p.delete(k); return p }, { replace: true })
+    if (wantedTool === 'settings' || wantedTool === 'members') { setSettingsOpen(true); return }
+    if (!TOOLS.some((t) => t.id === wantedTool)) return
+    setTarget(f)
+    setActive(wantedTool)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantedTool, !!room])
+  useEffect(() => { if (target && active !== target.tool) setTarget(null) }, [active, target])
   const wantedDoc = params.get('doc')
   useEffect(() => {
     if (!wantedDoc || editingDoc?.id === wantedDoc) return
@@ -457,15 +472,15 @@ export default function RoomPage() {
 
       {tool && tool.id !== 'player' && (
         <Modal title={tool.label} icon={<tool.icon size={20} />} wide={tool.ready} xl={XL_TOOLS.has(tool.id)} flush={tool.ready} onClose={() => setActive(null)}>
-          {tool.id === 'files' && <FilesTool room={room} onEditDoc={openDoc} />}
+          {tool.id === 'files' && <FilesTool room={room} onEditDoc={openDoc} focus={target} />}
           {tool.id === 'board' && <BoardsTool room={room} onOpen={openDoc} />}
           {tool.id === 'attendance' && <AssistTool room={room} online={online} />}
           {tool.id === 'focus' && <FocusTool room={room} focus={focus} />}
-          {tool.id === 'links' && <LinksTool room={room} />}
-          {tool.id === 'calendar' && <CalendarTool room={room} />}
-          {tool.id === 'media' && <MediaReviewTool room={room} />}
-          {tool.id === 'polls' && <PollsTool room={room} />}
-          {tool.id === 'actions' && <TasksTool room={room} />}
+          {tool.id === 'links' && <LinksTool room={room} focus={target} />}
+          {tool.id === 'calendar' && <CalendarTool room={room} focus={target} />}
+          {tool.id === 'media' && <MediaReviewTool room={room} focus={target} />}
+          {tool.id === 'polls' && <PollsTool room={room} focus={target} />}
+          {tool.id === 'actions' && <TasksTool room={room} focus={target} />}
           {tool.id === 'chat' && <ChatTool room={room} online={online} onSeen={markChatSeen} />}
           {tool.id === 'notes' && <NotesTool room={room} kind="NOTE" placeholder="Escribe una nota para la sala…" />}
           {!tool.ready && (

@@ -5,6 +5,7 @@ import { useRealtime } from '../realtime'
 import { useToast } from '../toast'
 import { ThemeToggle } from '../theme'
 import { uploads } from '../uploadManager'
+import { NotificationBell } from '../notifications'
 import Avatar from './Avatar'
 import TopBar from './TopBar'
 import LegalLinks from './LegalLinks'
@@ -27,6 +28,7 @@ export default function Layout() {
         <ThemeToggle />
         {user && (
           <>
+            <NotificationBell />
             <Link to="/settings" className="btn ghost sm profile-link" title={`${user.email} · Ajustes de la cuenta`} aria-label="Ajustes de la cuenta">
               <Avatar name={user.displayName} userId={user.id} version={user.avatarVersion} size={26} />
               <span className="hide-sm">{user.displayName}</span>

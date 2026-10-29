@@ -1,3 +1,4 @@
+import { byItem, flash, useFocusTarget, type FocusTarget } from './focus'
 import { useEffect, useMemo, useState } from 'react'
 import { BarChart3, Check, Clock, EyeOff, Lock, LockOpen, Pencil, Plus, Sparkles, Trash2, Trophy, Users, X } from 'lucide-react'
 import type { Room } from '../api'
@@ -46,7 +47,7 @@ const left = (ms: number) => {
 
 const SUMMARY: AiAction[] = [{ id: 'sum', label: 'Resumir el resultado', task: 'poll_summary' }]
 
-export default function PollsTool({ room }: { room: Room }) {
+export default function PollsTool({ room, focus }: { room: Room; focus?: FocusTarget | null }) {
   const { user } = useAuth()
   const toast = useToast()
   const dialogs = useDialogs()
@@ -56,6 +57,7 @@ export default function PollsTool({ room }: { room: Room }) {
   const [tab, setTab] = useState<'open' | 'closed' | 'all'>('open')
   const [editing, setEditing] = useState<Poll | 'new' | null>(null)
   const [now, setNow] = useState(Date.now())
+  useFocusTarget(focus, !loading, (f) => { if (f.item) { setTab('all'); flash(byItem(f.item)) } })
   const [busy, setBusy] = useState<string | null>(null)
   const people = useMemo(() => new Map(room.participants.map((p) => [p.userId, p])), [room.participants])
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 20_000); return () => clearInterval(t) }, [])
@@ -128,7 +130,7 @@ export default function PollsTool({ room }: { room: Room }) {
           const mine = d.mine ?? []
           const canTouch = canWrite && (p.authorId === user?.id || staff)
           return (
-            <article key={p.id} className={`poll ${closedNow ? 'closed' : ''}`}>
+            <article key={p.id} data-item-id={p.id} className={`poll ${closedNow ? 'closed' : ''}`}>
               <header>
                 <div className="poll-q">
                   <h3>{d.question}</h3>

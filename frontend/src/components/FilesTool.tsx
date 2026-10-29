@@ -1,3 +1,4 @@
+import { flash, useFocusTarget, type FocusTarget } from '../tools/focus'
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import {
   ChevronRight, Download, X, File, FileArchive, FileAudio, FileCode, FileImage, FileText, FileVideo, Folder, PenTool, Presentation, Sheet, FilePlus2, ChevronDown, FolderInput, FolderPlus, FolderUp, Eye, Loader2,
@@ -87,7 +88,7 @@ const NEW_KINDS = [
 
 const when = fmtDateTime
 
-export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?: (d: DocInfo) => void }) {
+export default function FilesTool({ room, onEditDoc, focus }: { room: Room; onEditDoc?: (d: DocInfo) => void; focus?: FocusTarget | null }) {
   const { user } = useAuth()
   const toast = useToast()
   const dialogs = useDialogs()
@@ -119,6 +120,15 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [anchor, setAnchor] = useState<string | null>(null)
   foldersRef.current = folders
+  // desde una notificación: se abre la carpeta del archivo, se selecciona y se resalta
+  useFocusTarget(focus, !!focus?.file && files.some((f) => f.id === focus.file), (f) => {
+    const file = files.find((x) => x.id === f.file)
+    if (!file) return
+    setQuery('')
+    setCurrent(file.folderId ?? null)
+    setSel(new Set([file.id]))
+    flash(`[data-sel-id="${file.id}"]`)
+  })
 
   const setView = (v: View) => {
     setViewState(v)

@@ -1,3 +1,4 @@
+import { useFocusTarget, type FocusTarget } from './focus'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, CalendarPlus, Check, ChevronLeft, ChevronRight, Download, HelpCircle, ListTodo, MapPin, Pencil, Plus, Sparkles, Trash2, Users, X } from 'lucide-react'
 import type { Room } from '../api'
@@ -77,7 +78,7 @@ const download = (name: string, text: string) => {
   setTimeout(() => URL.revokeObjectURL(a.href), 2000)
 }
 
-export default function CalendarTool({ room }: { room: Room }) {
+export default function CalendarTool({ room, focus }: { room: Room; focus?: FocusTarget | null }) {
   const { user } = useAuth()
   const toast = useToast()
   const dialogs = useDialogs()
@@ -92,6 +93,14 @@ export default function CalendarTool({ room }: { room: Room }) {
   // el evento abierto se lee siempre de la lista en vivo: así las respuestas que llegan se ven al instante
   const open = openState ? { ...openState, ev: openState.id ? items.find((x) => x.id === openState.id) : undefined } : null
   const [aiOpen, setAiOpen] = useState(false)
+  // desde una notificación: se va al día del evento y se abre su ficha
+  useFocusTarget(focus, !loading, (f) => {
+    const ev = items.find((x) => x.id === f.item)
+    if (!ev) return
+    const [y, m, d] = ev.data.start.slice(0, 10).split('-').map(Number)
+    setCursor(new Date(y!, m! - 1, d!))
+    setOpen({ id: ev.id, edit: false })
+  })
   useEffect(() => { if (openState?.id && !open?.ev && !loading) setOpen(null) }) // lo borraron mientras estaba abierto
   const people = useMemo(() => new Map(room.participants.map((p) => [p.userId, p])), [room.participants])
   const todayKey = ymd(new Date())

@@ -70,3 +70,12 @@ los gestos de quien reproduce se envían al servidor y los ajenos se aplican con
 
 **YouTube y los anuncios.** Se incrusta con `youtube-nocookie.com` y se controla por `postMessage` **sin cargar ningún script de YouTube** (la política de seguridad solo permite ese iframe: `frame-src https://www.youtube-nocookie.com`). Nora **no bloquea ni salta anuncios** de YouTube (hacerlo infringe sus condiciones y se rompe a menudo): con YouTube Premium no salen,
 y en el resto de casos pueden aparecer. Lo que **nunca** tiene anuncios: los audios y vídeos de los archivos de la sala y los enlaces directos (`media-src 'self' https:`). Los títulos de YouTube se piden al servidor (oEmbed público, solo `youtube.com`).
+
+## Notificaciones
+
+La **campana** de la barra superior reúne lo relevante de todas tus salas, con insignia de «sin ver», pestañas Todas / Sin ver y el botón **Marcar todas como vistas**. Llegan **en vivo** por el WebSocket (`notification.new`) y se sincronizan entre pestañas y dispositivos (`notification.read`).
+Qué avisa: te asignan una tarea, alguien crea una votación o agenda un evento, comentan un archivo tuyo en Media Review, suben archivos (varios seguidos se agrupan), quieren entrar a tu sala o alguien entra, la sala va a expirar (a quien la creó) y cuando queda inactiva o se reactiva. Nunca te avisa de lo que haces tú.
+
+**Cada aviso lleva el lugar exacto** (`link`: `tool`, `item`, `file`, `conv`, `msg`). Al pulsarlo se abre `/room/{código}?tool=…&item=…` y la herramienta se coloca justo ahí: la tarea se abre, el evento se abre en su día, la votación y el enlace se resaltan, el comentario de Media Review se resalta con su archivo elegido y el archivo nuevo se selecciona en su carpeta.
+Las notificaciones se guardan en la tabla `notifications` (V18), se purgan las leídas con más de 30 días y se borran con la sala.
+Para añadir un aviso nuevo basta llamar a `NotificationService.notify(...)` con el `link` al lugar; la herramienta recibe el destino en su prop `focus` y usa `useFocusTarget` y `flash` (`tools/focus.ts`).
