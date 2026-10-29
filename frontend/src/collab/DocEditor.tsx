@@ -91,7 +91,8 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
       localStorage.setItem('nora-editor-bar', hidden ? 'hidden' : 'shown')
     } catch { /* sin almacenamiento */ }
   }
-  const barHidden = wide && hideBar // la barra solo se oculta con la ventana ampliada
+  const roomy = wide || fullscreen.active
+  const barHidden = roomy && hideBar // la barra solo se oculta con la ventana ampliada o en pantalla completa
   const toggleWide = () => setWide((w) => {
     try {
       localStorage.setItem('nora-editor-wide', w ? '0' : '1')
@@ -401,7 +402,7 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
           <button className="icon-btn" aria-label={wide ? 'Volver al tamaño normal' : 'Ocupar toda la ventana'} title={wide ? 'Volver al tamaño normal' : 'Ocupar toda la ventana'} aria-pressed={wide} onClick={toggleWide}>
             {wide ? <Minimize2 size={19} /> : <Maximize2 size={19} />}
           </button>
-          {wide && <button className="icon-btn" aria-label="Ocultar la barra superior" title="Ocultar la barra superior (más espacio)" onClick={() => setBar(true)}><ChevronUp size={19} /></button>}
+          {roomy && <button className="icon-btn" aria-label="Ocultar la barra superior" title="Ocultar la barra superior (más espacio)" onClick={() => setBar(true)}><ChevronUp size={19} /></button>}
           {fullscreen.supported && (
             <button className="icon-btn" aria-label={fullscreen.active ? 'Salir de pantalla completa' : 'Pantalla completa'} title={fullscreen.active ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa de la pantalla'} aria-pressed={fullscreen.active}
               onClick={() => void fullscreen.toggle().catch(() => toast('Tu navegador no permitió la pantalla completa', 'error'))}>
