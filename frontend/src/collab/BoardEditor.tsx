@@ -1,7 +1,7 @@
 import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  CaptureUpdateAction, DefaultSidebar, Excalidraw, MainMenu, Sidebar, convertToExcalidrawElements, exportToBlob, exportToSvg, getCommonBounds, loadFromBlob, reconcileElements, viewportCoordsToSceneCoords,
+  CaptureUpdateAction, DefaultSidebar, Excalidraw, MainMenu, Sidebar, convertToExcalidrawElements, exportToBlob, exportToSvg, getCommonBounds, loadFromBlob, reconcileElements, restoreElements, viewportCoordsToSceneCoords,
 } from '@excalidraw/excalidraw'
 import '@excalidraw/excalidraw/index.css'
 import type { BinaryFileData, Collaborator, ExcalidrawImperativeAPI, SocketId } from '@excalidraw/excalidraw/types'
@@ -242,7 +242,13 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
   const insertSystem = useCallback((item: SysItem) => {
     if (!api) return
     if (!editableRef.current) return toast('Solo lectura: no puedes añadir elementos', 'warning')
-    const fresh = reidElements((item.elements as (Record<string, unknown> & { id: string })[]).filter((e) => !e.isDeleted)) as unknown as ExcalidrawElement[]
+    // las bibliotecas (sobre todo las antiguas) pueden traer elementos sin campos que hoy son obligatorios (groupIds, version, index…):
+    // se completan igual que hace Excalidraw al cargar un archivo, y se desbloquean para que el elemento insertado se pueda mover
+    const fresh = restoreElements(
+      reidElements((item.elements as (Record<string, unknown> & { id: string })[]).filter((e) => !e.isDeleted)) as never,
+      null,
+      { refreshDimensions: false, repairBindings: true },
+    ).map((e) => ({ ...e, locked: false })) as unknown as ExcalidrawElement[]
     if (!fresh.length) return
     const s = api.getAppState()
     const c = viewportCoordsToSceneCoords({ clientX: s.offsetLeft + s.width / 2, clientY: s.offsetTop + s.height / 2 }, s)
