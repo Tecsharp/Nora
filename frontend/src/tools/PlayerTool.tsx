@@ -254,7 +254,7 @@ function Transport({ state, adapter, sync, canWrite, send, title, onPrev, onNext
       <div className="pl-now"><strong className="truncate">{title}</strong><small>{state.by ? `${state.playing ? 'Puesto' : 'Pausado'} por ${state.by}` : ' '}</small></div>
       <div className="pl-seek">
         <span className="mr-time">{fmtTime(shown)}</span>
-        <input type="range" min={0} max={Math.max(1, Math.floor(dur))} step={1} value={Math.min(shown, Math.max(1, dur))} disabled={!canWrite || !dur} aria-label="Posición"
+        <input className="rng" style={{ ['--p' as string]: `${dur ? Math.min(100, (shown / dur) * 100) : 0}%` }} type="range" min={0} max={Math.max(1, Math.floor(dur))} step={1} value={Math.min(shown, Math.max(1, dur))} disabled={!canWrite || !dur} aria-label="Posición"
           onChange={(e) => setDrag(Number(e.target.value))} onPointerUp={() => { if (drag != null) { void send({ action: 'seek', position: drag }); setDrag(null) } }}
           onKeyUp={() => { if (drag != null) { void send({ action: 'seek', position: drag }); setDrag(null) } }} />
         <span className="mr-time">{dur ? fmtTime(dur) : '--:--'}</span>
@@ -267,7 +267,7 @@ function Transport({ state, adapter, sync, canWrite, send, title, onPrev, onNext
         <select value={state.rate} disabled={!canWrite} aria-label="Velocidad" onChange={(e) => void send({ action: 'rate', rate: Number(e.target.value) })}>{RATES.map((r) => <option key={r} value={r}>{r}×</option>)}</select>
         <span className="spacer" />
         <button className="icon-btn" aria-label={muted ? 'Activar sonido' : 'Silenciar'} title="Solo afecta a tu equipo" onClick={() => { setMuted(!muted); volume(vol, !muted) }}>{muted ? <VolumeX size={18} /> : <Volume2 size={18} />}</button>
-        <input className="pl-vol" type="range" min={0} max={1} step={0.05} value={muted ? 0 : vol} aria-label="Volumen (solo tú)" onChange={(e) => { const v = Number(e.target.value); setVol(v); setMuted(v === 0); volume(v, v === 0) }} />
+        <input className="pl-vol rng" style={{ ['--p' as string]: `${(muted ? 0 : vol) * 100}%` }} type="range" min={0} max={1} step={0.05} value={muted ? 0 : vol} aria-label="Volumen (solo tú)" onChange={(e) => { const v = Number(e.target.value); setVol(v); setMuted(v === 0); volume(v, v === 0) }} />
         <button className="icon-btn" aria-label="Resincronizar" title="Volver a ponerme al ritmo del grupo" onClick={() => { sync.apply(true) }}><RefreshCw size={17} /></button>
       </div>
     </div>

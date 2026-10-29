@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Elementos de las herramientas de la sala (Chat, Acciones, Votaciones, Media Review, Calendario, Enlaces, Reproductor).
+ * Elementos de las herramientas de la sala (Chat, Tablero, Votaciones, Media Review, Calendario, Enlaces, Reproductor).
  * Permisos: ver y reaccionar/votar lo puede cualquier participante; crear y editar, quien pueda escribir (no lectores);
  * editar o borrar lo de otras personas solo quien modera, salvo las tareas, que todo el que escribe puede mover y completar.
  * Cada cambio se reparte a la sala como {@code item.changed {tool, op, item}}.

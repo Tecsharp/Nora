@@ -1243,9 +1243,9 @@ label.kb-search { display: flex; flex-direction: row; align-items: center; }
 .pl-empty { flex: 1; min-height: 260px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; max-width: 420px; margin: 0 auto; text-align: center; color: var(--muted); }
 .pl-bar { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 16px; background: var(--surface-2); }
 .pl-now { display: flex; flex-direction: column; min-width: 0; } .pl-now small { color: var(--muted); }
-.pl-seek { display: flex; align-items: center; gap: 10px; } .pl-seek input[type=range] { flex: 1; accent-color: var(--accent); }
+.pl-seek { display: flex; align-items: center; gap: 10px; } .pl-seek .rng { flex: 1; }
 .pl-ctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .pl-ctl .spacer { flex: 1; } .pl-ctl select { width: auto; min-height: 34px; padding: 2px 26px 2px 10px; border-radius: 999px; font-size: 0.82rem; }
-.pl-vol { width: 90px; accent-color: var(--accent); }
+.pl-vol { width: 90px; }
 .pl-note { display: flex; align-items: flex-start; gap: 6px; margin: 0; font-size: 0.74rem; color: var(--muted); line-height: 1.4; } .pl-note svg { flex: none; margin-top: 2px; }
 .pl-queue { display: flex; flex-direction: column; gap: 10px; padding: 16px 14px; border-left: 1px solid var(--hairline); min-height: 0; }
 .pl-queue h4 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
@@ -1261,3 +1261,20 @@ label.kb-search { display: flex; flex-direction: row; align-items: center; }
 @media (max-width: 860px) { .pl { grid-template-columns: 1fr; } .pl-queue { border-left: 0; border-top: 1px solid var(--hairline); } }
 .tool-badge .pl-eq i { background: var(--accent-fg); }
 .modal-backdrop.ai-layer { z-index: 120; }
+
+/* Deslizadores propios: los estilos generales de «input» (relleno, borde) descuadraban el pulgar respecto a la barra */
+input.rng { -webkit-appearance: none; appearance: none; height: 18px; padding: 0; border: 0; border-radius: 999px; background: transparent; box-shadow: none; cursor: pointer; --p: 0%; }
+input.rng:focus { background: transparent; }
+input.rng::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: linear-gradient(to right, var(--accent) var(--p), var(--surface-3) var(--p)); }
+input.rng::-moz-range-track { height: 6px; border-radius: 999px; background: var(--surface-3); }
+input.rng::-moz-range-progress { height: 6px; border-radius: 999px; background: var(--accent); }
+input.rng::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; margin-top: -5px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25), 0 2px 5px rgba(0, 0, 0, 0.35); }
+input.rng::-moz-range-thumb { width: 16px; height: 16px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25), 0 2px 5px rgba(0, 0, 0, 0.35); }
+input.rng:disabled { opacity: 0.5; cursor: default; }
+/* Herramientas fijadas */
+.tool-pin { position: absolute; right: 12px; bottom: 12px; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; color: var(--muted); opacity: 0; transition: opacity 0.15s, background 0.15s; cursor: pointer; }
+.tool:hover .tool-pin, .tool:focus-within .tool-pin, .tool.pinned .tool-pin { opacity: 1; }
+.tool-pin:hover { background: var(--surface-3); color: var(--text); }
+.tool.pinned { box-shadow: 0 0 0 1px var(--accent), var(--shadow-sm); }
+.tool.pinned .tool-pin { color: var(--accent-text); }
+@media (hover: none) { .tool-pin { opacity: 1; } }

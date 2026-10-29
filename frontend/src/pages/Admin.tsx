@@ -331,7 +331,7 @@ function AiStatus() {
     <>
       <h3>IA (DeepSeek) <span className={`badge ${ai.enabled ? 'green' : ''}`}><i /> {ai.enabled ? `Activa · ${ai.model}` : 'Desactivada'}</span></h3>
       {ai.enabled
-        ? <p className="muted small">Las funciones de IA aparecen en Notas, Documentos, Chat, Acciones, Votaciones, Calendario y Media Review. Solo se envía a DeepSeek el texto que cada persona decide procesar. Para desactivarla pon <code>NORA_AI_ENABLED=false</code> en <code>.env</code> y reinicia.</p>
+        ? <p className="muted small">Las funciones de IA aparecen en Notas, Documentos, Chat, Tablero, Votaciones, Calendario y Media Review. Solo se envía a DeepSeek el texto que cada persona decide procesar. Para desactivarla pon <code>NORA_AI_ENABLED=false</code> en <code>.env</code> y reinicia.</p>
         : <p className="muted small">Mientras esté desactivada, la interfaz no muestra ninguna función de IA. Para activarla, en el <code>.env</code> del servidor pon <code>NORA_AI_ENABLED=true</code> y tu clave en <code>NORA_DEEPSEEK_API_KEY</code> (de platform.deepseek.com) y ejecuta <code>docker compose up -d</code>.</p>}
     </>
   )

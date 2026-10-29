@@ -1,7 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useState, type ComponentType } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  ArrowLeft, Check, Pencil, UserX, Settings, UserCheck, X, Clapperboard, ClipboardList, Clock, Copy, FolderOpen, Hash, Monitor, PenTool, Plus, ShieldCheck,
+  ArrowLeft, Check, Pencil, UserX, Settings, UserCheck, X, Clapperboard, ClipboardList, Clock, Copy, FolderOpen, Hash, Monitor, PenTool, Pin, PinOff, ShieldCheck,
   SquareCheckBig, Trash2, MessageSquare, KanbanSquare, CalendarDays, Link2, Timer, Tv, type LucideProps,
 } from 'lucide-react'
 import { api, ApiError, type JoinRequest, type Room } from '../api'
@@ -58,8 +58,7 @@ const TOOLS: Tool[] = [
   { id: 'player', label: 'Reproductor', icon: Tv, ready: true, tone: 'red' },
   { id: 'attendance', label: 'Asistencia', icon: Monitor, ready: true, tone: 'amber' },
   { id: 'polls', label: 'Votaciones', icon: SquareCheckBig, ready: true, tone: 'teal' },
-  { id: 'actions', label: 'Acciones', icon: KanbanSquare, ready: true, tone: 'orange' },
-  { id: 'more', label: 'Más herramientas', icon: Plus, ready: false },
+  { id: 'actions', label: 'Tablero', icon: KanbanSquare, ready: true, tone: 'orange' },
 ]
 
 /** Herramientas que piden más ancho (tableros, calendario…). */
@@ -82,6 +81,13 @@ export default function RoomPage() {
   const [requests, setRequests] = useState<JoinRequest[]>([])
   const [online, setOnline] = useState<Set<string>>(new Set())
   const [chatUnread, setChatUnread] = useState(0)
+  const pinKey = `nora-pinned-tools:${user?.id ?? ''}`
+  const [pinned, setPinned] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem(`nora-pinned-tools:${user?.id ?? ''}`) ?? '[]') as string[] } catch { return [] } })
+  const togglePin = (id: string) => setPinned((l) => {
+    const next = l.includes(id) ? l.filter((x) => x !== id) : [...l, id]
+    try { localStorage.setItem(pinKey, JSON.stringify(next)) } catch { /* sin almacenamiento */ }
+    return next
+  })
   const [playerOn, setPlayerOn] = useState(false) // el Reproductor, una vez abierto, sigue montado para que no se corte el sonido
   const [playing, setPlaying] = useState(false)
   useEffect(() => { if (active === 'player') setPlayerOn(true) }, [active])
@@ -376,12 +382,16 @@ export default function RoomPage() {
       <div className="tools-wrap">
         <div className="section-title"><h3>Herramientas</h3></div>
         <div className="tools stagger">
-          {TOOLS.map((t, i) => (
-            <button key={t.id} className={`tool t-${t.id} ${t.ready ? '' : 'soon'}`} style={{ ['--i' as string]: i + 2 }} onClick={() => setActive(t.id)}>
+          {[...TOOLS].sort((a, b) => (pinned.includes(a.id) ? pinned.indexOf(a.id) : 999) - (pinned.includes(b.id) ? pinned.indexOf(b.id) : 999)).map((t, i) => (
+            <button key={t.id} className={`tool t-${t.id} ${t.ready ? '' : 'soon'} ${pinned.includes(t.id) ? 'pinned' : ''}`} style={{ ['--i' as string]: i + 2 }} onClick={() => setActive(t.id)}>
               <span className={`ico ${t.tone ? `tinted tn-${t.tone}` : ''}`}><t.icon size={22} /></span>
               <span className="tl">
                 <span>{t.label}</span>
                 {!t.ready && <small>Próximamente</small>}
+              </span>
+              <span className="tool-pin" role="button" tabIndex={0} aria-pressed={pinned.includes(t.id)} aria-label={pinned.includes(t.id) ? `Desfijar ${t.label}` : `Fijar ${t.label} arriba`} title={pinned.includes(t.id) ? 'Quitar de fijadas' : 'Fijar arriba'}
+                onClick={(e) => { e.stopPropagation(); togglePin(t.id) }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); togglePin(t.id) } }}>
+                {pinned.includes(t.id) ? <PinOff size={14} /> : <Pin size={14} />}
               </span>
               {t.id === 'player' && playing && <span className="tool-badge info" title="Sonando"><span className="pl-eq"><i /><i /><i /></span></span>}
               {t.id === 'focus' && focus.state.status === 'running' && <span className="tool-badge info mono" title="Temporizador en marcha">{fmtFocus(focus.remaining)}</span>}
