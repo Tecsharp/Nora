@@ -25,6 +25,7 @@ import AssistTool from '../assist/AssistTool'
 import ChatTool from '../tools/ChatTool'
 import TasksTool from '../tools/TasksTool'
 import PollsTool from '../tools/PollsTool'
+import MediaReviewTool from '../tools/MediaReviewTool'
 import { ASSIGNABLE, ROLE_HINT, ROLE_LABEL, type RoomRole } from '../roles'
 import { remaining } from '../time'
 import { setFilesOpen } from '../ui'
@@ -45,7 +46,7 @@ const TOOLS: Tool[] = [
   { id: 'board', label: 'Pizarra', icon: PenTool, ready: true, tone: 'violet' },
   { id: 'notes', label: 'Notas', icon: ClipboardList, ready: true, tone: 'rose' },
   { id: 'chat', label: 'Chat', icon: MessageSquare, ready: true, tone: 'cyan' },
-  { id: 'media', label: 'Media Review', icon: Clapperboard, ready: false },
+  { id: 'media', label: 'Media Review', icon: Clapperboard, ready: true, tone: 'rose' },
   { id: 'attendance', label: 'Asistencia', icon: Monitor, ready: true, tone: 'amber' },
   { id: 'polls', label: 'Votaciones', icon: SquareCheckBig, ready: true, tone: 'teal' },
   { id: 'actions', label: 'Acciones', icon: KanbanSquare, ready: true, tone: 'orange' },
@@ -401,6 +402,7 @@ export default function RoomPage() {
           {tool.id === 'files' && <FilesTool room={room} onEditDoc={openDoc} />}
           {tool.id === 'board' && <BoardsTool room={room} onOpen={openDoc} />}
           {tool.id === 'attendance' && <AssistTool room={room} online={online} />}
+          {tool.id === 'media' && <MediaReviewTool room={room} />}
           {tool.id === 'polls' && <PollsTool room={room} />}
           {tool.id === 'actions' && <TasksTool room={room} />}
           {tool.id === 'chat' && <ChatTool room={room} online={online} onSeen={markChatSeen} />}

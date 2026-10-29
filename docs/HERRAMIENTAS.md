@@ -31,3 +31,12 @@ con las flechas de la tarjeta o su menú «Mover a». Con la IA activa: **Crear 
 Votaciones de una o varias opciones, anónimas o no, con **cierre manual o automático** (1 h, 24 h, 3 días, 1 semana), resultados con barras y porcentajes **en vivo**, avatares de quienes votaron cada opción (si no es anónima),
 opción ganadora al cerrar, filtros Abiertas/Cerradas y plantilla «Sí / No / Me abstengo». Cualquier participante (también los lectores) puede votar y cambiar su voto mientras esté abierta; crear es de quien escribe; cerrar/reabrir, editar y
 borrar, de su autor o de quien modera. En las **anónimas el servidor nunca envía quién votó qué** (solo totales y el propio voto). Con la IA activa: sugerir opciones y resumir el resultado.
+
+## Media Review
+
+Revisión de **vídeo, audio e imagen** de los archivos de la sala. El reproductor salta con precisión (flechas ±5 s, Mayús ±1 s, espacio para pausar, `C` para comentar), la **línea de tiempo muestra una marca por comentario** y pulsar una marca o su hora lleva a ese
+momento. En imágenes se **señala un punto** (pin numerado). Los comentarios se pueden resolver/reabrir, editar y borrar, se filtran (todos/pendientes/resueltos), se copian como lista de cambios y, con la IA activa, se resumen. Cada archivo muestra cuántos
+comentarios tiene pendientes (o un visto si todo está resuelto). Lectores: ven y reproducen, no comentan.
+
+**Reproducción:** el navegador no puede enviar el token de sesión desde `<video>`, así que `POST /api/rooms/{code}/files/{id}/stream` devuelve una dirección **firmada y de 6 horas** (`/api/media/{token}`) que el servidor atiende **por tramos (Range, 206)** para poder saltar sin bajar el archivo entero.
+Solo se sirven tipos de audio, vídeo e imagen raster conocidos (nunca SVG ni nada ejecutable), con `nosniff`.

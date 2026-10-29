@@ -225,6 +225,9 @@ public class FileService {
         }
     }
 
+    /** El archivo de la sala (para quien ya comprobó que la persona participa). */
+    public RoomFile meta(UUID roomId, UUID fileId) { return find(roomId, fileId); }
+
     private RoomFile find(UUID roomId, UUID fileId) {
         RoomFile f = files.findById(fileId).orElseThrow(() -> ApiException.notFound("Archivo no encontrado"));
         if (!f.getRoomId().equals(roomId)) throw ApiException.notFound("Archivo no encontrado");
