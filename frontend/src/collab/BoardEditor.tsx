@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CaptureUpdateAction, DefaultSidebar, Excalidraw, MainMenu, Sidebar, convertToExcalidrawElements, exportToBlob, exportToSvg, getCommonBounds, loadFromBlob, reconcileElements, viewportCoordsToSceneCoords,
@@ -97,6 +98,14 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
   const snapSeen = useRef<boolean | null>(null)
   const [sel, setSel] = useState({ n: 0, frame: false }) // lo seleccionado: decide si se ofrece la barra de alineación
   const [snap, setSnap] = useState(() => readSnap() && typeof store.meta.get('grid') !== 'number')
+  const [sbWidth, setSbWidth] = useState(() => {
+    try {
+      return Math.min(760, Math.max(260, Number(localStorage.getItem('nora-board-sidebar')) || 302))
+    } catch {
+      return 302
+    }
+  })
+  const [sbEl, setSbEl] = useState<HTMLElement | null>(null)
   const [phone, setPhone] = useState(false) // diseño de móvil de Excalidraw: sin panel de propiedades a mano, la barra no puede pulsar sus botones
 
   const initialData = useMemo(() => {
@@ -278,7 +287,7 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
     }, LOCAL)
   }, [doc, store, toast])
 
-  const onChange = useCallback((elements: readonly OrderedExcalidrawElement[], appState: { viewBackgroundColor: string; selectedElementIds: Record<string, true>; objectsSnapModeEnabled: boolean; gridModeEnabled: boolean }, files: Record<string, BinaryFileData>) => {
+  const onChange = useCallback((elements: readonly OrderedExcalidrawElement[], appState: { viewBackgroundColor: string; selectedElementIds: Record<string, true>; objectsSnapModeEnabled: boolean; gridModeEnabled: boolean; openSidebar?: { name: string } | null }, files: Record<string, BinaryFileData>) => {
     if (root.current) {
       const live = elements.filter((e) => !e.isDeleted)
       root.current.dataset.count = String(live.length) // útil para accesibilidad y para las pruebas automáticas
@@ -294,6 +303,8 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
       board.current.selectedElementIds = picked
       publish()
     }
+    if (!appState.openSidebar) setSbEl(null)
+    else requestAnimationFrame(() => setSbEl((cur) => document.querySelector<HTMLElement>('.default-sidebar') ?? cur))
     const n = Object.keys(picked).length
     const frame = n > 1 && elements.some((e) => picked[e.id] && (e.type === 'frame' || e.type === 'magicframe'))
     setSel((s) => (s.n === n && s.frame === frame ? s : { n, frame }))
@@ -464,6 +475,28 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
     return () => ro.disconnect()
   }, [])
 
+  /** Ensancha la barra lateral de las bibliotecas arrastrando su borde izquierdo (se recuerda el ancho). */
+  const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    const box = root.current!.getBoundingClientRect()
+    let last = sbWidth
+    const move = (ev: PointerEvent) => {
+      last = Math.round(Math.min(Math.min(760, box.width - 320), Math.max(260, box.right - ev.clientX)))
+      setSbWidth(last)
+    }
+    const up = () => {
+      document.removeEventListener('pointermove', move)
+      document.removeEventListener('pointerup', up)
+      document.body.classList.remove('no-select')
+      try {
+        localStorage.setItem('nora-board-sidebar', String(last))
+      } catch { /* sin almacenamiento */ }
+    }
+    document.body.classList.add('no-select')
+    document.addEventListener('pointermove', move)
+    document.addEventListener('pointerup', up)
+  }
+
   /** Imán: igual que Alt+S de Excalidraw (y, como él, apaga la cuadrícula). */
   const toggleSnap = useCallback(() => {
     if (!api) return
@@ -483,7 +516,7 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
   }, [handle, onHandle])
 
   return (
-    <div className="board-editor" ref={root}>
+    <div className="board-editor" ref={root} style={{ ['--nora-sb' as string]: `${sbWidth}px` }}>
       <Excalidraw
         excalidrawAPI={setApi}
         initialData={initialData}
@@ -545,6 +578,12 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
           <MainMenu.DefaultItems.ChangeCanvasBackground />
         </MainMenu>
       </Excalidraw>
+      {sbEl && !phone && createPortal(
+        // dentro de la propia barra: así Excalidraw no la cierra al pulsar el asa (lo haría con un clic «fuera»)
+        <div className="board-sb-handle" role="separator" aria-orientation="vertical" aria-label="Cambiar el ancho de la barra de bibliotecas" title="Arrastra para cambiar el ancho (doble clic: ancho original)"
+          onPointerDown={startResize} onDoubleClick={() => { setSbWidth(302); try { localStorage.removeItem('nora-board-sidebar') } catch { /* nada */ } }} />,
+        sbEl,
+      )}
       {editable && !phone && sel.n > 1 && !sel.frame && (
         <div className="board-align" role="toolbar" aria-label="Alinear los elementos seleccionados" onMouseDown={(e) => e.preventDefault()}>
           <span className="board-align-title">Alinear</span>
