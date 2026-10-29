@@ -82,6 +82,12 @@ Nora puede ayudar con IA (mejorar y traducir textos, resumir, extraer tareas, cr
 interfaz: se activa a mano en el `.env` (`NORA_AI_ENABLED=true` y `NORA_DEEPSEEK_API_KEY=…`, ya vienen ahí apagadas) y `docker compose up -d`. La clave solo vive en el servidor y
 solo se envía a DeepSeek el texto que cada persona decide procesar. Detalles en [docs/IA.md](docs/IA.md).
 
+### Herramientas de la sala
+
+Además de Archivos, Pizarra y Notas, cada sala tiene: **Chat** (respuestas, reacciones, @menciones, sin leer), **Acciones** (tablero de tareas con arrastrar y soltar), **Votaciones** (anónimas, cierre automático, resultados en vivo), **Media Review** (comentarios en el momento exacto de un vídeo/audio o en un punto de una imagen),
+**Calendario** (mes y agenda, respuestas «Voy», `.ics`, recordatorios), **Enlaces** (marcadores compartidos con etiquetas), **Foco** (Pomodoro compartido con grupo de enfocados), **Reproductor** (cola sincronizada de YouTube, enlaces directos y archivos de la sala, sin cortar el sonido al cerrar la ventana) y **Asistencia** (ver/controlar pantallas).
+Con la IA activa (opcional) casi todas incorporan ayuda: resumir el chat, crear tareas o eventos desde un texto, sugerir opciones de votación, resumir comentarios de revisión… Detalles y permisos en [docs/HERRAMIENTAS.md](docs/HERRAMIENTAS.md).
+
 ### Subidas reanudables
 
 Los archivos se suben por trozos de 8 MiB con multipart de S3 (`POST /api/rooms/{code}/uploads`, `PUT …/parts/{n}`, `POST …/complete`). El servidor guarda qué trozos llegaron: si se corta internet, se cierra la pestaña o se reinicia el navegador, al volver a elegir el mismo archivo solo se envían los que faltan. El cliente sube 3 trozos en paralelo, reintenta con espera, se pausa sin conexión y detecta conexiones colgadas (20 s sin avance). Muestra porcentaje, velocidad y tiempo restante; el resto de la sala ve el avance en vivo. Las subidas abandonadas se limpian a las 24 h.
@@ -170,4 +176,4 @@ cd frontend && npm install && npm run dev
 
 ## Estado
 
-Herramientas operativas: **Archivos**, **Notas** y **Pizarra** (colaborativa, estilo Excalidraw); la edición colaborativa de documentos vive dentro de **Archivos**. **Asistencia** (ver/controlar pantallas) también está operativa. Votaciones, Media Review y Acciones aparecen como «Próximamente». La presencia y los eventos de la sala van por WebSocket.
+Herramientas operativas: **Archivos**, **Notas** y **Pizarra** (colaborativa, estilo Excalidraw); la edición colaborativa de documentos vive dentro de **Archivos**. Todas las herramientas de la sala están operativas (ver «Herramientas de la sala»). La presencia y los eventos de la sala van por WebSocket.

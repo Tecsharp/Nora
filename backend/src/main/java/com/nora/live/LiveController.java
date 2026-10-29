@@ -35,7 +35,20 @@ public class LiveController {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("serverNow", System.currentTimeMillis());
         out.put("focus", live.focusState(room.getId()));
+        out.put("player", live.playerState(room.getId()));
         return out;
+    }
+
+    @GetMapping("/player/title")
+    public Map<String, Object> title(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @org.springframework.web.bind.annotation.RequestParam String url) {
+        rooms.requireMember(p.userId(), code);
+        return Map.of("title", live.youtubeTitle(url));
+    }
+
+    @PostMapping("/player")
+    public Map<String, Object> player(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @RequestBody Map<String, Object> body) {
+        Room room = rooms.requireWriter(p.userId(), p.role(), code);
+        return live.playerAction(room.getId(), users.findById(p.userId()).orElseThrow().getDisplayName(), body);
     }
 
     @PostMapping("/focus")

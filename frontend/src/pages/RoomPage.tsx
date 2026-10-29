@@ -2,7 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useState, type ComponentType } 
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, Check, Pencil, UserX, Settings, UserCheck, X, Clapperboard, ClipboardList, Clock, Copy, FolderOpen, Hash, Monitor, PenTool, Plus, ShieldCheck,
-  SquareCheckBig, Trash2, MessageSquare, KanbanSquare, CalendarDays, Link2, Timer, type LucideProps,
+  SquareCheckBig, Trash2, MessageSquare, KanbanSquare, CalendarDays, Link2, Timer, Tv, type LucideProps,
 } from 'lucide-react'
 import { api, ApiError, type JoinRequest, type Room } from '../api'
 import { useAuth } from '../auth'
@@ -29,6 +29,7 @@ import MediaReviewTool from '../tools/MediaReviewTool'
 import CalendarTool, { useCalendarWatch } from '../tools/CalendarTool'
 import LinksTool from '../tools/LinksTool'
 import FocusTool from '../tools/FocusTool'
+import PlayerTool from '../tools/PlayerTool'
 import { fmt as fmtFocus, useFocus } from '../tools/useFocus'
 import { ASSIGNABLE, ROLE_HINT, ROLE_LABEL, type RoomRole } from '../roles'
 import { remaining } from '../time'
@@ -54,6 +55,7 @@ const TOOLS: Tool[] = [
   { id: 'calendar', label: 'Calendario', icon: CalendarDays, ready: true, tone: 'green' },
   { id: 'links', label: 'Enlaces', icon: Link2, ready: true, tone: 'cyan' },
   { id: 'focus', label: 'Foco', icon: Timer, ready: true, tone: 'violet' },
+  { id: 'player', label: 'Reproductor', icon: Tv, ready: true, tone: 'red' },
   { id: 'attendance', label: 'Asistencia', icon: Monitor, ready: true, tone: 'amber' },
   { id: 'polls', label: 'Votaciones', icon: SquareCheckBig, ready: true, tone: 'teal' },
   { id: 'actions', label: 'Acciones', icon: KanbanSquare, ready: true, tone: 'orange' },
@@ -61,7 +63,7 @@ const TOOLS: Tool[] = [
 ]
 
 /** Herramientas que piden más ancho (tableros, calendario…). */
-const XL_TOOLS = new Set(['actions', 'calendar', 'media'])
+const XL_TOOLS = new Set(['actions', 'calendar', 'media', 'player'])
 
 const DocEditor = lazy(() => import('../collab/DocEditor'))
 
@@ -80,6 +82,9 @@ export default function RoomPage() {
   const [requests, setRequests] = useState<JoinRequest[]>([])
   const [online, setOnline] = useState<Set<string>>(new Set())
   const [chatUnread, setChatUnread] = useState(0)
+  const [playerOn, setPlayerOn] = useState(false) // el Reproductor, una vez abierto, sigue montado para que no se corte el sonido
+  const [playing, setPlaying] = useState(false)
+  useEffect(() => { if (active === 'player') setPlayerOn(true) }, [active])
   const calendar = useCalendarWatch(code, user?.id)
   const focus = useFocus(code)
   const toast = useToast()
@@ -378,6 +383,7 @@ export default function RoomPage() {
                 <span>{t.label}</span>
                 {!t.ready && <small>Próximamente</small>}
               </span>
+              {t.id === 'player' && playing && <span className="tool-badge info" title="Sonando"><span className="pl-eq"><i /><i /><i /></span></span>}
               {t.id === 'focus' && focus.state.status === 'running' && <span className="tool-badge info mono" title="Temporizador en marcha">{fmtFocus(focus.remaining)}</span>}
               {t.id === 'calendar' && calendar.today > 0 && <span className="tool-badge info" aria-label={`${calendar.today} eventos hoy`} title="Eventos de hoy">{calendar.today}</span>}
               {t.id === 'chat' && chatUnread > 0 && <span className="tool-badge" aria-label={`${chatUnread} mensajes sin leer`}>{chatUnread > 99 ? '99+' : chatUnread}</span>}
@@ -408,7 +414,13 @@ export default function RoomPage() {
           onChanged={(expiresAt) => setRoom((r) => (r ? { ...r, expiresAt } : r))} />
       )}
 
-      {tool && (
+      {playerOn && (
+        <Modal title="Reproductor" icon={<Tv size={20} />} wide xl flush hidden={active !== 'player'} onClose={() => setActive(null)}>
+          <PlayerTool room={room} onPlaying={setPlaying} />
+        </Modal>
+      )}
+
+      {tool && tool.id !== 'player' && (
         <Modal title={tool.label} icon={<tool.icon size={20} />} wide={tool.ready} xl={XL_TOOLS.has(tool.id)} flush={tool.ready} onClose={() => setActive(null)}>
           {tool.id === 'files' && <FilesTool room={room} onEditDoc={openDoc} />}
           {tool.id === 'board' && <BoardsTool room={room} onOpen={openDoc} />}

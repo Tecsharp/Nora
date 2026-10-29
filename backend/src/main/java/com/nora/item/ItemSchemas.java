@@ -96,7 +96,15 @@ final class ItemSchemas {
                 out.put("title", str(d, "title", 200, false));
                 String k = (String) out.get("kind");
                 if (k.equals("file")) out.put("fileId", uuid(str(d, "fileId", 40, true)));
-                else out.put("url", url(str(d, "url", 2000, true)));
+                else {
+                    String u = url(str(d, "url", 2000, true));
+                    out.put("url", u);
+                    if (k.equals("youtube")) {
+                        String id = youtubeId(u);
+                        if (id == null) throw ApiException.badRequest("No se reconoce ese enlace de YouTube");
+                        out.put("ytId", id);
+                    }
+                }
             }
             default -> throw ApiException.badRequest("Herramienta desconocida");
         }
@@ -161,6 +169,30 @@ final class ItemSchemas {
             throw ApiException.badRequest("Fecha y hora no válidas");
         }
         return s;
+    }
+
+    private static final Pattern YT_ID = Pattern.compile("^[A-Za-z0-9_-]{11}$");
+
+    /** Identificador de un vídeo de YouTube a partir de su enlace (watch, youtu.be, shorts, embed, live); null si no lo es. */
+    static String youtubeId(String url) {
+        try {
+            java.net.URI u = java.net.URI.create(url);
+            String host = u.getHost() == null ? "" : u.getHost().toLowerCase().replaceFirst("^(www\\.|m\\.|music\\.)", "");
+            String path = u.getPath() == null ? "" : u.getPath();
+            String id = null;
+            if (host.equals("youtu.be")) id = path.replaceFirst("^/", "").split("/")[0];
+            else if (host.equals("youtube.com") || host.equals("youtube-nocookie.com")) {
+                if (path.equals("/watch") && u.getQuery() != null) {
+                    for (String kv : u.getQuery().split("&")) if (kv.startsWith("v=")) id = kv.substring(2);
+                } else {
+                    java.util.regex.Matcher m = Pattern.compile("^/(?:embed|shorts|live|v)/([^/?]+)").matcher(path);
+                    if (m.find()) id = m.group(1);
+                }
+            }
+            return id != null && YT_ID.matcher(id).matches() ? id : null;
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     private static String url(String s) {

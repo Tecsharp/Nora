@@ -59,3 +59,14 @@ Un **temporizador único para toda la sala** (Foco 25 · Descanso corto 5 · Des
 El estado vive **en memoria del servidor** (`LiveService`) y se difunde como `live.changed`; el servidor es la única fuente de la hora y cada navegador calcula lo que falta con su desfase de reloj, así que todos ven lo mismo aunque tengan el reloj mal puesto. Al terminar cada periodo el servidor avanza solo y cada navegador **avisa
 con un mensaje y un sonido** (generado con WebAudio, sin archivos; se puede apagar) aunque la herramienta esté cerrada; el **título de la pestaña** y la insignia de la herramienta muestran el tiempo mientras corre.
 Cada persona puede **unirse al grupo de foco** con una frase de en qué trabaja; si se desconecta de la sala deja de contar. Si el servidor se reinicia, el temporizador vuelve a empezar.
+
+## Reproductor sincronizado
+
+Escuchad música o mirad un vídeo **a la vez**: una **cola compartida** (YouTube, enlaces directos a audio/vídeo y archivos de la sala) y un solo reproductor cuyo play, pausa, salto, velocidad y siguiente se aplican a todas las personas. Quien llega tarde se pone solo en el punto exacto.
+Se puede cerrar la ventana y **sigue sonando** (el Reproductor permanece montado; la insignia de la herramienta muestra que suena).
+
+**Cómo se sincroniza.** El servidor (`LiveService`, en memoria) guarda «qué suena, la posición a la hora X del servidor, si está sonando y la velocidad». Cada navegador calcula dónde debería ir ahora con su desfase de reloj y corrige la deriva cada 1,5 s (si se aleja más de 1,2 s salta);
+los gestos de quien reproduce se envían al servidor y los ajenos se aplican con una ventana de silencio para no devolver el eco. Si el navegador bloquea el sonido hasta que se pulse algo, aparece «Toca para unirte a la reproducción».
+
+**YouTube y los anuncios.** Se incrusta con `youtube-nocookie.com` y se controla por `postMessage` **sin cargar ningún script de YouTube** (la política de seguridad solo permite ese iframe: `frame-src https://www.youtube-nocookie.com`). Nora **no bloquea ni salta anuncios** de YouTube (hacerlo infringe sus condiciones y se rompe a menudo): con YouTube Premium no salen,
+y en el resto de casos pueden aparecer. Lo que **nunca** tiene anuncios: los audios y vídeos de los archivos de la sala y los enlaces directos (`media-src 'self' https:`). Los títulos de YouTube se piden al servidor (oEmbed público, solo `youtube.com`).

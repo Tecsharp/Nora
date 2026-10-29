@@ -1231,3 +1231,32 @@ label.kb-search { display: flex; flex-direction: row; align-items: center; }
 @media (max-width: 760px) { .fc { grid-template-columns: 1fr; } .fc-side { border-left: 0; border-top: 1px solid var(--hairline); } .fc-time { font-size: 2.8rem; } }
 .tool-badge.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .fc-members { flex: 1; } .fc-members li { flex: none; min-height: 50px; }
+
+/* ---- Reproductor ---- */
+.pl { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 340px; overflow-y: auto; }
+.pl-main { display: flex; flex-direction: column; gap: 12px; padding: 16px; min-width: 0; }
+.pl-stage { position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: 56vh; border-radius: 18px; overflow: hidden; background: #000; box-shadow: 0 0 0 1px var(--hairline); display: grid; place-items: center; }
+.pl-frame, .pl-video { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #000; object-fit: contain; }
+.pl-audio { color: #8e86d8; display: grid; place-items: center; width: 100%; height: 100%; background: radial-gradient(circle at 50% 40%, #2a2550, #0c0b17); }
+.pl-err { color: #fff; font-size: 0.9rem; padding: 12px 18px; text-align: center; }
+.pl-join { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 10px; border: 0; background: rgba(0, 0, 0, 0.7); color: #fff; font: inherit; font-size: 1.05rem; font-weight: 700; cursor: pointer; z-index: 3; }
+.pl-empty { flex: 1; min-height: 260px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; max-width: 420px; margin: 0 auto; text-align: center; color: var(--muted); }
+.pl-bar { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 16px; background: var(--surface-2); }
+.pl-now { display: flex; flex-direction: column; min-width: 0; } .pl-now small { color: var(--muted); }
+.pl-seek { display: flex; align-items: center; gap: 10px; } .pl-seek input[type=range] { flex: 1; accent-color: var(--accent); }
+.pl-ctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .pl-ctl .spacer { flex: 1; } .pl-ctl select { width: auto; min-height: 34px; padding: 2px 26px 2px 10px; border-radius: 999px; font-size: 0.82rem; }
+.pl-vol { width: 90px; accent-color: var(--accent); }
+.pl-note { display: flex; align-items: flex-start; gap: 6px; margin: 0; font-size: 0.74rem; color: var(--muted); line-height: 1.4; } .pl-note svg { flex: none; margin-top: 2px; }
+.pl-queue { display: flex; flex-direction: column; gap: 10px; padding: 16px 14px; border-left: 1px solid var(--hairline); min-height: 0; }
+.pl-queue h4 { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 0.9rem; }
+.pl-add { display: flex; flex-direction: column; gap: 8px; }
+.pl-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; flex: 1; min-height: 120px; }
+.pl-list li { display: flex; align-items: center; gap: 4px; border-radius: 12px; flex: none; } .pl-list li.now { background: var(--accent-soft); }
+.pl-item { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; border-radius: 12px; } .pl-item:disabled { cursor: default; } .pl-item:not(:disabled):hover { background: var(--surface-2); }
+.pl-num { flex: none; width: 20px; text-align: center; font: 600 0.75rem var(--mono); color: var(--muted); }
+.pl-name { min-width: 0; display: flex; flex-direction: column; } .pl-name strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.85rem; } .pl-name small { color: var(--muted); }
+.pl-none { padding: 12px 4px; }
+.pl-eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; } .pl-eq i { width: 3px; background: var(--accent); border-radius: 2px; animation: pleq 0.9s ease-in-out infinite; } .pl-eq i:nth-child(2) { animation-delay: 0.2s; } .pl-eq i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes pleq { 0%, 100% { height: 3px; } 50% { height: 14px; } }
+@media (max-width: 860px) { .pl { grid-template-columns: 1fr; } .pl-queue { border-left: 0; border-top: 1px solid var(--hairline); } }
+.tool-badge .pl-eq i { background: var(--accent-fg); }
