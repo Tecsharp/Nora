@@ -1,6 +1,7 @@
 package com.nora.folder;
 
 import com.nora.common.ApiException;
+import com.nora.collab.CollabRepository;
 import com.nora.file.FileService;
 import com.nora.note.RoomNoteRepository;
 import com.nora.user.Role;
@@ -32,12 +33,14 @@ public class FolderService {
     private final RoomFolderRepository folders;
     private final FileService files;
     private final RoomNoteRepository notes;
+    private final CollabRepository boards;
     private final ApplicationEventPublisher events;
 
-    public FolderService(RoomFolderRepository folders, FileService files, RoomNoteRepository notes, ApplicationEventPublisher events) {
+    public FolderService(RoomFolderRepository folders, FileService files, RoomNoteRepository notes, CollabRepository boards, ApplicationEventPublisher events) {
         this.folders = folders;
         this.files = files;
         this.notes = notes;
+        this.boards = boards;
         this.events = events;
     }
 
@@ -93,6 +96,17 @@ public class FolderService {
         }
         List<UUID> deletedFiles = files.deleteInFolders(roomId, ids);
         notes.deleteByRoomIdAndFolderIdIn(roomId, ids);
+        if (f.getKind() == RoomFolder.Kind.BOARD) {
+            for (CollabRepository.InFolder b : boards.inFolders(roomId, ids)) { // las pizarras de la carpeta y su archivo .excalidraw
+                boards.delete(b.id());
+                events.publishEvent(new RoomEvent(roomId, "doc.deleted", Map.of("id", b.id())));
+                if (b.sourceFileId() != null) {
+                    try {
+                        files.delete(roomId, b.sourceFileId(), userId, true);
+                    } catch (ApiException ignored) { /* el archivo ya no existía */ }
+                }
+            }
+        }
         folders.deleteById(folderId); // las subcarpetas caen en cascada
         events.publishEvent(new RoomEvent(roomId, "folder.deleted",
                 Map.of("id", folderId, "kind", f.getKind(), "ids", new ArrayList<>(ids), "files", deletedFiles)));

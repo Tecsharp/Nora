@@ -5,7 +5,10 @@ import {
 import '@excalidraw/excalidraw/index.css'
 import type { BinaryFileData, Collaborator, ExcalidrawImperativeAPI, SocketId } from '@excalidraw/excalidraw/types'
 import type { ExcalidrawElement, OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types'
-import { FileDown, Upload } from 'lucide-react'
+import {
+  AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical, AlignVerticalDistributeCenter, ChevronDown, FileDown, Magnet, Upload,
+  type LucideIcon,
+} from 'lucide-react'
 import type { CollabProvider } from './provider'
 import { BoardStore, MAX_FILE_CHARS, type BoardElement } from './boardModel'
 import { blobToDataURL, jpegToPdf, newId, reidElements, shrinkDataURL, type BoardHandle } from './boardIO'
@@ -15,6 +18,36 @@ import { useToast } from '../toast'
 const LOCAL = 'board-local'
 const keyOf = (e: { version: number; versionNonce: number }) => `${e.version}:${e.versionNonce}`
 const LIBRARY_KEY = 'nora-board-library'
+
+const SNAP_KEY = 'nora-board-snap'
+/** El imán (ajustar al centro y a los bordes de los demás elementos) viene activado; se recuerda si alguien lo apaga. */
+const readSnap = () => {
+  try {
+    return localStorage.getItem(SNAP_KEY) !== 'off'
+  } catch {
+    return true
+  }
+}
+const saveSnap = (on: boolean) => {
+  try {
+    localStorage.setItem(SNAP_KEY, on ? 'on' : 'off')
+  } catch { /* sin almacenamiento: solo dura esta sesión */ }
+}
+
+/** Botones de alineación. Los nombres son los de Excalidraw en español: se usan para pulsar su botón nativo, que mueve también el texto ligado, las flechas y los grupos. */
+const ALIGN: ({ label: string; icon: LucideIcon; hint?: string } | null)[] = [
+  { label: 'Alinear a la izquierda', icon: AlignStartVertical, hint: 'Ctrl+Mayús+←' },
+  { label: 'Centrar horizontalmente', icon: AlignCenterVertical, hint: 'quedan en columna, con el mismo centro' },
+  { label: 'Alinear a la derecha', icon: AlignEndVertical, hint: 'Ctrl+Mayús+→' },
+  null,
+  { label: 'Alineación superior', icon: AlignStartHorizontal, hint: 'Ctrl+Mayús+↑' },
+  { label: 'Centrar verticalmente', icon: AlignCenterHorizontal, hint: 'quedan en fila, con el mismo centro' },
+  { label: 'Alineación inferior', icon: AlignEndHorizontal, hint: 'Ctrl+Mayús+↓' },
+]
+const DISTRIBUTE: { label: string; icon: LucideIcon }[] = [
+  { label: 'Distribuir horizontalmente', icon: AlignHorizontalDistributeCenter },
+  { label: 'Distribuir verticalmente', icon: AlignVerticalDistributeCenter },
+]
 
 function readLibrary() {
   try {
@@ -31,6 +64,8 @@ interface Props {
   /** El editor pide importar un archivo (menú de Excalidraw). */
   onImportRequest: () => void
   onSaveCopy: () => void
+  /** Con la barra superior del editor oculta: pulsarlo la vuelve a mostrar (el botón sale junto al imán). */
+  onShowBar?: () => void
 }
 
 /**
@@ -40,7 +75,7 @@ interface Props {
  * Excalidraw, igual que en su colaboración oficial. Los cursores, selecciones y el puntero láser de los demás llegan por la
  * presencia (awareness) del documento.
  */
-export default function BoardEditor({ provider, editable, onHandle, onImportRequest, onSaveCopy }: Props) {
+export default function BoardEditor({ provider, editable, onHandle, onImportRequest, onSaveCopy, onShowBar }: Props) {
   const doc = provider.doc
   const store = useMemo(() => new BoardStore(doc), [doc])
   const toast = useToast()
@@ -54,13 +89,18 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
   const root = useRef<HTMLDivElement>(null)
   const editableRef = useRef(editable)
   editableRef.current = editable
+  const snapSeen = useRef<boolean | null>(null)
+  const [sel, setSel] = useState({ n: 0, frame: false }) // lo seleccionado: decide si se ofrece la barra de alineación
+  const [snap, setSnap] = useState(() => readSnap() && typeof store.meta.get('grid') !== 'number')
+  const [phone, setPhone] = useState(false) // diseño de móvil de Excalidraw: sin panel de propiedades a mano, la barra no puede pulsar sus botones
 
   const initialData = useMemo(() => {
+    const grid = typeof store.meta.get('grid') === 'number'
     const els = store.ordered()
     els.forEach((e) => synced.current.set(e.id, keyOf(e)))
     return {
       elements: els as unknown as ExcalidrawElement[],
-      appState: { viewBackgroundColor: store.background, gridModeEnabled: typeof store.meta.get('grid') === 'number' },
+      appState: { viewBackgroundColor: store.background, gridModeEnabled: grid, objectsSnapModeEnabled: !grid && readSnap() },
       files: Object.fromEntries([...store.files.entries()].map(([id, f]) => [id, f])) as unknown as Record<string, BinaryFileData>,
       libraryItems: readLibrary(),
       scrollToContent: true,
@@ -71,20 +111,35 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
   useEffect(() => {
     if (!api) return
     let raf = 0
+    let fallback: ReturnType<typeof setTimeout> | undefined
+    let all = true // la primera vez se reconcilia todo; después solo lo que cambió
+    const dirty = new Set<string>()
     const apply = () => {
+      cancelAnimationFrame(raf)
+      clearTimeout(fallback)
       raf = 0
-      const remote = store.ordered()
+      fallback = undefined
+      const remote = all ? store.ordered() : [...dirty].map((id) => store.elements.get(id)).filter((e): e is BoardElement => !!e)
+      const ids = all ? null : [...dirty]
+      all = false
+      dirty.clear()
+      if (!remote.length) return
       const local = api.getSceneElementsIncludingDeleted()
       const reconciled = reconcileElements(local, remote as never, api.getAppState())
       for (const e of reconciled) {
+        if (ids && !ids.includes(e.id)) continue
         const r = store.elements.get(e.id)
         if (r && r.version === e.version && r.versionNonce === e.versionNonce) synced.current.set(e.id, keyOf(e))
       }
       api.updateScene({ elements: reconciled, captureUpdate: CaptureUpdateAction.NEVER })
     }
-    const onElements = (_ev: unknown, txn: { origin: unknown }) => {
+    const onElements = (ev: { keysChanged?: Set<string> }, txn: { origin: unknown }) => {
       if (txn.origin === LOCAL) return
+      ev.keysChanged?.forEach((k) => dirty.add(k))
+      if (!ev.keysChanged) all = true
+      // en el siguiente fotograma; si la pestaña está oculta o tapada el navegador no los da, y no se puede quedar sin verse
       if (!raf) raf = requestAnimationFrame(apply)
+      if (fallback === undefined) fallback = setTimeout(apply, 50)
     }
     const onFiles = () => {
       const have = api.getFiles()
@@ -106,8 +161,20 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
       store.files.unobserve(onFiles)
       store.meta.unobserve(onMeta)
       cancelAnimationFrame(raf)
+      clearTimeout(fallback)
     }
   }, [api, store])
+
+  // Pizarra en vivo: los cambios y los cursores salen casi sin espera (el resto de documentos agrupa más)
+  useEffect(() => {
+    const before = { flush: provider.flushMs, aw: provider.awarenessMs }
+    provider.flushMs = 8
+    provider.awarenessMs = 16
+    return () => {
+      provider.flushMs = before.flush
+      provider.awarenessMs = before.aw
+    }
+  }, [provider])
 
   // ---- escena → Yjs ----
   const timer = useRef<ReturnType<typeof setTimeout>>()
@@ -142,20 +209,30 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
     }, LOCAL)
   }, [doc, store, toast])
 
-  const onChange = useCallback((elements: readonly OrderedExcalidrawElement[], appState: { viewBackgroundColor: string; selectedElementIds: Record<string, true> }, files: Record<string, BinaryFileData>) => {
+  const onChange = useCallback((elements: readonly OrderedExcalidrawElement[], appState: { viewBackgroundColor: string; selectedElementIds: Record<string, true>; objectsSnapModeEnabled: boolean; gridModeEnabled: boolean }, files: Record<string, BinaryFileData>) => {
     if (root.current) {
       const live = elements.filter((e) => !e.isDeleted)
       root.current.dataset.count = String(live.length) // útil para accesibilidad y para las pruebas automáticas
       root.current.dataset.types = live.map((e) => e.type).join(',')
+      root.current.dataset.sig = String(Math.round(live.reduce((a, e) => a + e.x + e.y, 0))) // para las pruebas automáticas: cambia cuando algo se mueve
     }
     if (editableRef.current) {
       latest.current = { elements, bg: appState.viewBackgroundColor, files }
-      if (!timer.current) timer.current = setTimeout(flush, 60)
+      if (!timer.current) timer.current = setTimeout(flush, 0)
     }
-    const sel = appState.selectedElementIds
-    if (JSON.stringify(sel) !== JSON.stringify(board.current.selectedElementIds ?? {})) {
-      board.current.selectedElementIds = sel
+    const picked = appState.selectedElementIds
+    if (JSON.stringify(picked) !== JSON.stringify(board.current.selectedElementIds ?? {})) {
+      board.current.selectedElementIds = picked
       publish()
+    }
+    const n = Object.keys(picked).length
+    const frame = n > 1 && elements.some((e) => picked[e.id] && (e.type === 'frame' || e.type === 'magicframe'))
+    setSel((s) => (s.n === n && s.frame === frame ? s : { n, frame }))
+    // la preferencia del imán es lo que se ve en pantalla (con la cuadrícula activa, Excalidraw lo apaga solo y eso no cuenta)
+    if (snapSeen.current !== appState.objectsSnapModeEnabled) {
+      if (snapSeen.current !== null && !appState.gridModeEnabled) saveSnap(appState.objectsSnapModeEnabled)
+      snapSeen.current = appState.objectsSnapModeEnabled
+      setSnap(appState.objectsSnapModeEnabled)
     }
   }, [flush]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -173,8 +250,8 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
       pubTimer.current = undefined
       provider.awareness.setLocalStateField('board', { ...board.current })
     }
-    if (now - lastPub.current > 40) send()
-    else if (!pubTimer.current) pubTimer.current = setTimeout(send, 40)
+    if (now - lastPub.current > 16) send()
+    else if (!pubTimer.current) pubTimer.current = setTimeout(send, 16)
   }
 
   useEffect(() => {
@@ -309,6 +386,29 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
   }, [api])
 
   useEffect(() => {
+    const el = root.current
+    if (!el) return
+    const read = () => requestAnimationFrame(() => setPhone(!!el.querySelector('.excalidraw--mobile')))
+    const ro = new ResizeObserver(read)
+    ro.observe(el)
+    read()
+    return () => ro.disconnect()
+  }, [])
+
+  /** Imán: igual que Alt+S de Excalidraw (y, como él, apaga la cuadrícula). */
+  const toggleSnap = useCallback(() => {
+    if (!api) return
+    api.updateScene({ appState: { objectsSnapModeEnabled: !api.getAppState().objectsSnapModeEnabled, gridModeEnabled: false }, captureUpdate: CaptureUpdateAction.NEVER })
+  }, [api])
+
+  /** Pulsa el botón de alineación de Excalidraw (el panel de propiedades): así se mueven también el texto ligado, las flechas y los grupos. */
+  const align = useCallback((label: string) => {
+    const btn = root.current?.querySelector<HTMLButtonElement>(`.excalidraw button[aria-label="${label}"]`)
+    if (btn) btn.click()
+    else toast('No se pudo alinear. Selecciona de nuevo los elementos', 'error')
+  }, [toast])
+
+  useEffect(() => {
     onHandle(handle)
     return () => onHandle(null)
   }, [handle, onHandle])
@@ -337,10 +437,26 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
         aiEnabled={false}
         name="Pizarra"
         UIOptions={{ canvasActions: { loadScene: false, saveToActiveFile: false, export: { saveFileToDisk: true }, toggleTheme: true } }}
+        renderTopRightUI={() => (
+          <>
+            {onShowBar && (
+              <button type="button" className="board-chip on show-bar" aria-label="Mostrar la barra superior" title="Mostrar la barra superior" onClick={onShowBar}>
+                <ChevronDown size={16} /><span>Barra</span>
+              </button>
+            )}
+            {editable && (
+              <button type="button" className={`board-chip ${snap ? 'on' : ''}`} aria-pressed={snap} onClick={toggleSnap}
+                title="Imán: al mover o dibujar, los elementos se ajustan al centro y a los bordes de los demás y aparecen guías (Alt+S)">
+                <Magnet size={15} /><span>Imán</span>
+              </button>
+            )}
+          </>
+        )}
       >
         <MainMenu>
           <MainMenu.Item icon={<Upload size={16} />} onSelect={onImportRequest}>Importar archivo…</MainMenu.Item>
           <MainMenu.Item icon={<FileDown size={16} />} onSelect={onSaveCopy}>Guardar copia en la sala…</MainMenu.Item>
+          {editable && <MainMenu.Item icon={<Magnet size={16} />} onSelect={toggleSnap} selected={snap} shortcut="Alt+S">Imán: ajustar al centro y bordes</MainMenu.Item>}
           <MainMenu.DefaultItems.Export />
           <MainMenu.DefaultItems.SaveAsImage />
           <MainMenu.Separator />
@@ -352,6 +468,24 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
           <MainMenu.DefaultItems.ChangeCanvasBackground />
         </MainMenu>
       </Excalidraw>
+      {editable && !phone && sel.n > 1 && !sel.frame && (
+        <div className="board-align" role="toolbar" aria-label="Alinear los elementos seleccionados" onMouseDown={(e) => e.preventDefault()}>
+          <span className="board-align-title">Alinear</span>
+          {ALIGN.map((a, i) => a ? (
+            <button key={a.label} type="button" className="board-align-btn" aria-label={a.label} title={a.hint ? `${a.label} (${a.hint})` : a.label} onClick={() => align(a.label)}>
+              <a.icon size={17} />
+            </button>
+          ) : <span key={`sep${i}`} className="board-align-sep" />)}
+          {sel.n > 2 && (
+            <>
+              <span className="board-align-sep" />
+              {DISTRIBUTE.map((a) => (
+                <button key={a.label} type="button" className="board-align-btn" aria-label={a.label} title={a.label} onClick={() => align(a.label)}><a.icon size={17} /></button>
+              ))}
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }

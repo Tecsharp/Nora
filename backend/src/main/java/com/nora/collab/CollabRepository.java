@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class CollabRepository {
 
     public record DocRow(UUID id, UUID roomId, String kind, String name, UUID createdBy, Instant createdAt, Instant updatedAt,
-                         UUID sourceFileId, String sourceExt, long seq, long snapshotSeq, String seedState, long savedSeq, Instant savedAt, UUID savedBy, Instant thumbAt) {}
+                         UUID sourceFileId, String sourceExt, long seq, long snapshotSeq, String seedState, long savedSeq, Instant savedAt, UUID savedBy, Instant thumbAt, UUID folderId) {}
 
     public record ListRow(DocRow doc, String createdByName) {}
 
@@ -24,7 +24,7 @@ public class CollabRepository {
 
     public record VersionRow(UUID id, Instant createdAt, String createdByName, String label, long seq) {}
 
-    private static final String COLS = "id, room_id, kind, name, created_by, created_at, updated_at, source_file_id, source_ext, seq, snapshot_seq, seed_state, saved_seq, saved_at, saved_by, thumb_at";
+    private static final String COLS = "id, room_id, kind, name, created_by, created_at, updated_at, source_file_id, source_ext, seq, snapshot_seq, seed_state, saved_seq, saved_at, saved_by, thumb_at, folder_id";
     private static final int KEEP_VERSIONS = 40;
 
     private final JdbcTemplate jdbc;
@@ -38,13 +38,31 @@ public class CollabRepository {
                 r.getObject("created_by", UUID.class), r.getTimestamp("created_at").toInstant(), r.getTimestamp("updated_at").toInstant(),
                 r.getObject("source_file_id", UUID.class), r.getString("source_ext"), r.getLong("seq"), r.getLong("snapshot_seq"), r.getString("seed_state"),
                 r.getLong("saved_seq"), r.getTimestamp("saved_at") == null ? null : r.getTimestamp("saved_at").toInstant(), r.getObject("saved_by", UUID.class),
-                r.getTimestamp("thumb_at") == null ? null : r.getTimestamp("thumb_at").toInstant());
+                r.getTimestamp("thumb_at") == null ? null : r.getTimestamp("thumb_at").toInstant(), r.getObject("folder_id", UUID.class));
     }
 
-    public void insert(UUID id, UUID roomId, String kind, String name, UUID createdBy, UUID sourceFileId, String sourceExt, String seed) {
+    public void insert(UUID id, UUID roomId, String kind, String name, UUID createdBy, UUID sourceFileId, String sourceExt, String seed, UUID folderId) {
         Timestamp now = Timestamp.from(Instant.now());
-        jdbc.update("insert into collab_docs (id, room_id, kind, name, created_by, created_at, updated_at, source_file_id, source_ext, seed_content) "
-                + "values (?,?,?,?,?,?,?,?,?,?)", id, roomId, kind, name, createdBy, now, now, sourceFileId, sourceExt, seed);
+        jdbc.update("insert into collab_docs (id, room_id, kind, name, created_by, created_at, updated_at, source_file_id, source_ext, seed_content, folder_id) "
+                + "values (?,?,?,?,?,?,?,?,?,?,?)", id, roomId, kind, name, createdBy, now, now, sourceFileId, sourceExt, seed, folderId);
+    }
+
+    public void setFolder(UUID id, UUID folderId) {
+        jdbc.update("update collab_docs set folder_id = ? where id = ?", folderId, id);
+    }
+
+    /** Pizarras (id y archivo de origen) que están en alguna de estas carpetas. */
+    public record InFolder(UUID id, UUID sourceFileId) {}
+
+    public List<InFolder> inFolders(UUID roomId, java.util.Collection<UUID> folderIds) {
+        if (folderIds.isEmpty()) return List.of();
+        String in = String.join(",", java.util.Collections.nCopies(folderIds.size(), "?"));
+        Object[] args = new Object[folderIds.size() + 1];
+        args[0] = roomId;
+        int i = 1;
+        for (UUID f : folderIds) args[i++] = f;
+        return jdbc.query("select id, source_file_id from collab_docs where room_id = ? and folder_id in (" + in + ")",
+                (r, n) -> new InFolder(r.getObject(1, UUID.class), r.getObject(2, UUID.class)), args);
     }
 
     public Optional<DocRow> find(UUID id) {
@@ -58,7 +76,7 @@ public class CollabRepository {
 
     public List<ListRow> list(UUID roomId) {
         return jdbc.query("select d.id, d.room_id, d.kind, d.name, d.created_by, d.created_at, d.updated_at, d.source_file_id, d.source_ext, d.seq, "
-                        + "d.snapshot_seq, d.seed_state, d.saved_seq, d.saved_at, d.saved_by, d.thumb_at, u.display_name from collab_docs d join users u on u.id = d.created_by "
+                        + "d.snapshot_seq, d.seed_state, d.saved_seq, d.saved_at, d.saved_by, d.thumb_at, d.folder_id, u.display_name from collab_docs d join users u on u.id = d.created_by "
                         + "where d.room_id = ? order by d.updated_at desc",
                 (r, i) -> new ListRow(doc(r, i), r.getString("display_name")), roomId);
     }

@@ -115,3 +115,23 @@ export interface BoardHandle {
 }
 
 export type { BoardElement }
+
+/** Dibuja una pizarra guardada (el contenido de su .excalidraw) como PNG (con la escena incrustada), SVG o PDF, sin abrir el editor. */
+export async function renderSavedBoard(file: Blob, kind: 'png' | 'svg' | 'pdf'): Promise<Blob> {
+  const { loadFromBlob, exportToBlob, exportToSvg } = await import('@excalidraw/excalidraw')
+  const scene = await loadFromBlob(file, null, null)
+  const elements = scene.elements.filter((e) => !e.isDeleted)
+  if (!elements.length) throw new Error('La pizarra está vacía')
+  const files = scene.files ?? {}
+  const appState = { ...scene.appState, exportBackground: true, exportWithDarkMode: false, exportEmbedScene: kind !== 'pdf' }
+  if (kind === 'svg') {
+    const svg = await exportToSvg({ elements, appState, files, exportPadding: 20 })
+    return new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml' })
+  }
+  if (kind === 'png') return exportToBlob({ elements, appState, files, mimeType: 'image/png', exportPadding: 20, getDimensions: (w: number, h: number) => ({ width: w * 2, height: h * 2, scale: 2 }) })
+  const jpeg = await exportToBlob({ elements, appState, files, mimeType: 'image/jpeg', quality: 0.92, exportPadding: 20, getDimensions: (w: number, h: number) => ({ width: w * 2, height: h * 2, scale: 2 }) })
+  const bmp = await createImageBitmap(jpeg)
+  const out = await jpegToPdf(jpeg, bmp.width, bmp.height)
+  bmp.close()
+  return out
+}
