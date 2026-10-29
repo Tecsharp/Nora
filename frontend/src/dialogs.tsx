@@ -14,6 +14,8 @@ export interface ConfirmOptions {
   icon?: 'trash' | 'user-x' | 'warning' | 'info' | 'question'
   /** Pide escribir esta palabra para poder confirmar (para acciones que no se pueden deshacer). */
   typeToConfirm?: string
+  /** Solo informa: un único botón. */
+  hideCancel?: boolean
 }
 
 export interface PromptOptions {
@@ -31,6 +33,8 @@ export interface PromptOptions {
 
 interface Api {
   confirm: (o: ConfirmOptions) => Promise<boolean>
+  /** Aviso con un solo botón. */
+  notify: (o: Omit<ConfirmOptions, 'hideCancel'>) => Promise<void>
   prompt: (o: PromptOptions) => Promise<string | null>
 }
 
@@ -38,7 +42,7 @@ type Pending =
   | { kind: 'confirm'; o: ConfirmOptions; done: (v: boolean) => void }
   | { kind: 'prompt'; o: PromptOptions; done: (v: string | null) => void }
 
-const Ctx = createContext<Api>({ confirm: async () => false, prompt: async () => null })
+const Ctx = createContext<Api>({ confirm: async () => false, notify: async () => {}, prompt: async () => null })
 
 /** Diálogos de confirmación y de texto con el estilo de Nora (en lugar de los avisos del navegador). */
 export const useDialogs = () => useContext(Ctx)
@@ -49,7 +53,8 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   const [queue, setQueue] = useState<Pending[]>([])
   const confirm = useCallback((o: ConfirmOptions) => new Promise<boolean>((done) => setQueue((q) => [...q, { kind: 'confirm', o, done }])), [])
   const prompt = useCallback((o: PromptOptions) => new Promise<string | null>((done) => setQueue((q) => [...q, { kind: 'prompt', o, done }])), [])
-  const api = useRef<Api>({ confirm, prompt })
+  const notify = useCallback((o: Omit<ConfirmOptions, 'hideCancel'>) => confirm({ ...o, hideCancel: true, confirmLabel: o.confirmLabel ?? 'Entendido' }).then(() => undefined), [confirm])
+  const api = useRef<Api>({ confirm, notify, prompt })
   const current = queue[0]
   const close = (): void => setQueue((q) => q.slice(1))
 
@@ -118,7 +123,7 @@ function ConfirmDialog({ o, onDone }: { o: ConfirmOptions; onDone: (v: boolean) 
         </label>
       )}
       <div className="dlg-actions">
-        <button ref={cancel} className="btn" onClick={() => onDone(false)}>{o.cancelLabel ?? 'Cancelar'}</button>
+        {!o.hideCancel && <button ref={cancel} className="btn" onClick={() => onDone(false)}>{o.cancelLabel ?? 'Cancelar'}</button>}
         <button ref={primary} className={`btn ${tone === 'danger' ? 'danger-solid' : 'primary'}`} disabled={!ok} onClick={() => onDone(true)}>{o.confirmLabel ?? 'Aceptar'}</button>
       </div>
     </Shell>

@@ -1,7 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useState, type ComponentType } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  ArrowLeft, Check, Pencil, Settings, UserCheck, X, Clapperboard, ClipboardList, Clock, Copy, FolderOpen, Hash, Monitor, PenTool, Plus, ShieldCheck,
+  ArrowLeft, Check, Pencil, UserX, Settings, UserCheck, X, Clapperboard, ClipboardList, Clock, Copy, FolderOpen, Hash, Monitor, PenTool, Plus, ShieldCheck,
   SquareCheckBig, Trash2, Zap, type LucideProps,
 } from 'lucide-react'
 import { api, ApiError, type JoinRequest, type Room } from '../api'
@@ -138,6 +138,15 @@ export default function RoomPage() {
     })
     if (d.userId === user?.id) toast(`Tu rol en la sala ahora es: ${ROLE_LABEL[d.role]} (${ROLE_HINT[d.role].toLowerCase()})`, 'info')
   })
+  useRealtime('member.removed', (d: { userId: string; displayName: string }) => {
+    setRoom((r) => r && { ...r, participants: r.participants.filter((x) => x.userId !== d.userId) })
+    if (d.userId !== user?.id) toast(`${d.displayName} ya no está en la sala`, 'info')
+  })
+  useRealtime('member.kicked', (d: { code: string; roomName: string }) => {
+    if (d.code !== code) return
+    navigate('/')
+    void dialogs.notify({ title: 'Te han expulsado de la sala', message: <>El propietario te ha quitado de <b>{d.roomName}</b>. Si crees que es un error, pídele el código para volver a entrar.</>, tone: 'warning', icon: 'user-x' })
+  })
   useRealtime('room.closed', (d: { reason: string }) => {
     toast(d.reason === 'expired' ? 'La sala ha expirado y se han borrado sus archivos' : 'La sala ha sido cerrada', 'warning')
     navigate('/')
@@ -192,6 +201,17 @@ export default function RoomPage() {
       setRoom((r) => (r ? { ...r, participants: r.participants.map((x) => (x.userId === userId ? { ...x, role } : x)) } : r))
     } catch (err) {
       toast(err instanceof ApiError ? err.message : 'No se pudo cambiar el rol', 'error')
+    }
+  }
+
+  async function expel(userId: string, name: string) {
+    if (!await dialogs.confirm({ title: `¿Expulsar a ${name}?`, message: <>Dejará de ver la sala y su contenido al instante. Lo que haya subido o escrito se queda en la sala. Podrá volver a entrar si tiene el código{room?.settings.requireApproval ? ' y tú lo apruebas' : ''}.</>, confirmLabel: 'Expulsar', tone: 'danger', icon: 'user-x' })) return
+    try {
+      await api(`/rooms/${code}/members/${userId}`, 'DELETE')
+      setRoom((r) => r && { ...r, participants: r.participants.filter((x) => x.userId !== userId) })
+      toast(`${name} ha sido expulsado de la sala`, 'success')
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : 'No se pudo expulsar', 'error')
     }
   }
 
@@ -272,13 +292,15 @@ export default function RoomPage() {
                   <span className={`role-tag ${p.role === 'OWNER' || p.role === 'MODERATOR' ? 'strong' : ''}`}>{ROLE_LABEL[p.role]}</span>
                 </span>
                 {canAssign && p.role !== 'OWNER' && (
-                  <Menu label={`Cambiar el rol de ${p.displayName}`} items={[
+                  <Menu label={`Opciones de ${p.displayName}`} items={[
                     { heading: 'Rol en la sala' },
                     ...ASSIGNABLE.map((r) => ({
                       label: `${ROLE_LABEL[r]} · ${ROLE_HINT[r]}`,
                       icon: r === p.role ? <Check size={16} /> : <span style={{ width: 16 }} />,
                       onClick: () => void assignRole(p.userId, r),
                     })),
+                    'separator',
+                    { label: 'Expulsar de la sala', icon: <UserX size={16} />, danger: true, onClick: () => void expel(p.userId, p.displayName) },
                   ]} />
                 )}
               </span>

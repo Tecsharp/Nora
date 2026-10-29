@@ -82,10 +82,12 @@ El creador de la sala asigna a cada participante uno de estos roles desde la lis
 
 | Rol | Puede |
 |---|---|
-| **Propietario** (el creador) | Todo: asignar roles, cambiar la duración y cerrar la sala |
+| **Propietario** (el creador) | Todo: asignar roles, **expulsar participantes**, cambiar la duración y cerrar la sala |
 | **Moderador** | Subir, crear y además editar, mover y borrar el contenido de cualquiera |
 | **Colaborador** (por defecto) | Subir, crear carpetas, notas y portapapeles, y gestionar lo suyo |
 | **Lector** | Solo ver, descargar y copiar |
+
+**Expulsar** (menú «⋯» de la persona → «Expulsar de la sala», `DELETE /api/rooms/{code}/members/{userId}`): solo el propietario o un administrador; la persona sale de la lista, pierde el acceso en vivo y a los documentos abiertos al instante y recibe un aviso. Lo que subió se queda; puede volver con el código (y con aprobación si la sala la pide).
 
 Los permisos se comprueban en el servidor (un lector recibe 403 al intentar subir o modificar) y el cambio de rol llega en vivo a la persona afectada. Un administrador del sistema conserva control sobre cualquier sala en la que participe.
 

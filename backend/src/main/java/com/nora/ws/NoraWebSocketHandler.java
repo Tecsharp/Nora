@@ -222,6 +222,16 @@ public class NoraWebSocketHandler extends TextWebSocketHandler {
         presence.clearRoom(roomId);
     }
 
+    /** Expulsado de la sala: sus conexiones dejan de estar dentro de ella y de sus documentos abiertos. */
+    void evict(UUID roomId, UUID userId) {
+        for (Conn c : List.copyOf(conns.values())) {
+            if (c.userId.equals(userId) && roomId.equals(c.roomId)) {
+                collab.leaveAll(c);
+                leaveRoom(c);
+            }
+        }
+    }
+
     void closeUser(UUID userId) {
         for (Conn c : List.copyOf(conns.values())) {
             if (c.userId.equals(userId)) {

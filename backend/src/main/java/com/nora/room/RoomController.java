@@ -86,6 +86,13 @@ public class RoomController {
         return rooms.setMemberRole(p.userId(), p.role(), code, userId, req.role());
     }
 
+    /** Expulsa a un participante de la sala. Solo el propietario (o un administrador). */
+    @DeleteMapping("/{code}/members/{userId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void expel(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable java.util.UUID userId) {
+        rooms.removeMember(p.userId(), p.role(), code, userId);
+    }
+
     @DeleteMapping("/{code}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void close(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code) {

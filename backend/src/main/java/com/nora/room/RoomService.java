@@ -327,6 +327,22 @@ public class RoomService {
         return new ParticipantDto(targetId, name, presence.isOnline(room.getId(), targetId), false, role.name());
     }
 
+    /** El propietario (o un administrador) expulsa a un participante: deja de ser miembro y se le corta el acceso en vivo. */
+    @Transactional
+    public void removeMember(UUID actorId, Role sysRole, String code, UUID targetId) {
+        Room room = requireMember(actorId, code);
+        if (!room.getOwnerId().equals(actorId) && sysRole != Role.ADMIN) throw ApiException.forbidden("Solo el propietario puede expulsar a otras personas");
+        if (room.getOwnerId().equals(targetId)) throw ApiException.badRequest("No se puede expulsar al propietario de la sala");
+        if (actorId.equals(targetId)) throw ApiException.badRequest("No puedes expulsarte a ti mismo");
+        RoomMember m = members.findById(new RoomMember.Key(room.getId(), targetId))
+                .orElseThrow(() -> ApiException.notFound("Esa persona ya no participa en la sala"));
+        members.delete(m);
+        joinRequests.findByRoomIdAndUserId(room.getId(), targetId).ifPresent(joinRequests::delete);
+        String name = user(targetId).getDisplayName();
+        events.publishEvent(new UserEvent(targetId, "member.kicked", Map.of("code", room.getCode(), "roomName", room.getName())));
+        events.publishEvent(new RoomEvent(room.getId(), "member.removed", Map.of("userId", targetId, "displayName", name)));
+    }
+
     private Room openRoom(String code) {
         Room room = rooms.findByCode(normalize(code)).orElseThrow(() -> ApiException.notFound("Sala no encontrada"));
         if (room.isExpired()) throw new ApiException(org.springframework.http.HttpStatus.GONE, "La sala ha expirado");
