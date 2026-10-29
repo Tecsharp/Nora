@@ -109,20 +109,35 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
   useEffect(() => {
     if (!api) return
     let raf = 0
+    let fallback: ReturnType<typeof setTimeout> | undefined
+    let all = true // la primera vez se reconcilia todo; después solo lo que cambió
+    const dirty = new Set<string>()
     const apply = () => {
+      cancelAnimationFrame(raf)
+      clearTimeout(fallback)
       raf = 0
-      const remote = store.ordered()
+      fallback = undefined
+      const remote = all ? store.ordered() : [...dirty].map((id) => store.elements.get(id)).filter((e): e is BoardElement => !!e)
+      const ids = all ? null : [...dirty]
+      all = false
+      dirty.clear()
+      if (!remote.length) return
       const local = api.getSceneElementsIncludingDeleted()
       const reconciled = reconcileElements(local, remote as never, api.getAppState())
       for (const e of reconciled) {
+        if (ids && !ids.includes(e.id)) continue
         const r = store.elements.get(e.id)
         if (r && r.version === e.version && r.versionNonce === e.versionNonce) synced.current.set(e.id, keyOf(e))
       }
       api.updateScene({ elements: reconciled, captureUpdate: CaptureUpdateAction.NEVER })
     }
-    const onElements = (_ev: unknown, txn: { origin: unknown }) => {
+    const onElements = (ev: { keysChanged?: Set<string> }, txn: { origin: unknown }) => {
       if (txn.origin === LOCAL) return
+      ev.keysChanged?.forEach((k) => dirty.add(k))
+      if (!ev.keysChanged) all = true
+      // en el siguiente fotograma; si la pestaña está oculta o tapada el navegador no los da, y no se puede quedar sin verse
       if (!raf) raf = requestAnimationFrame(apply)
+      if (fallback === undefined) fallback = setTimeout(apply, 50)
     }
     const onFiles = () => {
       const have = api.getFiles()
@@ -144,8 +159,20 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
       store.files.unobserve(onFiles)
       store.meta.unobserve(onMeta)
       cancelAnimationFrame(raf)
+      clearTimeout(fallback)
     }
   }, [api, store])
+
+  // Pizarra en vivo: los cambios y los cursores salen casi sin espera (el resto de documentos agrupa más)
+  useEffect(() => {
+    const before = { flush: provider.flushMs, aw: provider.awarenessMs }
+    provider.flushMs = 8
+    provider.awarenessMs = 16
+    return () => {
+      provider.flushMs = before.flush
+      provider.awarenessMs = before.aw
+    }
+  }, [provider])
 
   // ---- escena → Yjs ----
   const timer = useRef<ReturnType<typeof setTimeout>>()
@@ -185,10 +212,11 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
       const live = elements.filter((e) => !e.isDeleted)
       root.current.dataset.count = String(live.length) // útil para accesibilidad y para las pruebas automáticas
       root.current.dataset.types = live.map((e) => e.type).join(',')
+      root.current.dataset.sig = String(Math.round(live.reduce((a, e) => a + e.x + e.y, 0))) // para las pruebas automáticas: cambia cuando algo se mueve
     }
     if (editableRef.current) {
       latest.current = { elements, bg: appState.viewBackgroundColor, files }
-      if (!timer.current) timer.current = setTimeout(flush, 60)
+      if (!timer.current) timer.current = setTimeout(flush, 0)
     }
     const picked = appState.selectedElementIds
     if (JSON.stringify(picked) !== JSON.stringify(board.current.selectedElementIds ?? {})) {
@@ -220,8 +248,8 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
       pubTimer.current = undefined
       provider.awareness.setLocalStateField('board', { ...board.current })
     }
-    if (now - lastPub.current > 40) send()
-    else if (!pubTimer.current) pubTimer.current = setTimeout(send, 40)
+    if (now - lastPub.current > 16) send()
+    else if (!pubTimer.current) pubTimer.current = setTimeout(send, 16)
   }
 
   useEffect(() => {

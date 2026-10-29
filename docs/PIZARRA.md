@@ -31,7 +31,8 @@ La herramienta **Pizarra** de cada sala es un lienzo infinito para dibujar, esqu
 | **Importar** | galería o menú «⋯» | Lee un `.excalidraw`/`.json`, un PNG o SVG con la escena incrustada o una imagen suelta. Dentro de una pizarra se elige **añadir** (aparece donde estás mirando, ya seleccionado) o **reemplazar todo**; ambas se pueden deshacer. |
 | **Historial** | cabecera | Versiones automáticas (cada 10 min) y manuales; restaurar una versión es un cambio más (todos la reciben y se puede deshacer). |
 | Abrir desde Archivos | un clic | Cualquier `.excalidraw` de la sala se abre como pizarra colaborativa. |
-| Galería | herramienta **Pizarra** | Miniaturas, nueva pizarra, importar, renombrar y borrar. |
+| Galería | herramienta **Pizarra** | Miniaturas, nueva pizarra, importar, renombrar, mover y borrar. |
+| **Carpetas** | galería | Pestañas «Todas», «Sin carpeta» y una por carpeta, igual que las categorías de Notas: crear, renombrar y borrar carpetas (borrar una carpeta borra sus pizarras y sus archivos `.excalidraw`), mover una pizarra desde el menú «⋯» → «Mover a», y «Nueva pizarra»/«Importar» crean dentro de la carpeta que estás viendo. Todos las ven en vivo. |
 
 Una pizarra, como cualquier otro documento de Nora, **es un archivo de la sala**: «Nueva pizarra» crea `Pizarra sin título.excalidraw` en Archivos; borrar el archivo borra la pizarra y renombrar una renombra la otra.
 
@@ -43,10 +44,10 @@ Una pizarra, como cualquier otro documento de Nora, **es un archivo de la sala**
         └──reconcileElements◀─────Y.Map observe──┴──────────────────── doc.update de B, C… ◀────────────────┘
 ```
 - **Modelo (`boardModel.ts`)**: un `Y.Map` con un valor por elemento (el JSON del elemento de Excalidraw, entero), otro con las imágenes (`id → dataURL`) y otro con el fondo/cuadrícula. El orden de apilado es el `index` fraccionario que Excalidraw asigna a cada elemento.
-- **Escena → Yjs**: cada cambio local se compara con la última versión (`version` + `versionNonce`) ya enviada de cada elemento; solo se escribe lo que cambió, agrupado cada 60 ms. Se clona el elemento antes de guardarlo (Excalidraw lo muta en sitio).
-- **Yjs → escena**: lo remoto se reconcilia con `reconcileElements` de Excalidraw, la **misma lógica de su colaboración oficial** (gana la versión mayor y se respeta lo que estás editando en ese momento). No pasa por el historial local.
+- **Escena → Yjs**: cada cambio local se compara con la última versión (`version` + `versionNonce`) ya enviada de cada elemento; solo se escribe lo que cambió, sin espera, y el proveedor lo envía a los 8 ms (los demás documentos agrupan 120 ms). Al arrastrar, los demás ven el movimiento con un retraso de un fotograma más la red. Se clona el elemento antes de guardarlo (Excalidraw lo muta en sitio).
+- **Yjs → escena**: solo se reconcilian los elementos que cambiaron (no toda la pizarra) y se aplican en el siguiente fotograma, o a los 50 ms si el navegador no da fotogramas (pestaña oculta o tapada); lo remoto se reconcilia con `reconcileElements` de Excalidraw, la **misma lógica de su colaboración oficial** (gana la versión mayor y se respeta lo que estás editando en ese momento). No pasa por el historial local.
 - **Borrado**: los elementos borrados se quedan como lápidas (`isDeleted`) para que el borrado se propague y se pueda restaurar; las de más de una semana se limpian al abrir.
-- **Presencia**: cursor, botón, selección y centro/zoom de la vista viajan por el *awareness* del documento (limitado a ~25 mensajes/s por persona).
+- **Presencia**: cursor, botón, selección y centro/zoom de la vista viajan por el *awareness* del documento (hasta ~60 mensajes/s por persona).
 - **Imágenes**: se sincronizan como `dataURL` en un mensaje; si pesan más de ~1,1 M caracteres se reducen (WebP) para la copia compartida (quien la insertó conserva la original).
 - **Servidor**: la pizarra es el cuarto tipo de documento (`BOARD`). Valida el `.excalidraw` que entra o sale (JSON con lista de `elementos`, máximo 50 000, y solo conserva elementos, imágenes y fondo/cuadrícula; descarta el estado de la vista de quien lo guardó). No necesita el conversor de oficina. Miniaturas: `PUT/GET /docs/{id}/thumbnail` (JPEG/PNG/WebP ≤ 200 KB, solo quien puede escribir la sube).
 - **Sin Internet**: las fuentes de Excalidraw se copian junto a la aplicación (`/excalidraw-assets/`) y se descarta su copia de respaldo en `esm.sh`; la CSP del gateway no se ha relajado.

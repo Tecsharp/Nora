@@ -1,6 +1,6 @@
 # Nora
 
-Aplicación web para compartir documentos y archivos de forma colaborativa en **salas temporales**: cada sala tiene un código, un tiempo de expiración, participantes conectados y un conjunto de herramientas (archivos, notas, portapapeles… y más por venir).
+Aplicación web para compartir documentos y archivos de forma colaborativa en **salas temporales**: cada sala tiene un código, un tiempo de expiración, participantes conectados y un conjunto de herramientas (archivos, notas, pizarra… y más por venir).
 
 Todo corre en Docker: clonas, ejecutas un comando y listo.
 
@@ -71,7 +71,7 @@ Las subidas corren en segundo plano: un panel flotante las muestra cuando cierra
 - **Tema claro, oscuro o del sistema** (selector en la barra superior; se recuerda en el navegador y se aplica antes de pintar para evitar parpadeos).
 - Tipografía del sistema (`-apple-system`, SF Pro en dispositivos Apple; Segoe UI/Roboto en el resto). Las fuentes SF no se incluyen porque su licencia no permite redistribuirlas. Diseño adaptable: en móvil los diálogos son hojas inferiores y las tablas se simplifican.
 - **Archivos** funciona como un explorador: carpetas anidadas, migas de pan, vista cuadrícula/lista, búsqueda, orden, renombrar, mover (menú «Mover a…» o arrastrando) y subir arrastrando archivos a la carpeta actual. Borrar una carpeta elimina todo su contenido, también del almacén S3. Se pueden subir **carpetas enteras** (botón «Subir carpeta» o arrastrándolas): se reproduce su estructura en la sala y se omiten los archivos vacíos. Las descargas solo se inician con el botón y muestran un anillo de progreso sobre el icono (cancelables; se abortan si se quedan 45 s sin datos).
-- **Portapapeles** y **Notas** admiten categorías (crear, renombrar, borrar, filtrar y mover elementos entre ellas).
+- **Notas** y **Pizarra** admiten categorías/carpetas (crear, renombrar, borrar, filtrar y mover elementos entre ellas).
 - Páginas públicas de **Términos de uso**, **Privacidad** y **Manejo de datos** (`/terms`, `/privacy`, `/data`); el registro exige aceptarlos. Son una plantilla general: quien opere la instancia debe revisarlos y adaptarlos.
 
 - **Duración de la sala**: el propietario (o un admin) puede extenderla o reducirla desde la sala o desde la lista de salas (`PATCH /api/rooms/{code}/expiry`, `{deltaMinutes}` o `{unlimited:true}`). Debe quedar al menos 1 minuto y la duración total respeta el límite de la cuenta.
@@ -133,4 +133,4 @@ cd frontend && npm install && npm run dev
 
 ## Estado
 
-Herramientas operativas: **Archivos**, **Notas**, **Portapapeles** y **Pizarra** (colaborativa, estilo Excalidraw); la edición colaborativa de documentos vive dentro de **Archivos**. Votaciones, Media Review, Asistencia y Acciones aparecen como «Próximamente». La presencia y los eventos de la sala van por WebSocket.
+Herramientas operativas: **Archivos**, **Notas** y **Pizarra** (colaborativa, estilo Excalidraw); la edición colaborativa de documentos vive dentro de **Archivos**. Votaciones, Media Review, Asistencia y Acciones aparecen como «Próximamente». La presencia y los eventos de la sala van por WebSocket.

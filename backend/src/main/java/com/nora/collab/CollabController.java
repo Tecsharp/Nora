@@ -46,9 +46,16 @@ public class CollabController {
 
     /** Abre un archivo de oficina de la sala para editarlo (lo convierte la primera vez). */
     @PostMapping("/from-file/{fileId}")
-    public DocDto fromFile(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable UUID fileId) {
+    public DocDto fromFile(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable UUID fileId,
+                           @RequestParam(required = false) UUID folderId) {
         Room room = rooms.requireMember(p.userId(), code);
-        return collab.fromFile(room, p.userId(), p.role(), fileId);
+        return collab.fromFile(room, p.userId(), p.role(), fileId, folderId);
+    }
+
+    @PutMapping("/{id}/folder")
+    public DocDto move(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable UUID id, @RequestBody MoveRequest req) {
+        Room room = rooms.requireWriter(p.userId(), p.role(), code);
+        return collab.move(room, id, p.userId(), p.role(), req.folderId());
     }
 
     @GetMapping("/{id}")

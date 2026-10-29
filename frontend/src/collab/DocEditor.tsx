@@ -29,6 +29,7 @@ export interface DocInfo {
   savedAt?: string | null
   savedByName?: string | null
   thumbAt?: string | null
+  folderId?: string | null
 }
 
 interface Props {

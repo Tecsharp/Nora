@@ -67,6 +67,9 @@ export class CollabProvider {
   private offs: (() => void)[] = []
   private pending: Uint8Array[] = []
   private inflight: { ref: string; data: Uint8Array; sentAt: number } | null = null
+  /** Espera antes de enviar los cambios locales y la presencia. Las pizarras lo bajan para que lo que se mueve se vea casi al instante. */
+  flushMs = FLUSH_MS
+  awarenessMs = 60
   private flushTimer: ReturnType<typeof setTimeout> | null = null
   private ackTimer: ReturnType<typeof setTimeout> | null = null
   private awTimer: ReturnType<typeof setTimeout> | null = null
@@ -208,7 +211,7 @@ export class CollabProvider {
     this.pending.push(update)
     this.dirtySinceVersion = true
     this.listeners.forEach((l) => l())
-    this.scheduleFlush(FLUSH_MS)
+    this.scheduleFlush(this.flushMs)
   }
 
   private scheduleFlush(ms: number) {
@@ -279,7 +282,7 @@ export class CollabProvider {
     this.awTimer = setTimeout(() => {
       this.awTimer = null
       this.sendAwareness()
-    }, 60)
+    }, this.awarenessMs)
   }
 
   private sendAwareness() {
