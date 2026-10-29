@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  CaptureUpdateAction, Excalidraw, MainMenu, convertToExcalidrawElements, exportToBlob, exportToSvg, getCommonBounds, loadFromBlob, reconcileElements, viewportCoordsToSceneCoords,
+  CaptureUpdateAction, DefaultSidebar, Excalidraw, MainMenu, Sidebar, convertToExcalidrawElements, exportToBlob, exportToSvg, getCommonBounds, loadFromBlob, reconcileElements, viewportCoordsToSceneCoords,
 } from '@excalidraw/excalidraw'
 import '@excalidraw/excalidraw/index.css'
 import type { BinaryFileData, Collaborator, ExcalidrawImperativeAPI, SocketId } from '@excalidraw/excalidraw/types'
 import type { ExcalidrawElement, OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types'
 import {
-  AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical, AlignVerticalDistributeCenter, ChevronDown, FileDown, Magnet, Upload,
+  AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical, AlignVerticalDistributeCenter, ChevronDown, FileDown, Library as LibraryIcon, Magnet, Upload,
   type LucideIcon,
 } from 'lucide-react'
 import type { CollabProvider } from './provider'
@@ -15,6 +15,7 @@ import { blobToDataURL, jpegToPdf, newId, reidElements, shrinkDataURL, type Boar
 import { useTheme } from '../theme'
 import { useToast } from '../toast'
 import { api as http } from '../api'
+import SystemLibrary, { type SysGroup, type SysItem } from './SystemLibrary'
 
 type LibItem = { id: string; status?: 'published' | 'unpublished'; elements: unknown[]; created?: number; name?: string }
 const LOCAL = 'board-local'
@@ -180,6 +181,7 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
   }, [provider])
 
   // ---- biblioteca: las del sistema (solo lectura, de todos) + la propia de esta persona en esta sala (se guarda en el servidor) ----
+  const [sysGroups, setSysGroups] = useState<SysGroup[]>([])
   const libReady = useRef(false)
   const libSaved = useRef('')
   const libTimer = useRef<ReturnType<typeof setTimeout>>()
@@ -197,9 +199,9 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
         if (!own.length) { // primera vez en el servidor: se traen las de este navegador (las que había antes de esta versión)
           own = readLibrary().map((i: LibItem) => ({ ...i, status: 'unpublished' as const }))
         }
-        const sys = system.flatMap((l) => l.items.map((i) => ({ ...i, status: 'published' as const, name: i.name ?? l.name })))
+        setSysGroups(system.map((l) => ({ id: l.id, name: l.name, items: l.items.map((i) => ({ id: i.id, name: i.name, elements: i.elements })) })))
         libSaved.current = JSON.stringify(mine.items ?? [])
-        await api.updateLibrary({ libraryItems: [...sys, ...own] as never, merge: false, defaultStatus: 'unpublished' })
+        await api.updateLibrary({ libraryItems: own as never, merge: false, defaultStatus: 'unpublished' }) // las del sistema van en su propia pestaña
         libReady.current = true
         if (own.length && !mine.items?.length) saveLibrary(own)
       } catch {
@@ -224,17 +226,24 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
   }
   useEffect(() => () => clearTimeout(libTimer.current), [])
 
-  // La sección de las bibliotecas publicadas se llama «SISTEMA» (Excalidraw la llama «Biblioteca Excalidraw»)
-  useEffect(() => {
-    const el = root.current
-    if (!el) return
-    const rename = () => el.querySelectorAll('.library-menu-items-container__header').forEach((h) => {
-      if (h.textContent?.trim() === 'Biblioteca Excalidraw') h.textContent = 'SISTEMA · Bibliotecas de Nora'
+  /** Añade un elemento de una biblioteca del sistema en el centro de lo que se está viendo (con ids nuevos). */
+  const insertSystem = useCallback((item: SysItem) => {
+    if (!api) return
+    if (!editableRef.current) return toast('Solo lectura: no puedes añadir elementos', 'warning')
+    const fresh = reidElements((item.elements as (Record<string, unknown> & { id: string })[]).filter((e) => !e.isDeleted)) as unknown as ExcalidrawElement[]
+    if (!fresh.length) return
+    const s = api.getAppState()
+    const c = viewportCoordsToSceneCoords({ clientX: s.offsetLeft + s.width / 2, clientY: s.offsetTop + s.height / 2 }, s)
+    const [x1, y1, x2, y2] = getCommonBounds(fresh)
+    const dx = c.x - (x1 + x2) / 2
+    const dy = c.y - (y1 + y2) / 2
+    const placed = fresh.map((e) => ({ ...e, x: e.x + dx, y: e.y + dy }))
+    api.updateScene({
+      elements: [...api.getSceneElementsIncludingDeleted(), ...placed] as never,
+      appState: { selectedElementIds: Object.fromEntries(placed.map((e) => [e.id, true as const])) },
+      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
     })
-    const mo = new MutationObserver(rename)
-    mo.observe(el, { childList: true, subtree: true })
-    return () => mo.disconnect()
-  }, [])
+  }, [api, toast])
 
   // ---- escena → Yjs ----
   const timer = useRef<ReturnType<typeof setTimeout>>()
@@ -515,6 +524,12 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
           </>
         )}
       >
+        <DefaultSidebar>
+          <DefaultSidebar.TabTriggers>
+            <Sidebar.TabTrigger tab="sistema"><span title="Bibliotecas del sistema" aria-label="Bibliotecas del sistema" style={{ display: 'grid', placeItems: 'center' }}><LibraryIcon size={16} /></span></Sidebar.TabTrigger>
+          </DefaultSidebar.TabTriggers>
+          <Sidebar.Tab tab="sistema"><SystemLibrary groups={sysGroups} dark={dark} onInsert={insertSystem} /></Sidebar.Tab>
+        </DefaultSidebar>
         <MainMenu>
           <MainMenu.Item icon={<Upload size={16} />} onSelect={onImportRequest}>Importar archivo…</MainMenu.Item>
           <MainMenu.Item icon={<FileDown size={16} />} onSelect={onSaveCopy}>Guardar copia en la sala…</MainMenu.Item>

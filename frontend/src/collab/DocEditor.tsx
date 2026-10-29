@@ -13,6 +13,7 @@ import { useFullscreen } from '../fullscreen'
 import { CollabProvider, colorFor } from './provider'
 import type { BoardHandle } from './boardIO'
 import { readNativeForExport, restoreNonText, restoreText, seedNonText, type Kind, type Native } from './native'
+import { fmtDate, fmtDateTime } from '../dates'
 
 const TextEditor = lazy(() => import('./TextEditor'))
 const SheetEditor = lazy(() => import('./SheetEditor'))
@@ -488,7 +489,7 @@ function ago(iso: string) {
   if (s < 45) return 'ahora'
   if (s < 3600) return `hace ${Math.max(1, Math.round(s / 60))} min`
   if (s < 86400) return `hace ${Math.round(s / 3600)} h`
-  return new Date(iso).toLocaleDateString()
+  return fmtDate(iso)
 }
 
 function HistoryPanel({ code, doc, provider, editable, onClose }: { code: string; doc: DocInfo; provider: CollabProvider; editable: boolean; editor: Editor | null; onClose: () => void }) {
@@ -536,7 +537,7 @@ function HistoryPanel({ code, doc, provider, editable, onClose }: { code: string
             <li key={v.id} className="version">
               <div className="grow" style={{ minWidth: 0 }}>
                 <strong className="small truncate" style={{ display: 'block' }}>{v.label ?? 'Versión automática'}</strong>
-                <span className="muted small">{new Date(v.createdAt).toLocaleString()} · {v.createdByName}</span>
+                <span className="muted small">{fmtDateTime(v.createdAt)} · {v.createdByName}</span>
               </div>
               {editable && <button className="btn sm" onClick={() => void restore(v)}>Restaurar</button>}
             </li>
