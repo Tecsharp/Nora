@@ -60,6 +60,22 @@ Cada editor tiene una cinta de opciones al estilo Office: **texto** (fuentes, ta
 
 La herramienta **Pizarra** de cada sala es un lienzo infinito con el editor de **Excalidraw** (todas sus herramientas: formas, flechas ligadas, texto, dibujo libre, imágenes, marcos, láser, biblioteca…) sincronizado en tiempo real por el WebSocket de Nora, con cursores con nombre, selecciones, seguimiento de otra persona y permisos de la sala. Las figuras y textos se **alinean y centran** con el imán (guías al mover), con la barra «Alinear» y con las opciones de Excalidraw, y el editor tiene **pantalla completa**. Se guarda sola; **Guardar** escribe el archivo `.excalidraw` en Archivos; se puede **descargar** (`.excalidraw`, PNG y SVG con la escena incrustada, PDF), guardar copias en la sala e **importar** `.excalidraw`, PNG/SVG con escena e imágenes. Funciona sin Internet. Detalles en [docs/PIZARRA.md](docs/PIZARRA.md).
 
+### Asistencia (ver y controlar la pantalla de otra persona)
+
+La herramienta **Asistencia** de la sala permite **ver la pantalla** de otra persona (o enseñar la tuya) y, si esa persona lo acepta, **controlar su equipo**.
+La imagen viaja **directa entre los dos navegadores** (WebRTC); el servidor de Nora solo hace de «teléfono» (señalización por el WebSocket) y comprueba
+que ambos estén en la misma sala. **Quien comparte siempre decide**: acepta cada petición, elige qué pantalla enseña (para controlar, la completa) y
+puede cortar la sesión o el control cuando quiera; mientras alguien controla se ve un aviso rojo.
+
+- **Solo ver:** funciona con cualquier navegador de escritorio, sin instalar nada.
+- **Controlar:** un navegador no puede mover el ratón de un equipo, así que quien comparte instala el **agente de escritorio** (`agent/`, Rust, un ejecutable
+  para Windows, macOS y Linux) que se vincula con su cuenta con un código de un solo uso y solo aplica clics/teclas mientras haya un control concedido desde Nora.
+  Los binarios se compilan con `agent/build.sh` o el flujo `.github/workflows/agent.yml` y se copian a `agent/dist/` (el gateway los sirve en `/downloads/`).
+- **Redes:** por defecto usa un STUN público (`NORA_STUN_URLS`); para redes estrictas (empresas, 4G) activa el servidor TURN incluido:
+  define `NORA_TURN_SECRET` y `NORA_TURN_URLS=turn:TU-IP:3478` en `.env` y arranca con `docker compose --profile turn up -d` (abre 3478 y 49160-49200 UDP).
+
+Detalles técnicos, protocolo y límites en [docs/ASISTENCIA.md](docs/ASISTENCIA.md).
+
 ### Subidas reanudables
 
 Los archivos se suben por trozos de 8 MiB con multipart de S3 (`POST /api/rooms/{code}/uploads`, `PUT …/parts/{n}`, `POST …/complete`). El servidor guarda qué trozos llegaron: si se corta internet, se cierra la pestaña o se reinicia el navegador, al volver a elegir el mismo archivo solo se envían los que faltan. El cliente sube 3 trozos en paralelo, reintenta con espera, se pausa sin conexión y detecta conexiones colgadas (20 s sin avance). Muestra porcentaje, velocidad y tiempo restante; el resto de la sala ve el avance en vivo. Las subidas abandonadas se limpian a las 24 h.
@@ -148,4 +164,4 @@ cd frontend && npm install && npm run dev
 
 ## Estado
 
-Herramientas operativas: **Archivos**, **Notas** y **Pizarra** (colaborativa, estilo Excalidraw); la edición colaborativa de documentos vive dentro de **Archivos**. Votaciones, Media Review, Asistencia y Acciones aparecen como «Próximamente». La presencia y los eventos de la sala van por WebSocket.
+Herramientas operativas: **Archivos**, **Notas** y **Pizarra** (colaborativa, estilo Excalidraw); la edición colaborativa de documentos vive dentro de **Archivos**. **Asistencia** (ver/controlar pantallas) también está operativa. Votaciones, Media Review y Acciones aparecen como «Próximamente». La presencia y los eventos de la sala van por WebSocket.

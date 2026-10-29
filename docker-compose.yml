@@ -65,6 +65,11 @@ services:
       NORA_DEFAULT_ROOM_MINUTES: ${NORA_DEFAULT_ROOM_MINUTES:-120}
       NORA_DEFAULT_MAX_ROOMS: ${NORA_DEFAULT_MAX_ROOMS:-5}
       NORA_DEFAULT_MAX_PARTICIPANTS: ${NORA_DEFAULT_MAX_PARTICIPANTS:-25}
+      # Asistencia (ver/controlar pantalla): servidores para que los navegadores se conecten entre sí. Sin TURN funciona en la misma red y en la
+      # mayoría de redes domésticas; con redes más estrictas (empresas, 4G) conviene activar el servicio coturn (perfil «turn», ver README).
+      NORA_STUN_URLS: ${NORA_STUN_URLS:-stun:stun.l.google.com:19302}
+      NORA_TURN_URLS: ${NORA_TURN_URLS:-}
+      NORA_TURN_SECRET: ${NORA_TURN_SECRET:-}
     read_only: true
     tmpfs:
       - /tmp:size=1g
@@ -107,10 +112,25 @@ services:
       frontend: { condition: service_started }
     ports:
       - "${NORA_BIND:-0.0.0.0}:${NORA_PORT:-29817}:8080"
+    volumes:
+      - ./agent/dist:/srv/downloads:ro   # binarios del agente de Asistencia (ver agent/README.md)
     read_only: true
     tmpfs:
       - /tmp
     networks: [edge]
+
+  # Servidor TURN para Asistencia (opcional): ayuda a conectar a las personas que están detrás de redes estrictas.
+  # Se activa con:  docker compose --profile turn up -d   y definiendo NORA_TURN_URLS=turn:TU-IP:3478 y NORA_TURN_SECRET en .env.
+  # Usa la red del equipo (necesita un rango de puertos UDP para retransmitir); abre 3478 y 49160-49200 (UDP) en el cortafuegos.
+  coturn:
+    profiles: ["turn"]
+    image: coturn/coturn:4.6
+    restart: unless-stopped
+    network_mode: host
+    command: >
+      -n --realm=nora --use-auth-secret --static-auth-secret=${NORA_TURN_SECRET:-} --listening-port=3478
+      --min-port=49160 --max-port=49200 --fingerprint --no-cli --no-tls --no-dtls --no-multicast-peers
+      --denied-peer-ip=10.0.0.0-10.255.255.255 --denied-peer-ip=172.16.0.0-172.31.255.255 --denied-peer-ip=192.168.0.0-192.168.255.255
 
 networks:
   edge: {}

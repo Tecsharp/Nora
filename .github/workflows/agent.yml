@@ -1,0 +1,34 @@
+name: Agente de Asistencia
+
+# Compila el agente de escritorio para Windows, macOS y Linux. Los binarios quedan como artefactos del flujo;
+# cópialos a agent/dist/ con estos nombres para que Nora los ofrezca en Asistencia → «Descárgalo».
+on:
+  workflow_dispatch:
+  push:
+    paths: ["agent/**"]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - { os: windows-latest, bin: nora-agent.exe, out: nora-agent-windows.exe }
+          - { os: macos-latest, bin: nora-agent, out: nora-agent-macos }
+          - { os: ubuntu-22.04, bin: nora-agent, out: nora-agent-linux }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencias de Linux (X11)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libxdo-dev
+      - run: cargo build --release
+      - name: Renombrar
+        shell: bash
+        run: cp "target/release/${{ matrix.bin }}" "${{ matrix.out }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.out }}
+          path: agent/${{ matrix.out }}

@@ -19,6 +19,9 @@ import BoardsTool from '../components/BoardsTool'
 import type { DocInfo } from '../collab/DocEditor'
 import { canWrite as canWriteIn } from '../roles'
 import NotesTool from '../components/NotesTool'
+import { AssistProvider } from '../assist/AssistProvider'
+import AssistOverlay from '../assist/AssistOverlay'
+import AssistTool from '../assist/AssistTool'
 import { ASSIGNABLE, ROLE_HINT, ROLE_LABEL, type RoomRole } from '../roles'
 import { remaining } from '../time'
 import { setFilesOpen } from '../ui'
@@ -39,7 +42,7 @@ const TOOLS: Tool[] = [
   { id: 'board', label: 'Pizarra', icon: PenTool, ready: true, tone: 'violet' },
   { id: 'notes', label: 'Notas', icon: ClipboardList, ready: true, tone: 'rose' },
   { id: 'media', label: 'Media Review', icon: Clapperboard, ready: false },
-  { id: 'attendance', label: 'Asistencia', icon: Monitor, ready: false },
+  { id: 'attendance', label: 'Asistencia', icon: Monitor, ready: true, tone: 'amber' },
   { id: 'polls', label: 'Votaciones', icon: SquareCheckBig, ready: false },
   { id: 'actions', label: 'Acciones', icon: Zap, ready: false },
   { id: 'more', label: 'Más herramientas', icon: Plus, ready: false },
@@ -237,6 +240,7 @@ export default function RoomPage() {
   const canAssign = room.isOwner || user?.role === 'ADMIN'
 
   return (
+    <AssistProvider>
     <div className="room">
       <header className="room-top">
         <Link to="/" className="btn ghost sm"><ArrowLeft size={15} /> Mis salas</Link>
@@ -369,6 +373,7 @@ export default function RoomPage() {
         <Modal title={tool.label} icon={<tool.icon size={20} />} wide={tool.ready} flush={tool.ready} onClose={() => setActive(null)}>
           {tool.id === 'files' && <FilesTool room={room} onEditDoc={openDoc} />}
           {tool.id === 'board' && <BoardsTool room={room} onOpen={openDoc} />}
+          {tool.id === 'attendance' && <AssistTool room={room} online={online} />}
           {tool.id === 'notes' && <NotesTool room={room} kind="NOTE" placeholder="Escribe una nota para la sala…" />}
           {!tool.ready && (
             <div className="empty">
@@ -379,6 +384,8 @@ export default function RoomPage() {
           )}
         </Modal>
       )}
+      <AssistOverlay />
     </div>
+    </AssistProvider>
   )
 }
