@@ -43,6 +43,7 @@ export default function Menu({ items, label = 'Más acciones', trigger }: { item
   return (
     <span className="menu-anchor" ref={wrap} onClick={(e) => e.stopPropagation()}>
       <button
+        type="button"
         className={trigger ? 'menu-trigger' : 'icon-btn sm'}
         aria-label={label}
         aria-haspopup="menu"
@@ -70,7 +71,7 @@ export default function Menu({ items, label = 'Más acciones', trigger }: { item
             ) : 'heading' in it ? (
               <div key={i} className="menu-title">{it.heading}</div>
             ) : (
-              <button key={i} role="menuitem" className={it.danger ? 'danger' : ''}
+              <button key={i} type="button" role="menuitem" className={it.danger ? 'danger' : ''}
                 onClick={() => {
                   setOpen(false)
                   it.onClick()

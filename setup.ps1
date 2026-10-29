@@ -31,6 +31,13 @@ function Ensure-Var([string]$name, [string]$value) {
 Ensure-Var 'NORA_GARAGE_RPC_SECRET' (-join ((1..64) | ForEach-Object { '{0:x}' -f (Get-Random -Maximum 16) }))
 Ensure-Var 'NORA_GARAGE_ADMIN_TOKEN' (New-Secret 48)
 Ensure-Var 'NORA_CONVERTER_TOKEN' (New-Secret 40)
+# IA (DeepSeek): se deja DESACTIVADA en el .env para que se active a mano (ver .env.example)
+function Add-IfMissing([string]$name, [string]$value) {
+  if (Select-String -Path .env -Pattern "^$name=" -Quiet) { return }
+  Add-Content .env "$name=$value"
+}
+Add-IfMissing 'NORA_AI_ENABLED' 'false'
+Add-IfMissing 'NORA_DEEPSEEK_API_KEY' ''
 
 docker compose up -d --build
 if ($LASTEXITCODE -ne 0) {

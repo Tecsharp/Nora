@@ -10,6 +10,7 @@ import { useDialogs } from '../dialogs'
 import { useToast } from '../toast'
 import AdminLibraries from '../components/AdminLibraries'
 import { fmtDate, fmtShortMonth } from '../dates'
+import { useAi } from '../ai/AiProvider'
 
 interface Row {
   user: User
@@ -318,7 +319,21 @@ function SystemSettings() {
         {num('maxParticipants', 'Participantes por sala', 'personas', 2)}
       </div>
       <div><button className="btn primary" disabled={busy} onClick={() => void save()}>{busy ? 'Guardando…' : 'Guardar ajustes'}</button></div>
+      <AiStatus />
     </section>
+  )
+}
+
+/** Estado de la IA (se activa a mano en el .env del servidor; aquí solo se consulta). */
+function AiStatus() {
+  const ai = useAi()
+  return (
+    <>
+      <h3>IA (DeepSeek) <span className={`badge ${ai.enabled ? 'green' : ''}`}><i /> {ai.enabled ? `Activa · ${ai.model}` : 'Desactivada'}</span></h3>
+      {ai.enabled
+        ? <p className="muted small">Las funciones de IA aparecen en Notas, Documentos, Chat, Acciones, Votaciones, Calendario y Media Review. Solo se envía a DeepSeek el texto que cada persona decide procesar. Para desactivarla pon <code>NORA_AI_ENABLED=false</code> en <code>.env</code> y reinicia.</p>
+        : <p className="muted small">Mientras esté desactivada, la interfaz no muestra ninguna función de IA. Para activarla, en el <code>.env</code> del servidor pon <code>NORA_AI_ENABLED=true</code> y tu clave en <code>NORA_DEEPSEEK_API_KEY</code> (de platform.deepseek.com) y ejecuta <code>docker compose up -d</code>.</p>}
+    </>
   )
 }
 

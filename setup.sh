@@ -30,6 +30,14 @@ ensure() {
 ensure NORA_GARAGE_RPC_SECRET "$(hex 64)"
 ensure NORA_GARAGE_ADMIN_TOKEN "$(rand 48)"
 ensure NORA_CONVERTER_TOKEN "$(rand 40)"
+# IA (DeepSeek): se deja DESACTIVADA en el .env para que se active a mano (ver .env.example)
+add_if_missing() {
+  grep -Eq "^$1=" .env && return 0
+  [ -n "$(tail -c1 .env)" ] && echo >> .env
+  echo "$1=$2" >> .env
+}
+add_if_missing NORA_AI_ENABLED false
+add_if_missing NORA_DEEPSEEK_API_KEY ""
 
 docker compose up -d --build
 PORT="$(grep -E '^NORA_PORT=' .env | cut -d= -f2 | cut -d' ' -f1)"

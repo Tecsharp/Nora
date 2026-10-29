@@ -9,6 +9,9 @@ import { useDialogs } from '../dialogs'
 import { fmtDateTime } from '../dates'
 import { useMarquee } from '../marquee'
 import Menu, { type MenuItem } from './Menu'
+import AiAssist, { TEXT_ACTIONS, type AiAction } from '../ai/AiAssist'
+import { useTextareaAi } from '../ai/useTextareaAi'
+import { FileText as FileTextIcon } from 'lucide-react'
 import Modal from './Modal'
 
 interface Note {
@@ -38,6 +41,12 @@ const NOTES_MIME = 'application/x-nora-notes'
 const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name)
 
 /** Notas de la sala organizadas en carpetas (anidadas), con búsqueda, selección múltiple y arrastrar para mover. */
+const NOTE_ACTIONS: AiAction[] = [
+  ...TEXT_ACTIONS.slice(0, 8),
+  { id: 'meeting', label: 'Convertir en acta de reunión', task: 'meeting_notes', icon: <FileTextIcon size={16} />, group: 'Entender' },
+  ...TEXT_ACTIONS.slice(8),
+]
+
 export default function NotesTool({ room, kind, placeholder, copyable }: Props) {
   const { user } = useAuth()
   const toast = useToast()
@@ -52,7 +61,11 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
   const [creating, setCreating] = useState(false)
   const [folderName, setFolderName] = useState('')
   const [editing, setEditing] = useState<Note | null>(null)
+  const composerRef = useRef<HTMLTextAreaElement>(null)
+  const editorRef = useRef<HTMLTextAreaElement>(null)
   const [draft, setDraft] = useState('')
+  const composerAi = useTextareaAi(composerRef, text, setText)
+  const editorAi = useTextareaAi(editorRef, draft, setDraft)
   const [draftFolder, setDraftFolder] = useState('')
   const [saving, setSaving] = useState(false)
   const [sel, setSel] = useState<Set<string>>(new Set())
@@ -300,10 +313,13 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
       {!canWrite && <p className="callout small" style={{ margin: '12px 16px 0' }}>Tu rol en esta sala es de <strong>lector</strong>: puedes ver y copiar, pero no añadir ni modificar.</p>}
       {canWrite && (
         <form className="composer" onSubmit={add}>
-          <textarea rows={3} maxLength={20000} required placeholder={placeholder} aria-label="Contenido" value={text} onChange={(e) => setText(e.target.value)} />
+          <textarea ref={composerRef} rows={3} maxLength={20000} required placeholder={placeholder} aria-label="Contenido" value={text} onChange={(e) => setText(e.target.value)} />
           <div className="row spread">
             <span className="muted small">Se añadirá en «{where(current)}»</span>
-            <button className="btn primary sm" disabled={!text.trim()}><Plus size={15} /> Añadir</button>
+            <span className="row">
+              <AiAssist actions={NOTE_ACTIONS} getText={composerAi.getText} onApply={composerAi.onApply} disabled={!text.trim()} />
+              <button className="btn primary sm" disabled={!text.trim()}><Plus size={15} /> Añadir</button>
+            </span>
           </div>
         </form>
       )}
@@ -432,6 +448,7 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
           footer={
             <>
               {copyable && <button className="btn ghost" onClick={() => void copy(editing)}><Copy size={15} /> Copiar</button>}
+              {canTouch(editing.authorId) && <AiAssist actions={NOTE_ACTIONS} getText={editorAi.getText} onApply={editorAi.onApply} />}
               <span className="grow" />
               <button className="btn ghost" onClick={() => setEditing(null)}>{canTouch(editing.authorId) || canWrite ? 'Cancelar' : 'Cerrar'}</button>
               {(canTouch(editing.authorId) || canWrite) && (
@@ -439,7 +456,7 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
               )}
             </>
           }>
-          <textarea rows={12} maxLength={20000} aria-label="Contenido" value={draft} readOnly={!canTouch(editing.authorId)}
+          <textarea ref={editorRef} rows={12} maxLength={20000} aria-label="Contenido" value={draft} readOnly={!canTouch(editing.authorId)}
             onChange={(e) => setDraft(e.target.value)} style={{ minHeight: 220 }} autoFocus />
           {canWrite && (
             <label>

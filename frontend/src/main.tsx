@@ -17,6 +17,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { AuthProvider } from './auth'
+import { AiProvider } from './ai/AiProvider'
 import { RealtimeProvider } from './realtime'
 import { ThemeProvider } from './theme'
 import { ToastProvider } from './toast'
@@ -31,7 +32,9 @@ createRoot(document.getElementById('root')!).render(
         <DialogProvider>
         <AuthProvider>
           <RealtimeProvider>
-            <App />
+            <AiProvider>
+              <App />
+            </AiProvider>
           </RealtimeProvider>
         </AuthProvider>
         </DialogProvider>

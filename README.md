@@ -76,6 +76,12 @@ puede cortar la sesión o el control cuando quiera; mientras alguien controla se
 
 Detalles técnicos, protocolo y límites en [docs/ASISTENCIA.md](docs/ASISTENCIA.md).
 
+### IA con DeepSeek (opcional)
+
+Nora puede ayudar con IA (mejorar y traducir textos, resumir, extraer tareas, crear eventos desde una frase…) usando **DeepSeek**. Viene **desactivada** y sin rastro en la
+interfaz: se activa a mano en el `.env` (`NORA_AI_ENABLED=true` y `NORA_DEEPSEEK_API_KEY=…`, ya vienen ahí apagadas) y `docker compose up -d`. La clave solo vive en el servidor y
+solo se envía a DeepSeek el texto que cada persona decide procesar. Detalles en [docs/IA.md](docs/IA.md).
+
 ### Subidas reanudables
 
 Los archivos se suben por trozos de 8 MiB con multipart de S3 (`POST /api/rooms/{code}/uploads`, `PUT …/parts/{n}`, `POST …/complete`). El servidor guarda qué trozos llegaron: si se corta internet, se cierra la pestaña o se reinicia el navegador, al volver a elegir el mismo archivo solo se envían los que faltan. El cliente sube 3 trozos en paralelo, reintenta con espera, se pausa sin conexión y detecta conexiones colgadas (20 s sin avance). Muestra porcentaje, velocidad y tiempo restante; el resto de la sala ve el avance en vivo. Las subidas abandonadas se limpian a las 24 h.
