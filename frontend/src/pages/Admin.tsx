@@ -5,6 +5,7 @@ import { api, ApiError, formatBytes, type Limits, type User } from '../api'
 import { useAuth } from '../auth'
 import Avatar from '../components/Avatar'
 import Modal from '../components/Modal'
+import AdminLibraries from '../components/AdminLibraries'
 
 interface Row {
   user: User
@@ -222,6 +223,7 @@ export default function Admin() {
       </div>
 
       <StorageCard />
+      <AdminLibraries />
 
       <div className="row">
         <div className="input-icon grow" style={{ maxWidth: 360 }}>

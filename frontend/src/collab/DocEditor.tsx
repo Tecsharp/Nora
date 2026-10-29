@@ -425,7 +425,7 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
                 {everReady && (
                   doc.kind === 'DOC' ? <TextEditor provider={provider} editable={editable} onEditor={setEditor} />
                   : doc.kind === 'SHEET' ? <SheetEditor provider={provider} editable={editable} />
-                  : doc.kind === 'BOARD' ? <BoardEditor provider={provider} editable={editable} onHandle={setBoard} onImportRequest={() => fileInput.current?.click()} onSaveCopy={() => void exportAs('excalidraw', 'new')} onShowBar={barHidden ? () => setBar(false) : undefined} />
+                  : doc.kind === 'BOARD' ? <BoardEditor provider={provider} editable={editable} onHandle={setBoard} onImportRequest={() => fileInput.current?.click()} onSaveCopy={() => void exportAs('excalidraw', 'new')} onShowBar={barHidden ? () => setBar(false) : undefined} roomCode={code} />
                   : <SlidesEditor provider={provider} editable={editable} />
                 )}
               </Suspense>

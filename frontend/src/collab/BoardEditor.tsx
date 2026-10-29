@@ -14,7 +14,9 @@ import { BoardStore, MAX_FILE_CHARS, type BoardElement } from './boardModel'
 import { blobToDataURL, jpegToPdf, newId, reidElements, shrinkDataURL, type BoardHandle } from './boardIO'
 import { useTheme } from '../theme'
 import { useToast } from '../toast'
+import { api as http } from '../api'
 
+type LibItem = { id: string; status?: 'published' | 'unpublished'; elements: unknown[]; created?: number; name?: string }
 const LOCAL = 'board-local'
 const keyOf = (e: { version: number; versionNonce: number }) => `${e.version}:${e.versionNonce}`
 const LIBRARY_KEY = 'nora-board-library'
@@ -51,7 +53,7 @@ const DISTRIBUTE: { label: string; icon: LucideIcon }[] = [
 
 function readLibrary() {
   try {
-    return JSON.parse(localStorage.getItem(LIBRARY_KEY) ?? '[]') as never[]
+    return JSON.parse(localStorage.getItem(LIBRARY_KEY) ?? '[]') as LibItem[]
   } catch {
     return []
   }
@@ -66,6 +68,8 @@ interface Props {
   onSaveCopy: () => void
   /** Con la barra superior del editor oculta: pulsarlo la vuelve a mostrar (el botón sale junto al imán). */
   onShowBar?: () => void
+  /** Código de la sala: la biblioteca personal se guarda por persona y sala. */
+  roomCode: string
 }
 
 /**
@@ -75,7 +79,7 @@ interface Props {
  * Excalidraw, igual que en su colaboración oficial. Los cursores, selecciones y el puntero láser de los demás llegan por la
  * presencia (awareness) del documento.
  */
-export default function BoardEditor({ provider, editable, onHandle, onImportRequest, onSaveCopy, onShowBar }: Props) {
+export default function BoardEditor({ provider, editable, onHandle, onImportRequest, onSaveCopy, onShowBar, roomCode }: Props) {
   const doc = provider.doc
   const store = useMemo(() => new BoardStore(doc), [doc])
   const toast = useToast()
@@ -102,7 +106,6 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
       elements: els as unknown as ExcalidrawElement[],
       appState: { viewBackgroundColor: store.background, gridModeEnabled: grid, objectsSnapModeEnabled: !grid && readSnap() },
       files: Object.fromEntries([...store.files.entries()].map(([id, f]) => [id, f])) as unknown as Record<string, BinaryFileData>,
-      libraryItems: readLibrary(),
       scrollToContent: true,
     }
   }, [store])
@@ -175,6 +178,63 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
       provider.awarenessMs = before.aw
     }
   }, [provider])
+
+  // ---- biblioteca: las del sistema (solo lectura, de todos) + la propia de esta persona en esta sala (se guarda en el servidor) ----
+  const libReady = useRef(false)
+  const libSaved = useRef('')
+  const libTimer = useRef<ReturnType<typeof setTimeout>>()
+  useEffect(() => {
+    if (!api) return
+    let alive = true
+    void (async () => {
+      try {
+        const [system, mine] = await Promise.all([
+          http<{ id: string; name: string; items: LibItem[] }[]>('/libraries/system'),
+          http<{ items: LibItem[] }>(`/rooms/${roomCode}/library`),
+        ])
+        if (!alive) return
+        let own = (mine.items ?? []).map((i) => ({ ...i, status: 'unpublished' as const }))
+        if (!own.length) { // primera vez en el servidor: se traen las de este navegador (las que había antes de esta versión)
+          own = readLibrary().map((i: LibItem) => ({ ...i, status: 'unpublished' as const }))
+        }
+        const sys = system.flatMap((l) => l.items.map((i) => ({ ...i, status: 'published' as const, name: i.name ?? l.name })))
+        libSaved.current = JSON.stringify(mine.items ?? [])
+        await api.updateLibrary({ libraryItems: [...sys, ...own] as never, merge: false, defaultStatus: 'unpublished' })
+        libReady.current = true
+        if (own.length && !mine.items?.length) saveLibrary(own)
+      } catch {
+        libReady.current = false // sin conexión con el servidor: se queda con lo que haya en el navegador
+        const local = readLibrary()
+        if (local.length) await api.updateLibrary({ libraryItems: local as never, merge: false, defaultStatus: 'unpublished' }).catch(() => undefined)
+      }
+    })()
+    return () => { alive = false }
+  }, [api, roomCode]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function saveLibrary(items: LibItem[]) {
+    const body = JSON.stringify(items)
+    if (body === libSaved.current) return
+    if (body.length > 100 * 1024 * 1024) return toast('Tu biblioteca de esta sala supera el máximo de 100 MB', 'error')
+    clearTimeout(libTimer.current)
+    libTimer.current = setTimeout(() => {
+      http(`/rooms/${roomCode}/library`, 'PUT', items)
+        .then(() => { libSaved.current = body })
+        .catch((e) => toast(e instanceof Error ? e.message : 'No se pudo guardar tu biblioteca', 'error'))
+    }, 1500)
+  }
+  useEffect(() => () => clearTimeout(libTimer.current), [])
+
+  // La sección de las bibliotecas publicadas se llama «SISTEMA» (Excalidraw la llama «Biblioteca Excalidraw»)
+  useEffect(() => {
+    const el = root.current
+    if (!el) return
+    const rename = () => el.querySelectorAll('.library-menu-items-container__header').forEach((h) => {
+      if (h.textContent?.trim() === 'Biblioteca Excalidraw') h.textContent = 'SISTEMA · Bibliotecas de Nora'
+    })
+    const mo = new MutationObserver(rename)
+    mo.observe(el, { childList: true, subtree: true })
+    return () => mo.disconnect()
+  }, [])
 
   // ---- escena → Yjs ----
   const timer = useRef<ReturnType<typeof setTimeout>>()
@@ -428,9 +488,11 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
           publish()
         }}
         onLibraryChange={(items) => {
-          try {
-            localStorage.setItem(LIBRARY_KEY, JSON.stringify(items))
-          } catch { /* sin almacenamiento: la biblioteca solo dura esta sesión */ }
+          const mine = (items as unknown as LibItem[]).filter((i) => i.status !== 'published') // las del sistema no se guardan como propias
+          if (libReady.current) saveLibrary(mine)
+          else try {
+            localStorage.setItem(LIBRARY_KEY, JSON.stringify(mine)) // sin servidor, al menos en este navegador
+          } catch { /* sin almacenamiento */ }
         }}
         langCode="es-ES"
         theme={dark ? 'dark' : 'light'}

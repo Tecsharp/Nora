@@ -36,6 +36,10 @@ La herramienta **Pizarra** de cada sala es un lienzo infinito para dibujar, esqu
 
 Una pizarra, como cualquier otro documento de Nora, **es un archivo de la sala**: «Nueva pizarra» crea `Pizarra sin título.excalidraw` en Archivos; borrar el archivo borra la pizarra y renombrar una renombra la otra.
 
+**Bibliotecas de elementos:**
+- **SISTEMA**: el administrador sube archivos `.excalidrawlib` desde el panel de administración («Bibliotecas de la pizarra (SISTEMA)») y aparecen en la pizarra de **todas las salas** bajo la sección «SISTEMA · Bibliotecas de Nora», en solo lectura (`GET /api/libraries/system`; alta y baja en `/api/admin/libraries`, hasta 30 MB cada una).
+- **Propia**: lo que cada persona añade a su biblioteca se guarda en el servidor **por persona y sala** (`GET/PUT /api/rooms/{code}/library`), así que la tiene en cualquier navegador mientras la sala exista (se borra con ella). Máximo **100 MB** por persona y sala. La primera vez se traen las que ya hubiera en ese navegador.
+
 ## Cómo funciona
 
 ```
