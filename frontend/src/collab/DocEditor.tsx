@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import type { Editor } from '@tiptap/react'
-import { Check, ChevronDown, Copy, Download, FileText, History, Loader2, Maximize2, Minimize2, PenTool, Presentation, Save, Sheet, Upload, X } from 'lucide-react'
+import { Check, ChevronDown, Copy, Download, FileText, History, Fullscreen, Loader2, Maximize2, Minimize2, PenTool, Presentation, Save, Sheet, Upload, X } from 'lucide-react'
 import { ApiError, api, getAccessToken } from '../api'
 import { useAuth } from '../auth'
 import Avatar from '../components/Avatar'
@@ -71,6 +71,19 @@ export default function DocEditor(props: Props) {
 function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props & { provider: CollabProvider }) {
   const toast = useToast()
   const fullscreen = useFullscreen()
+  const [wide, setWide] = useState(() => {
+    try {
+      return localStorage.getItem('nora-editor-wide') === '1'
+    } catch {
+      return false
+    }
+  })
+  const toggleWide = () => setWide((w) => {
+    try {
+      localStorage.setItem('nora-editor-wide', w ? '0' : '1')
+    } catch { /* sin almacenamiento */ }
+    return !w
+  })
 
   const snap = useSyncExternalStore(
     useCallback((l) => provider.subscribe(l), [provider]),
@@ -345,7 +358,7 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
   const status = state === 'offline' || state === 'connecting' ? 'Sin conexión: se reanudará solo' : unsaved === 'true' ? 'Sincronizando…' : state === 'syncing' ? 'Sincronizando…' : 'Sincronizado'
 
   return createPortal(
-    <div className="modal-backdrop docapp-backdrop">
+    <div className={`modal-backdrop docapp-backdrop ${wide ? 'wide' : ''}`}>
       <div className="docapp" role="dialog" aria-modal="true" aria-label={`Editor: ${name}`}>
         <header className="docapp-head">
           <span className="docapp-ico"><Icon size={20} /></span>
@@ -371,10 +384,13 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
           )}
           <input ref={fileInput} type="file" hidden accept=".excalidraw,.json,application/json,image/png,image/jpeg,image/webp,image/gif,image/svg+xml" aria-label="Importar archivo"
             onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setImporting(f) }} />
+          <button className="icon-btn" aria-label={wide ? 'Volver al tamaño normal' : 'Ocupar toda la ventana'} title={wide ? 'Volver al tamaño normal' : 'Ocupar toda la ventana'} aria-pressed={wide} onClick={toggleWide}>
+            {wide ? <Minimize2 size={19} /> : <Maximize2 size={19} />}
+          </button>
           {fullscreen.supported && (
-            <button className="icon-btn" aria-label={fullscreen.active ? 'Salir de pantalla completa' : 'Pantalla completa'} title={fullscreen.active ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'} aria-pressed={fullscreen.active}
+            <button className="icon-btn" aria-label={fullscreen.active ? 'Salir de pantalla completa' : 'Pantalla completa'} title={fullscreen.active ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa de la pantalla'} aria-pressed={fullscreen.active}
               onClick={() => void fullscreen.toggle().catch(() => toast('Tu navegador no permitió la pantalla completa', 'error'))}>
-              {fullscreen.active ? <Minimize2 size={19} /> : <Maximize2 size={19} />}
+              <Fullscreen size={19} />
             </button>
           )}
           <button className="icon-btn" aria-label="Cerrar el editor" onClick={requestClose}><X size={20} /></button>
