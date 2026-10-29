@@ -9,6 +9,8 @@ import { useToast } from '../toast'
 import { canWrite as canWriteIn, isStaff as isStaffIn } from '../roles'
 import AiAssist, { type AiAction } from '../ai/AiAssist'
 import { fmtDateTime } from '../dates'
+import { loadFile, prefetchFile } from '../fileCache'
+import { mimeFor } from '../preview'
 import { fmtTime, mediaKind, streamUrl, useRoomFiles, type MediaKind, type RoomFileLite } from './media'
 import { useItems, type Item } from './useItems'
 
@@ -37,7 +39,7 @@ export default function MediaReviewTool({ room, focus }: { room: Room; focus?: F
   const media = useMemo(() => files.filter((f) => mediaKind(f.name)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)), [files])
   const [fileId, setFileId] = useState<string | null>(null)
   const [q, setQ] = useState('')
-  const [src, setSrc] = useState<{ url: string; loading: boolean; error: string }>({ url: '', loading: false, error: '' })
+  const [src, setSrc] = useState<{ url: string; loading: boolean; error: string; progress?: number }>({ url: '', loading: false, error: '' })
   const [time, setTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [playing, setPlaying] = useState(false)
@@ -61,14 +63,24 @@ export default function MediaReviewTool({ room, focus }: { room: Room; focus?: F
     if (c) flash(`#mr-c-${c.id}`)
   })
 
-  // dirección de reproducción firmada al elegir el archivo
+  // al elegir el archivo: las imágenes salen de la caché (o se descargan una vez, con progreso); el audio y el vídeo usan su dirección firmada
   useEffect(() => {
     if (!file) return
     let alive = true
-    setSrc({ url: '', loading: true, error: '' })
+    let objectUrl = ''
+    setSrc({ url: '', loading: true, error: '', progress: 0 })
     setTime(0); setDuration(0); setPlaying(false); setPin(null)
-    streamUrl(room.code, file.id).then((r) => alive && setSrc({ url: r.url, loading: false, error: '' }))
-      .catch((e) => alive && setSrc({ url: '', loading: false, error: e instanceof Error ? e.message : 'No se pudo abrir el archivo' }))
+    if (kind === 'image') {
+      const h = loadFile(room.code, file.id, (l, t) => alive && setSrc((s) => (s.loading ? { ...s, progress: t ? l / t : 0 } : s)), mimeFor(file.name, 'image'))
+      h.promise.then((b) => { if (!alive) return; objectUrl = URL.createObjectURL(b); setSrc({ url: objectUrl, loading: false, error: '', progress: 1 }) })
+        .catch((e) => { if (alive && !(e instanceof DOMException && e.name === 'AbortError')) setSrc({ url: '', loading: false, error: e instanceof Error ? e.message : 'No se pudo abrir el archivo', progress: 0 }) })
+      // las vecinas de la lista se dejan listas en segundo plano
+      const at = media.findIndex((f) => f.id === file.id)
+      for (const f of [media[at + 1], media[at + 2], media[at - 1]]) if (f && mediaKind(f.name) === 'image') prefetchFile(room.code, f.id, f.sizeBytes, mimeFor(f.name, 'image'))
+      return () => { alive = false; h.cancel(); if (objectUrl) URL.revokeObjectURL(objectUrl) }
+    }
+    streamUrl(room.code, file.id).then((r) => alive && setSrc({ url: r.url, loading: false, error: '', progress: 1 }))
+      .catch((e) => alive && setSrc({ url: '', loading: false, error: e instanceof Error ? e.message : 'No se pudo abrir el archivo', progress: 0 }))
     return () => { alive = false }
   }, [file?.id, room.code]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -203,7 +215,7 @@ export default function MediaReviewTool({ room, focus }: { room: Room; focus?: F
         {file && kind && (
           <>
             <div className="mr-view">
-              {src.loading && <div className="mr-load">Preparando…</div>}
+              {src.loading && <div className="mr-load">{kind === 'image' && src.progress ? `Cargando imagen ${Math.round(src.progress * 100)}%` : 'Preparando…'}</div>}
               {src.error && <div className="mr-err"><TriangleAlert size={20} />{src.error}</div>}
               {src.url && kind === 'video' && (
                 <video key={src.url} ref={el} src={src.url} controls playsInline preload="metadata"

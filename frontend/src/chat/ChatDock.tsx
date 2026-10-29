@@ -117,8 +117,12 @@ function DockWindow({ conv, min }: { conv: Conv; min: boolean }) {
   const sub = useConvSubtitle(conv)
   const [info, setInfo] = useState(false)
   return (
-    <section className={`cwin ${min ? 'min' : ''}`} aria-label={`Chat con ${chat.title(conv)}`}>
-      <header className="cwin-head" onClick={() => chat.toggleMin(conv.id)}>
+    <section className={`cwin ${min ? 'min' : ''}`} aria-label={`Chat con ${chat.title(conv)}`}
+      onKeyDown={(e) => {
+        // Esc cierra la ventana, salvo que lo haya usado algo de dentro (cancelar respuesta, menciones…) o venga de un diálogo abierto encima
+        if (e.key === 'Escape' && !e.defaultPrevented && e.currentTarget.contains(e.target as Node)) { e.stopPropagation(); chat.closeWindow(conv.id) }
+      }}>
+      <header className="cwin-head" tabIndex={0} onClick={() => chat.toggleMin(conv.id)}>
         <ConvAvatar conv={conv} size={30} />
         <span className="cwin-title">
           <b className="truncate">{chat.title(conv)}</b>

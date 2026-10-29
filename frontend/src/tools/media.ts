@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { memo } from '../fileCache'
 import { api } from '../api'
 import { useRealtime } from '../realtime'
 
@@ -39,7 +40,7 @@ export function useRoomFiles(code: string) {
 
 /** Dirección firmada y temporal para reproducir un archivo de la sala (el reproductor no puede enviar el token de sesión). */
 export async function streamUrl(code: string, fileId: string) {
-  return api<{ url: string; contentType: string; name: string; size: number }>(`/rooms/${encodeURIComponent(code)}/files/${fileId}/stream`, 'POST')
+  return memo(`stream:${code}/${fileId}`, () => api<{ url: string; contentType: string; name: string; size: number }>(`/rooms/${encodeURIComponent(code)}/files/${fileId}/stream`, 'POST'))
 }
 
 /** 75 → 1:15 · 3725 → 1:02:05 */

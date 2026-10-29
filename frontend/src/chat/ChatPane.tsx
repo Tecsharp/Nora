@@ -212,6 +212,7 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
   }
 
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (emojis && e.key === 'Escape') { e.stopPropagation(); return setEmojis(false) }
     if (mention) {
       if (e.key === 'ArrowDown') { e.preventDefault(); return setPick((p) => (p + 1) % mention.opts.length) }
       if (e.key === 'ArrowUp') { e.preventDefault(); return setPick((p) => (p - 1 + mention.opts.length) % mention.opts.length) }

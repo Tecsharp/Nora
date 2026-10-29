@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
+import { clearFileCache } from './fileCache'
 import { api, refreshSession, setAccessToken, setSessionLostHandler, type User } from './api'
 
 interface AuthState {
@@ -33,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await api('/auth/logout', 'POST')
     } finally {
+      clearFileCache()
       setAccessToken(null)
       setUser(null)
     }
