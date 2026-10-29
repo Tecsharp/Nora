@@ -412,7 +412,7 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
           <button className="icon-btn" aria-label="Cerrar el editor" onClick={requestClose}><X size={20} /></button>
         </header>
 
-        {barHidden && <button className="docapp-handle" aria-label="Mostrar la barra superior" title="Mostrar la barra superior" onClick={() => setBar(false)}><ChevronDown size={16} /></button>}
+        {barHidden && doc.kind !== 'BOARD' && <button className="docapp-handle" aria-label="Mostrar la barra superior" title="Mostrar la barra superior" onClick={() => setBar(false)}><ChevronDown size={16} /></button>}
         <div className="docapp-body">
           <div className="docapp-main">
             {deleted ? (
@@ -424,7 +424,7 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
                 {everReady && (
                   doc.kind === 'DOC' ? <TextEditor provider={provider} editable={editable} onEditor={setEditor} />
                   : doc.kind === 'SHEET' ? <SheetEditor provider={provider} editable={editable} />
-                  : doc.kind === 'BOARD' ? <BoardEditor provider={provider} editable={editable} onHandle={setBoard} onImportRequest={() => fileInput.current?.click()} onSaveCopy={() => void exportAs('excalidraw', 'new')} />
+                  : doc.kind === 'BOARD' ? <BoardEditor provider={provider} editable={editable} onHandle={setBoard} onImportRequest={() => fileInput.current?.click()} onSaveCopy={() => void exportAs('excalidraw', 'new')} onShowBar={barHidden ? () => setBar(false) : undefined} />
                   : <SlidesEditor provider={provider} editable={editable} />
                 )}
               </Suspense>

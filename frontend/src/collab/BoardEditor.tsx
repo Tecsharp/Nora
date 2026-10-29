@@ -6,7 +6,7 @@ import '@excalidraw/excalidraw/index.css'
 import type { BinaryFileData, Collaborator, ExcalidrawImperativeAPI, SocketId } from '@excalidraw/excalidraw/types'
 import type { ExcalidrawElement, OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types'
 import {
-  AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical, AlignVerticalDistributeCenter, FileDown, Magnet, Upload,
+  AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical, AlignVerticalDistributeCenter, ChevronDown, FileDown, Magnet, Upload,
   type LucideIcon,
 } from 'lucide-react'
 import type { CollabProvider } from './provider'
@@ -64,6 +64,8 @@ interface Props {
   /** El editor pide importar un archivo (menú de Excalidraw). */
   onImportRequest: () => void
   onSaveCopy: () => void
+  /** Con la barra superior del editor oculta: pulsarlo la vuelve a mostrar (el botón sale junto al imán). */
+  onShowBar?: () => void
 }
 
 /**
@@ -73,7 +75,7 @@ interface Props {
  * Excalidraw, igual que en su colaboración oficial. Los cursores, selecciones y el puntero láser de los demás llegan por la
  * presencia (awareness) del documento.
  */
-export default function BoardEditor({ provider, editable, onHandle, onImportRequest, onSaveCopy }: Props) {
+export default function BoardEditor({ provider, editable, onHandle, onImportRequest, onSaveCopy, onShowBar }: Props) {
   const doc = provider.doc
   const store = useMemo(() => new BoardStore(doc), [doc])
   const toast = useToast()
@@ -435,12 +437,21 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
         aiEnabled={false}
         name="Pizarra"
         UIOptions={{ canvasActions: { loadScene: false, saveToActiveFile: false, export: { saveFileToDisk: true }, toggleTheme: true } }}
-        renderTopRightUI={() => editable ? (
-          <button type="button" className={`board-chip ${snap ? 'on' : ''}`} aria-pressed={snap} onClick={toggleSnap}
-            title="Imán: al mover o dibujar, los elementos se ajustan al centro y a los bordes de los demás y aparecen guías (Alt+S)">
-            <Magnet size={15} /><span>Imán</span>
-          </button>
-        ) : null}
+        renderTopRightUI={() => (
+          <>
+            {onShowBar && (
+              <button type="button" className="board-chip on show-bar" aria-label="Mostrar la barra superior" title="Mostrar la barra superior" onClick={onShowBar}>
+                <ChevronDown size={16} /><span>Barra</span>
+              </button>
+            )}
+            {editable && (
+              <button type="button" className={`board-chip ${snap ? 'on' : ''}`} aria-pressed={snap} onClick={toggleSnap}
+                title="Imán: al mover o dibujar, los elementos se ajustan al centro y a los bordes de los demás y aparecen guías (Alt+S)">
+                <Magnet size={15} /><span>Imán</span>
+              </button>
+            )}
+          </>
+        )}
       >
         <MainMenu>
           <MainMenu.Item icon={<Upload size={16} />} onSelect={onImportRequest}>Importar archivo…</MainMenu.Item>
