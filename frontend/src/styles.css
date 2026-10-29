@@ -760,3 +760,8 @@ table.table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 .btn.danger-solid:hover { background: color-mix(in oklab, var(--red) 88%, #000); }
 .btn.danger-solid:disabled { opacity: 0.45; cursor: not-allowed; }
 @media (max-width: 860px) { .dlg-backdrop { align-items: center; padding: 16px; } }
+
+.prep-note { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; margin-bottom: 10px; border-radius: 14px; background: var(--accent-soft); color: var(--accent-text); }
+.prep-note svg { flex: none; margin-top: 2px; }
+.prep-note span { display: flex; flex-direction: column; gap: 2px; }
+.prep-note small { font-size: 0.8rem; opacity: 0.85; line-height: 1.4; }

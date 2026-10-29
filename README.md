@@ -91,6 +91,8 @@ El creador de la sala asigna a cada participante uno de estos roles desde la lis
 
 Los permisos se comprueban en el servidor (un lector recibe 403 al intentar subir o modificar) y el cambio de rol llega en vivo a la persona afectada. Un administrador del sistema conserva control sobre cualquier sala en la que participe.
 
+**Archivos grandes y carpetas:** si el navegador comprime lo elegido en un `.zip` (Safari lo hace con carpetas y paquetes como `.app`, `.pages` o `.key`) y tarda en entregarlo, Nora muestra «Comprimiendo lo que elegiste…» con un indicador y explica que se subirá como `.zip`; al soltar una carpeta muestra «Leyendo la carpeta…». La compresión la hace el navegador, no Nora, así que no hay porcentaje, solo el aviso de que está ocurriendo.
+
 ### Visor de documentos
 
 Al hacer clic en un archivo (o con el botón del ojo) se abre un visor con navegación entre los documentos de la carpeta (flechas del teclado o en pantalla): **imágenes** (JPG, PNG, GIF, WebP, AVIF, SVG…), **PDF** (con zoom, dibujado con pdf.js en el navegador) y **texto/código** (se muestra como texto plano, nunca se ejecuta). Todo se lee por la API autenticada y se muestra con URLs `blob:` locales; la CSP del gateway solo añade `blob:` para imágenes y workers. Los **vídeos no se previsualizan, solo se descargan**: reproducirlos exigiría transcodificarlos en el servidor (ffmpeg), algo que Nora no incluye por ahora.

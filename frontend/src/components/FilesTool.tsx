@@ -90,6 +90,8 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
   const { user } = useAuth()
   const toast = useToast()
   const dialogs = useDialogs()
+  const [zipping, setZipping] = useState(false) // el navegador está comprimiendo lo elegido (se ve como un .zip)
+  const [reading, setReading] = useState(false) // leyendo una carpeta soltada
   const mine = useUploads().filter((i) => i.code === room.code)
   const [files, setFiles] = useState<FileItem[]>([])
   const [folders, setFolders] = useState<FolderItem[]>([])
@@ -211,12 +213,14 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
   async function onPick() {
     setError('')
     // Las subidas viven en un gestor global: cerrar el explorador no las interrumpe.
-    for (const { file, handle } of await pickFiles()) uploads.add(room.code, file, handle, current)
+    const picked = await pickFiles(setZipping)
+    for (const { file, handle } of picked) uploads.add(room.code, file, handle, current)
+    if (picked.some((x) => /\.zip$/i.test(x.file.name) && x.file.type === 'application/zip')) toast('Los archivos .zip se suben tal cual, comprimidos', 'info')
   }
 
   async function onPickFolder() {
     setError('')
-    const picked = await pickFolder()
+    const picked = await pickFolder(setZipping)
     if (picked.length > 0) await uploadCollected(collectFromFiles(picked), current)
   }
 
@@ -415,7 +419,10 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
     // Las entradas del drop solo son válidas durante el evento: se capturan antes de cualquier espera.
     const entries = entriesFromDrop(e.dataTransfer.items)
     const plain = Array.from(e.dataTransfer.files)
-    if (entries.length > 0) void collectFromEntries(entries).then((c) => uploadCollected(c, folderId)).catch(() => setError('No se pudo leer la carpeta soltada'))
+    if (entries.length > 0) {
+      setReading(true)
+      void collectFromEntries(entries).then((c) => uploadCollected(c, folderId)).catch(() => setError('No se pudo leer la carpeta soltada')).finally(() => setReading(false))
+    }
     else for (const file of plain) uploads.add(room.code, file, undefined, folderId)
   }
 
@@ -601,6 +608,17 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
       <div className={`ex-body ${dragOver ? 'dragging' : ''}`}>
         {!canWrite && <p className="callout small" style={{ marginBottom: 10 }}>Tu rol en esta sala es de <strong>lector</strong>: puedes ver y descargar, pero no subir ni modificar.</p>}
         {error && <p className="error small" role="alert">{error}</p>}
+        {(zipping || reading) && (
+          <div className="prep-note" role="status">
+            <Loader2 size={20} className="spin-icon" />
+            <span>
+              <strong>{zipping ? 'Comprimiendo lo que elegiste…' : 'Leyendo la carpeta…'}</strong>
+              <small>{zipping
+                ? 'Tu navegador está preparando el archivo antes de entregarlo a Nora. Las carpetas y los paquetes (.app, .pages, .key…) y los archivos muy grandes se comprimen en un .zip, y se subirán como .zip. Puede tardar unos segundos; la subida empieza sola al terminar.'
+                : 'Estoy recorriendo sus archivos y subcarpetas para subirlos. Con carpetas grandes puede tardar un poco.'}</small>
+            </span>
+          </div>
+        )}
 
         {mine.map((i) => (
           <div key={i.key} className="upload-item">
