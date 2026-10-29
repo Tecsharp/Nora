@@ -2,7 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useState, type ComponentType } 
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, Check, Pencil, UserX, Settings, UserCheck, X, Clapperboard, ClipboardList, Clock, Copy, FolderOpen, Hash, Monitor, PenTool, Plus, ShieldCheck,
-  SquareCheckBig, Trash2, Zap, type LucideProps,
+  SquareCheckBig, Trash2, Zap, MessageSquare, type LucideProps,
 } from 'lucide-react'
 import { api, ApiError, type JoinRequest, type Room } from '../api'
 import { useAuth } from '../auth'
@@ -22,6 +22,7 @@ import NotesTool from '../components/NotesTool'
 import { AssistProvider } from '../assist/AssistProvider'
 import AssistOverlay from '../assist/AssistOverlay'
 import AssistTool from '../assist/AssistTool'
+import ChatTool from '../tools/ChatTool'
 import { ASSIGNABLE, ROLE_HINT, ROLE_LABEL, type RoomRole } from '../roles'
 import { remaining } from '../time'
 import { setFilesOpen } from '../ui'
@@ -41,6 +42,7 @@ const TOOLS: Tool[] = [
   { id: 'files', label: 'Archivos', icon: FolderOpen, ready: true, tone: 'blue' },
   { id: 'board', label: 'Pizarra', icon: PenTool, ready: true, tone: 'violet' },
   { id: 'notes', label: 'Notas', icon: ClipboardList, ready: true, tone: 'rose' },
+  { id: 'chat', label: 'Chat', icon: MessageSquare, ready: true, tone: 'cyan' },
   { id: 'media', label: 'Media Review', icon: Clapperboard, ready: false },
   { id: 'attendance', label: 'Asistencia', icon: Monitor, ready: true, tone: 'amber' },
   { id: 'polls', label: 'Votaciones', icon: SquareCheckBig, ready: false },
@@ -64,6 +66,7 @@ export default function RoomPage() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [requests, setRequests] = useState<JoinRequest[]>([])
   const [online, setOnline] = useState<Set<string>>(new Set())
+  const [chatUnread, setChatUnread] = useState(0)
   const toast = useToast()
   const dialogs = useDialogs()
   const status = useRtStatus()
@@ -126,6 +129,24 @@ export default function RoomPage() {
       return next
     })
     if (d.userId !== user?.id) toast(`${d.displayName} ${d.online ? 'se ha conectado' : 'se ha desconectado'}`, 'info')
+  })
+  // mensajes del chat sin leer: los que llegan con el chat cerrado y los que había desde la última vez
+  const chatSeenKey = `nora-chat-seen:${code}`
+  const markChatSeen = useCallback(() => {
+    try { localStorage.setItem(chatSeenKey, new Date().toISOString()) } catch { /* sin almacenamiento */ }
+    setChatUnread(0)
+  }, [chatSeenKey])
+  useEffect(() => {
+    if (!room) return
+    let seen = ''
+    try { seen = localStorage.getItem(chatSeenKey) ?? '' } catch { /* sin almacenamiento */ }
+    if (!seen) { markChatSeen(); return }
+    api<{ authorId: string | null; createdAt: string }[]>(`/rooms/${encodeURIComponent(code)}/items/chat?limit=50`)
+      .then((l) => setChatUnread(l.filter((m) => m.createdAt > seen && m.authorId !== user?.id).length)).catch(() => undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room?.id])
+  useRealtime('item.changed', (d: { tool: string; op: string; item: { authorId: string | null } }) => {
+    if (d.tool === 'chat' && d.op === 'created' && d.item.authorId !== user?.id) setChatUnread((n) => (active === 'chat' ? 0 : n + 1))
   })
   useRealtime('member.joined', (d: { displayName: string }) => {
     toast(`${d.displayName} se ha unido a la sala`, 'success')
@@ -342,6 +363,7 @@ export default function RoomPage() {
                 <span>{t.label}</span>
                 {!t.ready && <small>Próximamente</small>}
               </span>
+              {t.id === 'chat' && chatUnread > 0 && <span className="tool-badge" aria-label={`${chatUnread} mensajes sin leer`}>{chatUnread > 99 ? '99+' : chatUnread}</span>}
             </button>
           ))}
         </div>
@@ -374,6 +396,7 @@ export default function RoomPage() {
           {tool.id === 'files' && <FilesTool room={room} onEditDoc={openDoc} />}
           {tool.id === 'board' && <BoardsTool room={room} onOpen={openDoc} />}
           {tool.id === 'attendance' && <AssistTool room={room} online={online} />}
+          {tool.id === 'chat' && <ChatTool room={room} online={online} onSeen={markChatSeen} />}
           {tool.id === 'notes' && <NotesTool room={room} kind="NOTE" placeholder="Escribe una nota para la sala…" />}
           {!tool.ready && (
             <div className="empty">

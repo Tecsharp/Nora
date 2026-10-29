@@ -7,13 +7,15 @@ interface Props {
   icon?: ReactNode
   onClose: () => void
   wide?: boolean
+  /** Aún más ancho (tableros, calendario). */
+  xl?: boolean
   flush?: boolean
   footer?: ReactNode
   children: ReactNode
 }
 
 /** Diálogo accesible: se cierra con Esc o tocando fuera, bloquea el scroll de fondo y devuelve el foco al cerrar. */
-export default function Modal({ title, icon, onClose, wide, flush, footer, children }: Props) {
+export default function Modal({ title, icon, onClose, wide, xl, flush, footer, children }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const closeRef = useRef(onClose)
   closeRef.current = onClose
@@ -38,7 +40,7 @@ export default function Modal({ title, icon, onClose, wide, flush, footer, child
 
   return createPortal(
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={ref} className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}>
+      <div ref={ref} className={`modal ${wide || xl ? 'wide' : ''} ${xl ? 'xl' : ''}`} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}>
         <div className="modal-head">
           <h2>
             {icon}
