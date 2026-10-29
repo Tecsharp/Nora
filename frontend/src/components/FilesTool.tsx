@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import {
   ChevronRight, Download, X, File, FileArchive, FileAudio, FileCode, FileImage, FileText, FileVideo, Folder, PenTool, Presentation, Sheet, FilePlus2, ChevronDown, FolderInput, FolderPlus, FolderUp, Eye, Loader2,
-  House, LayoutGrid, List, Pencil, Search, Trash2, Upload,
+  House, LayoutGrid, List, Pencil, Search, Square, SquareCheck, Trash2, Upload,
 } from 'lucide-react'
 import { api, ApiError, downloadWithProgress, formatBytes, type DownloadHandle, type Room } from '../api'
 import { useAuth } from '../auth'
@@ -11,6 +11,7 @@ import { collectFromEntries, collectFromFiles, entriesFromDrop, type Collected }
 import { useRealtime } from '../realtime'
 import { useToast } from '../toast'
 import { useDialogs } from '../dialogs'
+import { useMarquee } from '../marquee'
 import { fingerprintOf } from '../uploader'
 import { isEditable, previewKind } from '../preview'
 import type { DocInfo } from '../collab/DocEditor'
@@ -114,6 +115,9 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
   const [dl, setDl] = useState<Record<string, { loaded: number; total: number }>>({})
   const dlHandles = useRef(new Map<string, DownloadHandle>())
   const foldersRef = useRef<FolderItem[]>([])
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const [sel, setSel] = useState<Set<string>>(new Set())
+  const [anchor, setAnchor] = useState<string | null>(null)
   foldersRef.current = folders
 
   const setView = (v: View) => {
@@ -349,6 +353,72 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
     }
   }
 
+  // ── Selección múltiple ──
+  const selectedFiles = useMemo(() => files.filter((f) => sel.has(f.id)), [files, sel])
+  const touchable = selectedFiles.filter((f) => canTouch(f.uploaderId))
+  const toggleSel = (id: string) => {
+    setSel((s) => {
+      const n = new Set(s)
+      if (!n.delete(id)) n.add(id)
+      return n
+    })
+    setAnchor(id)
+  }
+  /** Clic en un archivo: con Ctrl/⌘ o Mayús (o con algo ya seleccionado) selecciona; si no, lo abre. */
+  function clickFile(f: FileItem, e: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }, open: () => void) {
+    if (e.shiftKey && anchor) {
+      const ids = shownFiles.map((x) => x.id)
+      const a = ids.indexOf(anchor)
+      const z = ids.indexOf(f.id)
+      if (a >= 0 && z >= 0) return setSel(new Set(ids.slice(Math.min(a, z), Math.max(a, z) + 1)))
+    }
+    if (e.ctrlKey || e.metaKey || e.shiftKey || sel.size > 0) toggleSel(f.id)
+    else open()
+  }
+  const { box, justDragged } = useMarquee(bodyRef, true, (ids, additive) => setSel((s) => (additive ? new Set([...s, ...ids]) : new Set(ids))))
+  const clearSel = () => {
+    setSel(new Set())
+    setAnchor(null)
+  }
+  useEffect(() => clearSel(), [current, query])
+  useEffect(() => {
+    if (!sel.size) return
+    // Esc quita primero la selección (en fase de captura, para que no cierre también el explorador)
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.target instanceof HTMLInputElement) return
+      e.stopImmediatePropagation()
+      clearSel()
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [sel.size])
+
+  async function moveMany(list: FileItem[], folderId: string | null) {
+    const todo = list.filter((f) => canTouch(f.uploaderId) && (f.folderId ?? null) !== folderId)
+    if (!todo.length) return toast('No hay nada que mover (ya están ahí o no son tuyos)', 'info')
+    const results = await Promise.allSettled(todo.map((f) => api<FileItem>(`/rooms/${room.code}/files/${f.id}`, 'PATCH', { folderId })))
+    const moved = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []))
+    setFiles((all) => all.map((x) => moved.find((m) => m.id === x.id) ?? x))
+    const bad = todo.length - moved.length
+    toast(bad ? `Se movieron ${moved.length} y ${bad} no se pudieron mover` : `${moved.length} archivo${moved.length === 1 ? '' : 's'} movido${moved.length === 1 ? '' : 's'} a ${where(folderId)}`, bad ? 'error' : 'success')
+    clearSel()
+  }
+
+  async function removeMany(list: FileItem[]) {
+    const todo = list.filter((f) => canTouch(f.uploaderId))
+    if (!todo.length) return
+    if (!await dialogs.confirm({ title: todo.length === 1 ? `¿Borrar «${todo[0]!.name}»?` : `¿Borrar ${todo.length} archivos?`, message: 'Se eliminarán de la sala para todos. No se puede deshacer.', confirmLabel: todo.length === 1 ? 'Borrar archivo' : 'Borrar archivos', tone: 'danger' })) return
+    await Promise.allSettled(todo.map((f) => api(`/rooms/${room.code}/files/${f.id}`, 'DELETE')))
+    clearSel()
+  }
+
+  /** «Mover a»: la raíz y todas las carpetas con su ruta. */
+  const moveTargets = (list: FileItem[]): MenuItem[] => [
+    { label: 'Todos los archivos (raíz)', icon: <House size={16} />, onClick: () => void moveMany(list, null) },
+    ...[...folders].map((f) => ({ f, label: where(f.id) })).sort((a, b) => a.label.localeCompare(b.label))
+      .map(({ f, label }) => ({ label, icon: <FolderInput size={16} />, onClick: () => void moveMany(list, f.id) })),
+  ]
+
   /** Crea un documento, hoja o presentación nueva: nace como archivo de la sala (en la carpeta actual) y se abre para editar. */
   async function createDoc(k: (typeof NEW_KINDS)[number]) {
     if (newBusy || !onEditDoc) return
@@ -410,10 +480,10 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
     setDropTarget(null)
     setDragOver(false)
     if (!canWrite) return
-    const id = e.dataTransfer.getData(NORA_MIME)
-    if (id) {
-      const f = files.find((x) => x.id === id)
-      if (f && canTouch(f.uploaderId)) void moveFile(f, folderId)
+    const raw = e.dataTransfer.getData(NORA_MIME)
+    if (raw) {
+      const ids: string[] = JSON.parse(raw)
+      void moveMany(files.filter((x) => ids.includes(x.id)), folderId)
       return
     }
     // Las entradas del drop solo son válidas durante el evento: se capturan antes de cualquier espera.
@@ -497,10 +567,13 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
     const open = () => (canOpen ? void editFile(f) : setViewing(f.id))
     const pct = d && d.total > 0 ? Math.min(100, Math.round((d.loaded / d.total) * 100)) : 0
     rows.push(
-      <div key={`f-${f.id}`} className={`fitem ${d ? 'busy' : ''} ${canView || canOpen ? 'viewable' : ''}`}
-        {...(canView || canOpen ? { role: 'button', tabIndex: 0, 'aria-label': `${canOpen ? (canWrite ? 'Abrir para editar' : 'Abrir') : 'Ver'} ${f.name}`, onClick: open, onKeyDown: activate(open) } : {})}
+      <div key={`f-${f.id}`} data-sel-id={f.id} className={`fitem ${d ? 'busy' : ''} ${canView || canOpen ? 'viewable' : ''} ${sel.has(f.id) ? 'selected' : ''}`}
+        {...(canView || canOpen ? { role: 'button', tabIndex: 0, 'aria-label': `${canOpen ? (canWrite ? 'Abrir para editar' : 'Abrir') : 'Ver'} ${f.name}`, onKeyDown: (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); clickFile(f, e, open) } } } : {})}
+        onClick={(e) => clickFile(f, e, canView || canOpen ? open : () => {})}
         draggable={canTouch(f.uploaderId)}
-        onDragStart={(e) => { e.dataTransfer.setData(NORA_MIME, f.id); e.dataTransfer.effectAllowed = 'move' }}>
+        onDragStart={(e) => { e.dataTransfer.setData(NORA_MIME, JSON.stringify(sel.has(f.id) ? [...sel] : [f.id])); e.dataTransfer.effectAllowed = 'move' }}>
+        <button type="button" className={`fcheck ${sel.has(f.id) ? 'on' : ''}`} aria-label={`${sel.has(f.id) ? 'Quitar de la selección' : 'Seleccionar'} ${f.name}`} aria-pressed={sel.has(f.id)}
+          onClick={(e) => { e.stopPropagation(); toggleSel(f.id) }}>{sel.has(f.id) ? <SquareCheck size={20} /> : <Square size={20} />}</button>
         <span className={`ficon tn-${tone}`}>
           <Icon size={22} />
           {d && <ProgressRing percent={d.loaded > 0 ? pct : null} />}
@@ -541,7 +614,7 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
 
   return (
     <div
-      className="explorer"
+      className={`explorer ${sel.size > 0 ? 'sel-active' : ''}`}
       onDragOver={(e) => { if (isFileDrag(e)) { e.preventDefault(); setDragOver(true) } }}
       onDragLeave={(e) => { if (e.currentTarget === e.target) setDragOver(false) }}
       onDrop={(e) => dropOn(e, current)}
@@ -605,7 +678,24 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
         {searching && <span className="muted small" style={{ marginLeft: 8 }}>Resultados de «{query.trim()}»</span>}
       </nav>
 
-      <div className={`ex-body ${dragOver ? 'dragging' : ''}`}>
+      {sel.size > 0 && (
+        <div className="sel-bar" role="toolbar" aria-label="Archivos seleccionados">
+          <button type="button" className="icon-btn sm" aria-label="Quitar la selección" title="Quitar la selección (Esc)" onClick={clearSel}><X size={16} /></button>
+          <strong>{sel.size} seleccionado{sel.size === 1 ? '' : 's'}</strong>
+          <button type="button" className="btn ghost sm" onClick={() => setSel(sel.size === shownFiles.length ? new Set() : new Set(shownFiles.map((f) => f.id)))}>{sel.size === shownFiles.length ? 'Quitar todos' : 'Seleccionar todos'}</button>
+          <span className="grow" />
+          <button type="button" className="btn sm" onClick={() => selectedFiles.forEach(downloadFile)}><Download size={15} /> Descargar</button>
+          {touchable.length > 0 && (
+            <>
+              <Menu label="Mover los seleccionados a" items={[{ heading: `Mover ${touchable.length} a` }, ...moveTargets(touchable)]}
+                trigger={<span className="btn sm"><FolderInput size={15} /> Mover a… <ChevronDown size={14} /></span>} />
+              <button type="button" className="btn sm danger" onClick={() => void removeMany(touchable)}><Trash2 size={15} /> Borrar</button>
+            </>
+          )}
+        </div>
+      )}
+
+      <div ref={bodyRef} className={`ex-body ${dragOver ? 'dragging' : ''}`} onClick={(e) => { if (!justDragged.current && sel.size > 0 && !(e.target as Element).closest('[data-sel-id], button, a, .fitem, .menu, input, select')) clearSel() }}>
         {!canWrite && <p className="callout small" style={{ marginBottom: 10 }}>Tu rol en esta sala es de <strong>lector</strong>: puedes ver y descargar, pero no subir ni modificar.</p>}
         {error && <p className="error small" role="alert">{error}</p>}
         {(zipping || reading) && (
@@ -662,6 +752,7 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
           </div>
         ))}
 
+        {box && <div className="marquee" style={{ left: box.left, top: box.top, width: box.width, height: box.height }} />}
         {empty ? (
           <div className="empty">
             {searching ? <Search size={36} /> : <Folder size={36} />}
@@ -681,7 +772,7 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
 
       <div className="ex-status">
         <span>{shownFolders.length} carpeta{shownFolders.length === 1 ? '' : 's'} · {shownFiles.length} archivo{shownFiles.length === 1 ? '' : 's'}</span>
-        <span className="hide-sm">Subida reanudable · arrastra un archivo a una carpeta para moverlo</span>
+        <span className="hide-sm">Subida reanudable · arrastra con el ratón para seleccionar varios · arrástralos a una carpeta para moverlos</span>
       </div>
 
       {viewIndex >= 0 && (

@@ -93,6 +93,8 @@ Los permisos se comprueban en el servidor (un lector recibe 403 al intentar subi
 
 **Archivos grandes y carpetas:** si el navegador comprime lo elegido en un `.zip` (Safari lo hace con carpetas y paquetes como `.app`, `.pages` o `.key`) y tarda en entregarlo, Nora muestra «Comprimiendo lo que elegiste…» con un indicador y explica que se subirá como `.zip`; al soltar una carpeta muestra «Leyendo la carpeta…». La compresión la hace el navegador, no Nora, así que no hay porcentaje, solo el aviso de que está ocurriendo.
 
+**Selección múltiple:** en Archivos (y en Pizarra) se seleccionan varios elementos con la casilla de cada uno, Ctrl/⌘+clic, Mayús+clic (rango) o **arrastrando un rectángulo con el ratón** sobre un hueco. La barra de selección ofrece Descargar, **Mover a…** (cualquier carpeta o la raíz) y Borrar (con confirmación); también se pueden **arrastrar todos los seleccionados a una carpeta** o a la ruta de arriba. Esc quita la selección. Mover y borrar solo afectan a lo propio (o a todo si moderas).
+
 ### Visor de documentos
 
 Al hacer clic en un archivo (o con el botón del ojo) se abre un visor con navegación entre los documentos de la carpeta (flechas del teclado o en pantalla): **imágenes** (JPG, PNG, GIF, WebP, AVIF, SVG…), **PDF** (con zoom, dibujado con pdf.js en el navegador) y **texto/código** (se muestra como texto plano, nunca se ejecuta). Todo se lee por la API autenticada y se muestra con URLs `blob:` locales; la CSP del gateway solo añade `blob:` para imágenes y workers. Los **vídeos no se previsualizan, solo se descargan**: reproducirlos exigiría transcodificarlos en el servidor (ffmpeg), algo que Nora no incluye por ahora.

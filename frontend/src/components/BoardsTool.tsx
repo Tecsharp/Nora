@@ -12,6 +12,7 @@ import type { DocInfo } from '../collab/DocEditor'
 import { renderSavedBoard } from '../collab/boardIO'
 import Menu, { type MenuItem } from './Menu'
 import Tabs from './Tabs'
+import { useMarquee } from '../marquee'
 
 interface BoardItem extends DocInfo {
   createdBy: string
@@ -84,6 +85,8 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
   const [anchor, setAnchor] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   const pick = useRef<HTMLInputElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const { box, justDragged } = useMarquee(bodyRef, true, (ids, additive) => setSel((s) => (additive ? new Set([...s, ...ids]) : new Set(ids))))
   const canWrite = canWriteIn(room, user)
   const staff = isStaffIn(room, user)
   const canTouch = (ownerId: string) => canWrite && (ownerId === user?.id || staff)
@@ -397,7 +400,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
   const meta = (b: BoardItem) => `${b.createdByName} · ${when(b.updatedAt)}${searching && b.folderId ? ` · ${where(b.folderId)}` : ''}`
 
   const boardCards = shownBoards.map((b) => view === 'grid' ? (
-    <div key={b.id} className={`board-card ${sel.has(b.id) ? 'selected' : ''}`} role="button" tabIndex={0} aria-label={`Abrir ${b.name}`} {...dragProps(b)}
+    <div key={b.id} data-sel-id={b.id} className={`board-card ${sel.has(b.id) ? 'selected' : ''}`} role="button" tabIndex={0} aria-label={`Abrir ${b.name}`} {...dragProps(b)}
       onClick={(e) => clickBoard(b, e)} onKeyDown={(e) => e.key === 'Enter' && clickBoard(b, e)}>
       <div className="board-thumb"><Thumb code={room.code} board={b} /></div>
       {check(b)}
@@ -407,7 +410,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
       </div>
     </div>
   ) : (
-    <div key={b.id} className={`fitem board-row ${sel.has(b.id) ? 'selected' : ''}`} role="button" tabIndex={0} aria-label={`Abrir ${b.name}`} {...dragProps(b)}
+    <div key={b.id} data-sel-id={b.id} className={`fitem board-row ${sel.has(b.id) ? 'selected' : ''}`} role="button" tabIndex={0} aria-label={`Abrir ${b.name}`} {...dragProps(b)}
       onClick={(e) => clickBoard(b, e)} onKeyDown={(e) => e.key === 'Enter' && clickBoard(b, e)}>
       {check(b)}
       <span className="ficon"><PenTool size={20} /></span>
@@ -481,7 +484,8 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
         </div>
       )}
 
-      <div className="ex-body">
+      <div ref={bodyRef} className="ex-body" onClick={(e) => { if (!justDragged.current && sel.size > 0 && !(e.target as Element).closest('[data-sel-id], button, a, .fitem, .menu, input, select')) setSel(new Set()) }}>
+        {box && <div className="marquee" style={{ left: box.left, top: box.top, width: box.width, height: box.height }} />}
         {!canWrite && <p className="callout small" style={{ marginBottom: 10 }}>Tu rol en esta sala es de <strong>lector</strong>: puedes abrir las pizarras para verlas y descargarlas.</p>}
         {boards === null ? <p className="muted">Cargando…</p> : empty ? (
           <div className="empty">
