@@ -58,7 +58,7 @@ Cada editor tiene una cinta de opciones al estilo Office: **texto** (fuentes, ta
 
 ### Pizarra colaborativa
 
-La herramienta **Pizarra** de cada sala es un lienzo infinito con el editor de **Excalidraw** (todas sus herramientas: formas, flechas ligadas, texto, dibujo libre, imágenes, marcos, láser, biblioteca…) sincronizado en tiempo real por el WebSocket de Nora, con cursores con nombre, selecciones, seguimiento de otra persona y permisos de la sala. Se guarda sola; **Guardar** escribe el archivo `.excalidraw` en Archivos; se puede **descargar** (`.excalidraw`, PNG y SVG con la escena incrustada, PDF), guardar copias en la sala e **importar** `.excalidraw`, PNG/SVG con escena e imágenes. Funciona sin Internet. Detalles en [docs/PIZARRA.md](docs/PIZARRA.md).
+La herramienta **Pizarra** de cada sala es un lienzo infinito con el editor de **Excalidraw** (todas sus herramientas: formas, flechas ligadas, texto, dibujo libre, imágenes, marcos, láser, biblioteca…) sincronizado en tiempo real por el WebSocket de Nora, con cursores con nombre, selecciones, seguimiento de otra persona y permisos de la sala. Las figuras y textos se **alinean y centran** con el imán (guías al mover), con la barra «Alinear» y con las opciones de Excalidraw, y el editor tiene **pantalla completa**. Se guarda sola; **Guardar** escribe el archivo `.excalidraw` en Archivos; se puede **descargar** (`.excalidraw`, PNG y SVG con la escena incrustada, PDF), guardar copias en la sala e **importar** `.excalidraw`, PNG/SVG con escena e imágenes. Funciona sin Internet. Detalles en [docs/PIZARRA.md](docs/PIZARRA.md).
 
 ### Subidas reanudables
 

@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import type { Editor } from '@tiptap/react'
-import { Check, ChevronDown, Copy, Download, FileText, History, Loader2, PenTool, Presentation, Save, Sheet, Upload, X } from 'lucide-react'
+import { Check, ChevronDown, Copy, Download, FileText, History, Loader2, Maximize2, Minimize2, PenTool, Presentation, Save, Sheet, Upload, X } from 'lucide-react'
 import { ApiError, api, getAccessToken } from '../api'
 import { useAuth } from '../auth'
 import Avatar from '../components/Avatar'
 import Menu, { type MenuItem } from '../components/Menu'
 import { useRealtime } from '../realtime'
 import { useToast } from '../toast'
+import { useFullscreen } from '../fullscreen'
 import { CollabProvider, colorFor } from './provider'
 import type { BoardHandle } from './boardIO'
 import { readNativeForExport, restoreNonText, restoreText, seedNonText, type Kind, type Native } from './native'
@@ -68,6 +69,7 @@ export default function DocEditor(props: Props) {
 
 function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props & { provider: CollabProvider }) {
   const toast = useToast()
+  const fullscreen = useFullscreen()
 
   const snap = useSyncExternalStore(
     useCallback((l) => provider.subscribe(l), [provider]),
@@ -368,6 +370,12 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
           )}
           <input ref={fileInput} type="file" hidden accept=".excalidraw,.json,application/json,image/png,image/jpeg,image/webp,image/gif,image/svg+xml" aria-label="Importar archivo"
             onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setImporting(f) }} />
+          {fullscreen.supported && (
+            <button className="icon-btn" aria-label={fullscreen.active ? 'Salir de pantalla completa' : 'Pantalla completa'} title={fullscreen.active ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'} aria-pressed={fullscreen.active}
+              onClick={() => void fullscreen.toggle().catch(() => toast('Tu navegador no permitió la pantalla completa', 'error'))}>
+              {fullscreen.active ? <Minimize2 size={19} /> : <Maximize2 size={19} />}
+            </button>
+          )}
           <button className="icon-btn" aria-label="Cerrar el editor" onClick={requestClose}><X size={20} /></button>
         </header>
 

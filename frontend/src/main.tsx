@@ -11,6 +11,7 @@ window.FontFace = class extends NativeFontFace {
   }
 }
 
+import './canvasFilter'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
