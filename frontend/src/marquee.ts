@@ -25,10 +25,13 @@ export function useMarquee(container: RefObject<HTMLElement | null>, enabled: bo
       const sy = e.clientY
       const additive = e.ctrlKey || e.metaKey || e.shiftKey
       let active = false
+      document.body.classList.add('no-select') // sin selección de texto mientras se arrastra
+      window.getSelection()?.removeAllRanges()
       const move = (ev: PointerEvent) => {
         if (!active && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 5) return
         active = true
         ev.preventDefault()
+        window.getSelection()?.removeAllRanges()
         const r = el.getBoundingClientRect()
         const x1 = Math.max(r.left, Math.min(sx, ev.clientX))
         const x2 = Math.min(r.right, Math.max(sx, ev.clientX))
@@ -46,6 +49,7 @@ export function useMarquee(container: RefObject<HTMLElement | null>, enabled: bo
         document.removeEventListener('pointermove', move)
         document.removeEventListener('pointerup', up)
         setBox(null)
+        document.body.classList.remove('no-select')
         if (active) {
           justDragged.current = true
           setTimeout(() => (justDragged.current = false), 0)
@@ -54,8 +58,16 @@ export function useMarquee(container: RefObject<HTMLElement | null>, enabled: bo
       document.addEventListener('pointermove', move)
       document.addEventListener('pointerup', up)
     }
+    // En Brave/Chrome el arrastre empieza una selección de texto: se evita desde el mousedown sobre los huecos
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button === 0 && !(e.target instanceof Element && e.target.closest(INTERACTIVE))) e.preventDefault()
+    }
     el.addEventListener('pointerdown', onDown)
-    return () => el.removeEventListener('pointerdown', onDown)
+    el.addEventListener('mousedown', onMouseDown)
+    return () => {
+      el.removeEventListener('pointerdown', onDown)
+      el.removeEventListener('mousedown', onMouseDown)
+    }
   }, [container, enabled])
 
   return { box, justDragged }

@@ -103,7 +103,8 @@ public class FileService {
     @Transactional
     public FileDto update(UUID roomId, UUID fileId, UUID userId, boolean staff, boolean moveRequested, UUID folderId, String name) {
         RoomFile f = find(roomId, fileId);
-        if (!f.getUploaderId().equals(userId) && !staff) {
+        // Mover de carpeta lo puede hacer cualquiera que pueda escribir (el controlador ya lo exige); renombrar, solo quien lo subió o quien modera
+        if (name != null && !f.getUploaderId().equals(userId) && !staff) {
             throw ApiException.forbidden("No puedes modificar este archivo");
         }
         if (moveRequested) f.setFolderId(folderId);

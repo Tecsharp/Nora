@@ -93,6 +93,8 @@ Los permisos se comprueban en el servidor (un lector recibe 403 al intentar subi
 
 **Archivos grandes y carpetas:** si el navegador comprime lo elegido en un `.zip` (Safari lo hace con carpetas y paquetes como `.app`, `.pages` o `.key`) y tarda en entregarlo, Nora muestra «Comprimiendo lo que elegiste…» con un indicador y explica que se subirá como `.zip`; al soltar una carpeta muestra «Leyendo la carpeta…». La compresión la hace el navegador, no Nora, así que no hay porcentaje, solo el aviso de que está ocurriendo.
 
+**Notas con carpetas:** las notas se organizan igual que Archivos y Pizarra: carpetas anidadas con ruta, búsqueda, selección múltiple, arrastrar a una carpeta o a la ruta, y «Mover a…». **Mover** (archivos, pizarras y notas) lo puede hacer **cualquiera que pueda escribir** (colaborador, moderador, propietario), también con lo de otras personas; **renombrar, editar y borrar** siguen siendo de su autor o de quien modera. Los lectores no mueven nada.
+
 **Selección múltiple:** en Archivos (y en Pizarra) se seleccionan varios elementos con la casilla de cada uno, Ctrl/⌘+clic, Mayús+clic (rango) o **arrastrando un rectángulo con el ratón** sobre un hueco. La barra de selección ofrece Descargar, **Mover a…** (cualquier carpeta o la raíz) y Borrar (con confirmación); también se pueden **arrastrar todos los seleccionados a una carpeta** o a la ruta de arriba. Esc quita la selección. Mover y borrar solo afectan a lo propio (o a todo si moderas).
 
 ### Cuentas, Ajustes y administración

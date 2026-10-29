@@ -54,7 +54,7 @@ export default function Menu({ items, label = 'Más acciones', trigger }: { item
             const need = Math.max(280, items.length * 38 + 24)
             const up = r.bottom + need > window.innerHeight && r.top > window.innerHeight - r.bottom
             setPos(up
-              ? { position: 'fixed', right: Math.max(8, window.innerWidth - r.right), bottom: window.innerHeight - r.top + 4, maxHeight: r.top - 12, overflowY: 'auto' }
+              ? { position: 'fixed', right: Math.max(8, window.innerWidth - r.right), top: 'auto', bottom: window.innerHeight - r.top + 4, maxHeight: r.top - 12, overflowY: 'auto' }
               : { position: 'fixed', right: Math.max(8, window.innerWidth - r.right), top: r.bottom + 4, maxHeight: window.innerHeight - r.bottom - 12, overflowY: 'auto' })
           }
           setOpen((o) => !o)

@@ -151,7 +151,8 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
 
   // ---- selección ----
   const mineSel = useMemo(() => (boards ?? []).filter((b) => sel.has(b.id)), [boards, sel])
-  const movable = mineSel.filter((b) => canTouch(b.createdBy))
+  const movable = canWrite ? mineSel : []
+  const deletable = mineSel.filter((b) => canTouch(b.createdBy))
   const toggle = (id: string) => {
     setSel((s) => {
       const n = new Set(s)
@@ -188,8 +189,9 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
 
   // ---- acciones ----
   async function moveMany(list: BoardItem[], folderId: string | null) {
-    const todo = list.filter((b) => canTouch(b.createdBy) && (b.folderId ?? null) !== folderId)
-    if (!todo.length) return toast(list.length ? 'No hay nada que mover (ya están ahí o no son tuyas)' : 'Nada seleccionado', 'info')
+    if (!canWrite) return toast('Tu rol en esta sala es de solo lectura', 'warning')
+    const todo = list.filter((b) => (b.folderId ?? null) !== folderId) // cualquiera que pueda escribir puede mover
+    if (!todo.length) return toast(list.length ? `Ya ${list.length === 1 ? 'está' : 'están'} en ${folderId ? folderById.get(folderId)?.name : 'Pizarras'}` : 'Nada seleccionado', 'info')
     const results = await Promise.allSettled(todo.map((b) => api<BoardItem>(`/rooms/${room.code}/docs/${b.id}/folder`, 'PUT', { folderId })))
     setBoards((all) => all?.map((x) => (todo.some((t) => t.id === x.id) ? { ...x, folderId } : x)) ?? all)
     const bad = results.filter((r) => r.status === 'rejected').length
@@ -329,9 +331,8 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
     for (const [f, label] of [['excalidraw', 'Pizarra (.excalidraw)'], ['png', 'Imagen PNG'], ['svg', 'Imagen SVG'], ['pdf', 'PDF']] as const) {
       items.push({ label, icon: <Download size={16} />, onClick: () => void downloadBoard(b, f) })
     }
-    if (mine) {
-      items.push({ heading: 'Mover a' }, ...moveTargets([b]), 'separator', { label: 'Borrar', icon: <Trash2 size={16} />, danger: true, onClick: () => void removeMany([b]) })
-    }
+    if (canWrite) items.push({ heading: 'Mover a' }, ...moveTargets([b]))
+    if (mine) items.push('separator', { label: 'Borrar', icon: <Trash2 size={16} />, danger: true, onClick: () => void removeMany([b]) })
     return items
   }
 
@@ -391,7 +392,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
       {sel.has(b.id) ? <SquareCheck size={20} /> : <Square size={20} />}
     </button>
   )
-  const dragProps = (b: BoardItem) => canTouch(b.createdBy) ? {
+  const dragProps = (b: BoardItem) => canWrite ? {
     draggable: true,
     onDragStart: (e: DragEvent) => {
       e.dataTransfer.setData(BOARDS_MIME, JSON.stringify(dragIds(b)))
@@ -479,9 +480,9 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
             <>
               <Menu label="Mover las seleccionadas a" items={[{ heading: `Mover ${movable.length} a` }, ...moveTargets(movable)]}
                 trigger={<span className="btn sm"><FolderInput size={15} /> Mover a… <ChevronDown size={14} /></span>} />
-              <button type="button" className="btn sm danger" onClick={() => void removeMany(movable)}><Trash2 size={15} /> Borrar</button>
             </>
           )}
+          {deletable.length > 0 && <button type="button" className="btn sm danger" onClick={() => void removeMany(deletable)}><Trash2 size={15} /> Borrar{deletable.length < mineSel.length ? ` (${deletable.length})` : ''}</button>}
         </div>
       )}
 

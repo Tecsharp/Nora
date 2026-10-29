@@ -394,8 +394,9 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
   }, [sel.size])
 
   async function moveMany(list: FileItem[], folderId: string | null) {
-    const todo = list.filter((f) => canTouch(f.uploaderId) && (f.folderId ?? null) !== folderId)
-    if (!todo.length) return toast('No hay nada que mover (ya están ahí o no son tuyos)', 'info')
+    if (!canWrite) return toast('Tu rol en esta sala es de solo lectura', 'warning')
+    const todo = list.filter((f) => (f.folderId ?? null) !== folderId) // cualquiera que pueda escribir puede mover
+    if (!todo.length) return toast(`Ya ${list.length === 1 ? 'está' : 'están'} en ${where(folderId)}`, 'info')
     const results = await Promise.allSettled(todo.map((f) => api<FileItem>(`/rooms/${room.code}/files/${f.id}`, 'PATCH', { folderId })))
     const moved = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []))
     setFiles((all) => all.map((x) => moved.find((m) => m.id === x.id) ?? x))
@@ -519,10 +520,10 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
       ...(previewKind(f.name) ? [{ label: 'Vista previa', icon: <Eye size={16} />, onClick: () => setViewing(f.id) }] : []),
       { label: 'Descargar', icon: <Download size={16} />, onClick: () => void downloadFile(f) },
     ]
+    if (canWrite) items.push({ label: 'Mover a…', icon: <FolderInput size={16} />, onClick: () => setMoving(f) })
     if (canTouch(f.uploaderId)) {
       items.push(
         { label: 'Cambiar nombre', icon: <Pencil size={16} />, onClick: () => setRenaming({ kind: 'file', id: f.id, name: f.name }) },
-        { label: 'Mover a…', icon: <FolderInput size={16} />, onClick: () => setMoving(f) },
         'separator',
         { label: 'Borrar', icon: <Trash2 size={16} />, danger: true, onClick: () => void removeFile(f) },
       )
@@ -570,7 +571,7 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
       <div key={`f-${f.id}`} data-sel-id={f.id} className={`fitem ${d ? 'busy' : ''} ${canView || canOpen ? 'viewable' : ''} ${sel.has(f.id) ? 'selected' : ''}`}
         {...(canView || canOpen ? { role: 'button', tabIndex: 0, 'aria-label': `${canOpen ? (canWrite ? 'Abrir para editar' : 'Abrir') : 'Ver'} ${f.name}`, onKeyDown: (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); clickFile(f, e, open) } } } : {})}
         onClick={(e) => clickFile(f, e, canView || canOpen ? open : () => {})}
-        draggable={canTouch(f.uploaderId)}
+        draggable={canWrite}
         onDragStart={(e) => { e.dataTransfer.setData(NORA_MIME, JSON.stringify(sel.has(f.id) ? [...sel] : [f.id])); e.dataTransfer.effectAllowed = 'move' }}>
         <button type="button" className={`fcheck ${sel.has(f.id) ? 'on' : ''}`} aria-label={`${sel.has(f.id) ? 'Quitar de la selección' : 'Seleccionar'} ${f.name}`} aria-pressed={sel.has(f.id)}
           onClick={(e) => { e.stopPropagation(); toggleSel(f.id) }}>{sel.has(f.id) ? <SquareCheck size={20} /> : <Square size={20} />}</button>
@@ -685,13 +686,11 @@ export default function FilesTool({ room, onEditDoc }: { room: Room; onEditDoc?:
           <button type="button" className="btn ghost sm" onClick={() => setSel(sel.size === shownFiles.length ? new Set() : new Set(shownFiles.map((f) => f.id)))}>{sel.size === shownFiles.length ? 'Quitar todos' : 'Seleccionar todos'}</button>
           <span className="grow" />
           <button type="button" className="btn sm" onClick={() => selectedFiles.forEach(downloadFile)}><Download size={15} /> Descargar</button>
-          {touchable.length > 0 && (
-            <>
-              <Menu label="Mover los seleccionados a" items={[{ heading: `Mover ${touchable.length} a` }, ...moveTargets(touchable)]}
-                trigger={<span className="btn sm"><FolderInput size={15} /> Mover a… <ChevronDown size={14} /></span>} />
-              <button type="button" className="btn sm danger" onClick={() => void removeMany(touchable)}><Trash2 size={15} /> Borrar</button>
-            </>
+          {canWrite && (
+            <Menu label="Mover los seleccionados a" items={[{ heading: `Mover ${selectedFiles.length} a` }, ...moveTargets(selectedFiles)]}
+              trigger={<span className="btn sm"><FolderInput size={15} /> Mover a… <ChevronDown size={14} /></span>} />
           )}
+          {touchable.length > 0 && <button type="button" className="btn sm danger" onClick={() => void removeMany(touchable)}><Trash2 size={15} /> Borrar{touchable.length < selectedFiles.length ? ` (${touchable.length})` : ''}</button>}
         </div>
       )}
 

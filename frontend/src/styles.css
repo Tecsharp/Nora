@@ -827,3 +827,17 @@ table.table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 .syslib-ph { width: 55%; height: 55%; border-radius: 6px; background: rgba(127, 127, 127, 0.18); }
 .syslib-more { align-self: flex-start; margin: 2px 4px; padding: 4px 10px; border: 0; border-radius: 8px; background: rgba(127, 127, 127, 0.18); color: inherit; font: inherit; font-size: 0.8rem; cursor: pointer; }
 .syslib-more:hover { background: rgba(127, 127, 127, 0.3); }
+
+body.no-select, body.no-select * { user-select: none !important; -webkit-user-select: none !important; }
+.fitem, .board-card, .note-card[data-sel-id], .fgrid, .board-grid, .crumbs { -webkit-user-select: none; user-select: none; }
+
+/* Barra lateral de bibliotecas de la pizarra: ancho ajustable */
+.board-editor .excalidraw.excalidraw { --right-sidebar-width: var(--nora-sb, 302px) !important; }
+.default-sidebar { position: relative; }
+.board-sb-handle { position: absolute; top: 0; bottom: 0; left: -2px; width: 10px; z-index: 8; cursor: col-resize; touch-action: none; }
+.board-sb-handle::after { content: ''; position: absolute; left: 4px; top: 50%; width: 3px; height: 44px; margin-top: -22px; border-radius: 3px; background: var(--muted); opacity: 0.35; transition: opacity 0.15s; }
+.board-sb-handle:hover::after { opacity: 0.9; background: var(--accent); }
+.syslib-grid { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)) !important; }
+.note-card { position: relative; }
+.note-card.selected { box-shadow: 0 0 0 2px var(--accent); background: var(--accent-soft); }
+.note-card:hover .board-check, .note-card:focus-within .board-check, .note-card.selected .board-check, .sel-active .note-card .board-check { opacity: 1; }

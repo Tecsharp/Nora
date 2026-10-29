@@ -194,7 +194,6 @@ public class CollabService {
     public DocDto move(Room room, UUID docId, UUID userId, Role sys, UUID folderId) {
         DocRow d = docIn(room, docId);
         if (!"BOARD".equals(d.kind())) throw ApiException.badRequest("Solo las pizarras se organizan en carpetas aquí");
-        if (!d.createdBy().equals(userId) && !rooms.canModerate(room, userId, sys)) throw ApiException.forbidden("No puedes mover esta pizarra");
         folders.requireIn(room.getId(), RoomFolder.Kind.BOARD, folderId);
         repo.setFolder(docId, folderId);
         DocDto dto = dto(repo.find(docId).orElseThrow(), repo.creatorName(d.createdBy()), true);
