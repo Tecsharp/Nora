@@ -29,16 +29,19 @@ export function useItems<T = Record<string, unknown>>(code: string, tool: string
   const [hasMore, setHasMore] = useState(false)
   const limit = opts.limit ?? 200
   const alive = useRef(true)
+  const changes = useRef(0) // cambios aplicados mientras una carga estaba en vuelo: esa carga ya está vieja
   const base = `/rooms/${encodeURIComponent(code)}/items/${tool}`
 
   const order = useCallback((l: Item<T>[]) => (tool === 'chat'
     ? [...l].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
     : [...l].sort((a, b) => a.sort - b.sort || a.createdAt.localeCompare(b.createdAt))), [tool])
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (attempt = 0): Promise<void> => {
     try {
+      const seen = changes.current
       const l = await api<Item<T>[]>(`${base}?limit=${limit}`)
       if (!alive.current) return
+      if (changes.current !== seen && attempt < 3) return load(attempt + 1) // llegó algo mientras tanto: se vuelve a pedir en vez de pisarlo
       setItems(order(l))
       setHasMore(tool === 'chat' && l.length >= limit)
       setError('')
@@ -58,6 +61,7 @@ export function useItems<T = Record<string, unknown>>(code: string, tool: string
 
   /** Mezcla un elemento: las votaciones anónimas llegan sin «mine» en las difusiones; se conserva el propio. */
   const put = useCallback((it: Item<T>) => setItems((l) => {
+    changes.current++
     const i = l.findIndex((x) => x.id === it.id)
     if (i < 0) return order([...l, it])
     const prev = l[i]!
@@ -72,23 +76,24 @@ export function useItems<T = Record<string, unknown>>(code: string, tool: string
 
   useRealtime('item.changed', (e: { tool: string; op: string; item: Item<T> }) => {
     if (e.tool !== tool) return
-    if (e.op === 'deleted') setItems((l) => l.filter((x) => x.id !== e.item.id))
+    if (e.op === 'deleted') { changes.current++; setItems((l) => l.filter((x) => x.id !== e.item.id)) }
     else put(e.item)
   })
   useRealtime('reconnected', () => void load())
 
-  const create = useCallback(async (data: Partial<T> & Record<string, unknown>, sort?: number) => {
+  const create = useCallback(async (data: Partial<T>, sort?: number) => {
     const it = await api<Item<T>>(base, 'POST', { data, sort })
     put(it)
     return it
   }, [base, put])
-  const update = useCallback(async (id: string, data?: Partial<T> & Record<string, unknown>, sort?: number) => {
+  const update = useCallback(async (id: string, data?: Partial<T>, sort?: number) => {
     const it = await api<Item<T>>(`${base}/${id}`, 'PATCH', { data, sort })
     put(it)
     return it
   }, [base, put])
   const remove = useCallback(async (id: string) => {
     await api(`${base}/${id}`, 'DELETE')
+    changes.current++
     setItems((l) => l.filter((x) => x.id !== id))
   }, [base])
   const act = useCallback(async (id: string, action: string, body: Record<string, unknown> = {}) => {

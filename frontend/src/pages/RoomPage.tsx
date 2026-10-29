@@ -2,7 +2,7 @@ import { Suspense, lazy, useCallback, useEffect, useState, type ComponentType } 
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, Check, Pencil, UserX, Settings, UserCheck, X, Clapperboard, ClipboardList, Clock, Copy, FolderOpen, Hash, Monitor, PenTool, Plus, ShieldCheck,
-  SquareCheckBig, Trash2, Zap, MessageSquare, type LucideProps,
+  SquareCheckBig, Trash2, MessageSquare, KanbanSquare, type LucideProps,
 } from 'lucide-react'
 import { api, ApiError, type JoinRequest, type Room } from '../api'
 import { useAuth } from '../auth'
@@ -23,6 +23,7 @@ import { AssistProvider } from '../assist/AssistProvider'
 import AssistOverlay from '../assist/AssistOverlay'
 import AssistTool from '../assist/AssistTool'
 import ChatTool from '../tools/ChatTool'
+import TasksTool from '../tools/TasksTool'
 import { ASSIGNABLE, ROLE_HINT, ROLE_LABEL, type RoomRole } from '../roles'
 import { remaining } from '../time'
 import { setFilesOpen } from '../ui'
@@ -46,9 +47,12 @@ const TOOLS: Tool[] = [
   { id: 'media', label: 'Media Review', icon: Clapperboard, ready: false },
   { id: 'attendance', label: 'Asistencia', icon: Monitor, ready: true, tone: 'amber' },
   { id: 'polls', label: 'Votaciones', icon: SquareCheckBig, ready: false },
-  { id: 'actions', label: 'Acciones', icon: Zap, ready: false },
+  { id: 'actions', label: 'Acciones', icon: KanbanSquare, ready: true, tone: 'orange' },
   { id: 'more', label: 'Más herramientas', icon: Plus, ready: false },
 ]
+
+/** Herramientas que piden más ancho (tableros, calendario…). */
+const XL_TOOLS = new Set(['actions', 'calendar', 'media'])
 
 const DocEditor = lazy(() => import('../collab/DocEditor'))
 
@@ -392,10 +396,11 @@ export default function RoomPage() {
       )}
 
       {tool && (
-        <Modal title={tool.label} icon={<tool.icon size={20} />} wide={tool.ready} flush={tool.ready} onClose={() => setActive(null)}>
+        <Modal title={tool.label} icon={<tool.icon size={20} />} wide={tool.ready} xl={XL_TOOLS.has(tool.id)} flush={tool.ready} onClose={() => setActive(null)}>
           {tool.id === 'files' && <FilesTool room={room} onEditDoc={openDoc} />}
           {tool.id === 'board' && <BoardsTool room={room} onOpen={openDoc} />}
           {tool.id === 'attendance' && <AssistTool room={room} online={online} />}
+          {tool.id === 'actions' && <TasksTool room={room} />}
           {tool.id === 'chat' && <ChatTool room={room} online={online} onSeen={markChatSeen} />}
           {tool.id === 'notes' && <NotesTool room={room} kind="NOTE" placeholder="Escribe una nota para la sala…" />}
           {!tool.ready && (

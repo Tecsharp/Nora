@@ -144,6 +144,7 @@ export default function ChatTool({ room, online, onSeen }: { room: Room; online:
       e.preventDefault()
       void send()
     } else if (e.key === 'Escape' && (editing || replyTo)) {
+      e.stopPropagation() // cancela la respuesta/edición sin cerrar toda la herramienta
       setEditing(null)
       setReplyTo(null)
       setDraft('')
