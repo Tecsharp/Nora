@@ -1,6 +1,6 @@
 # Herramientas de la sala
 
-Las herramientas nuevas (Chat, Tablero, Votaciones, Media Review, Calendario, Enlaces, Reproductor) comparten una base común para que cada una sea pequeña,
+Las herramientas nuevas (Tablero, Votaciones, Media Review, Calendario, Enlaces, Reproductor) comparten una base común para que cada una sea pequeña,
 segura y en tiempo real.
 
 ## Base: `room_items`
@@ -16,8 +16,24 @@ segura y en tiempo real.
 
 ## Chat
 
-Mensajes con respuestas citadas, reacciones con emoji, @menciones, enlaces pulsables, editar/borrar los propios (y borrar quien modera), agrupado por persona y día, «N mensajes nuevos»
-al leer más arriba, carga de mensajes anteriores, insignia de **sin leer** en la herramienta y resumen de la conversación con IA. Los lectores leen y reaccionan pero no escriben.
+Tres tipos de conversación dentro de la sala: **General** (todas las personas), **grupos** (con sus ajustes) y **mensajes directos**. Todo va por el **WebSocket**: los mensajes, las ediciones, borrados y reacciones, el
+«**está escribiendo…**», el sin leer y los cambios de los grupos llegan al instante y **solo a quien participa** en cada conversación (eventos de usuario `chat.*`, no de sala).
+
+**Dock abajo a la derecha** (como Facebook o Google Workspace): el panel de contactos en la esquina (chats recientes con su último mensaje y contador, y las personas de la sala con su punto de conexión) y, a su izquierda,
+las **conversaciones abiertas como ventanas** que se minimizan, se cierran o se abren a pantalla completa. Cuando llega un mensaje de otra persona a un chat que no está a la vista, su ventana asoma minimizada con el contador.
+El estado del dock se recuerda por sala. En pantallas estrechas el dock se reduce al botón «Chat» y abre la vista completa.
+
+**Vista completa** (tarjeta Chat, al estilo de Telegram Web): lista de chats con buscador y filtros (Todos, No leídos, Grupos, Directos), conversación y panel de ajustes. Mensajes con respuestas citadas, reacciones, @menciones con
+autocompletado, enlaces pulsables, editar/borrar los propios (y borrar quien modera o administra), «Mensajes nuevos» al abrir, carga de anteriores y resumen con IA. Los lectores leen y reaccionan pero no escriben.
+
+**Ajustes de un grupo:** nombre, descripción y color; quién puede escribir y quién puede añadir personas (todas o solo administración); miembros con rol de administración (nombrar, quitar, expulsar); añadir personas de la sala;
+silenciar y fijar (por persona); salir y borrar el grupo. El grupo nunca se queda sin administración (si sale la última persona administradora, pasa a la más antigua). Los cambios quedan como mensajes de sistema.
+Quien sale de la sala o es expulsado deja también sus grupos y directos.
+
+**Avisos:** los directos y los grupos no silenciados llegan a la campana (agrupados por conversación, con enlace al mensaje); en la General solo cuando te mencionan.
+
+Datos: `chat_conversations`, `chat_members` (rol, silenciar, fijar, última lectura) y `chat_messages` (migración `V19`, que además convierte el chat antiguo de cada sala en su conversación General).
+API: `/api/rooms/{code}/chat/…` (`conversations`, `dm`, `messages`, `members`, `read`…); «escribiendo» es el mensaje WebSocket `chat.typing {conv}`.
 
 ## Tablero (tareas)
 

@@ -25,6 +25,8 @@ import { AssistProvider } from '../assist/AssistProvider'
 import AssistOverlay from '../assist/AssistOverlay'
 import AssistTool from '../assist/AssistTool'
 import ChatTool from '../tools/ChatTool'
+import { ChatProvider, useChat } from '../chat/ChatProvider'
+import ChatDock from '../chat/ChatDock'
 import TasksTool from '../tools/TasksTool'
 import PollsTool from '../tools/PollsTool'
 import MediaReviewTool from '../tools/MediaReviewTool'
@@ -64,7 +66,7 @@ const TOOLS: Tool[] = [
 ]
 
 /** Herramientas que piden más ancho (tableros, calendario…). */
-const XL_TOOLS = new Set(['actions', 'calendar', 'media', 'player'])
+const XL_TOOLS = new Set(['actions', 'calendar', 'media', 'player', 'chat'])
 
 const DocEditor = lazy(() => import('../collab/DocEditor'))
 
@@ -84,7 +86,6 @@ export default function RoomPage() {
   const [online, setOnline] = useState<Set<string>>(new Set())
   const [inactive, setInactive] = useState<RoomStatus | null>(null)
   const [reactivating, setReactivating] = useState(false)
-  const [chatUnread, setChatUnread] = useState(0)
   const pinKey = `nora-pinned-tools:${user?.id ?? ''}`
   const [pinned, setPinned] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem(`nora-pinned-tools:${user?.id ?? ''}`) ?? '[]') as string[] } catch { return [] } })
   const togglePin = (id: string) => setPinned((l) => {
@@ -165,24 +166,6 @@ export default function RoomPage() {
       return next
     })
     if (d.userId !== user?.id) toast(`${d.displayName} ${d.online ? 'se ha conectado' : 'se ha desconectado'}`, 'info')
-  })
-  // mensajes del chat sin leer: los que llegan con el chat cerrado y los que había desde la última vez
-  const chatSeenKey = `nora-chat-seen:${code}`
-  const markChatSeen = useCallback(() => {
-    try { localStorage.setItem(chatSeenKey, new Date().toISOString()) } catch { /* sin almacenamiento */ }
-    setChatUnread(0)
-  }, [chatSeenKey])
-  useEffect(() => {
-    if (!room) return
-    let seen = ''
-    try { seen = localStorage.getItem(chatSeenKey) ?? '' } catch { /* sin almacenamiento */ }
-    if (!seen) { markChatSeen(); return }
-    api<{ authorId: string | null; createdAt: string }[]>(`/rooms/${encodeURIComponent(code)}/items/chat?limit=50`)
-      .then((l) => setChatUnread(l.filter((m) => m.createdAt > seen && m.authorId !== user?.id).length)).catch(() => undefined)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [room?.id])
-  useRealtime('item.changed', (d: { tool: string; op: string; item: { authorId: string | null } }) => {
-    if (d.tool === 'chat' && d.op === 'created' && d.item.authorId !== user?.id) setChatUnread((n) => (active === 'chat' ? 0 : n + 1))
   })
   useRealtime('member.joined', (d: { displayName: string }) => {
     toast(`${d.displayName} se ha unido a la sala`, 'success')
@@ -326,8 +309,11 @@ export default function RoomPage() {
   const secure = window.location.protocol === 'https:'
   const canAssign = room.isOwner || user?.role === 'ADMIN'
 
+  const openChat = (convId?: string) => { setTarget({ tool: 'chat', conv: convId, nonce: Date.now() }); setActive('chat') }
+
   return (
     <AssistProvider code={room.code}>
+    <ChatProvider room={room} online={online} fullOpen={active === 'chat'} onOpenFull={openChat}>
     <div className="room">
       <header className="room-top">
         <Link to="/" className="btn ghost sm"><ArrowLeft size={15} /> Mis salas</Link>
@@ -436,7 +422,7 @@ export default function RoomPage() {
               {t.id === 'player' && playing && <span className="tool-badge info" title="Sonando"><span className="pl-eq"><i /><i /><i /></span></span>}
               {t.id === 'focus' && focus.state.status === 'running' && <span className="tool-badge info mono" title="Temporizador en marcha">{fmtFocus(focus.remaining)}</span>}
               {t.id === 'calendar' && calendar.today > 0 && <span className="tool-badge info" aria-label={`${calendar.today} eventos hoy`} title="Eventos de hoy">{calendar.today}</span>}
-              {t.id === 'chat' && chatUnread > 0 && <span className="tool-badge" aria-label={`${chatUnread} mensajes sin leer`}>{chatUnread > 99 ? '99+' : chatUnread}</span>}
+              {t.id === 'chat' && <ChatBadge />}
             </button>
           ))}
         </div>
@@ -481,7 +467,7 @@ export default function RoomPage() {
           {tool.id === 'media' && <MediaReviewTool room={room} focus={target} />}
           {tool.id === 'polls' && <PollsTool room={room} focus={target} />}
           {tool.id === 'actions' && <TasksTool room={room} focus={target} />}
-          {tool.id === 'chat' && <ChatTool room={room} online={online} onSeen={markChatSeen} />}
+          {tool.id === 'chat' && <ChatTool focus={target} />}
           {tool.id === 'notes' && <NotesTool room={room} kind="NOTE" placeholder="Escribe una nota para la sala…" />}
           {!tool.ready && (
             <div className="empty">
@@ -493,7 +479,16 @@ export default function RoomPage() {
         </Modal>
       )}
       <AssistOverlay />
+      <ChatDock />
     </div>
+    </ChatProvider>
     </AssistProvider>
   )
+}
+
+/** Insignia de mensajes sin leer sobre la tarjeta del Chat. */
+function ChatBadge() {
+  const { unread } = useChat()
+  if (unread <= 0) return null
+  return <span className="tool-badge" aria-label={`${unread} mensajes sin leer`}>{unread > 99 ? '99+' : unread}</span>
 }

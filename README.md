@@ -89,7 +89,7 @@ El propietario puede **reactivarla** con una nueva duración (cuenta como sala a
 
 ### Herramientas de la sala
 
-Además de Archivos, Pizarra y Notas, cada sala tiene: **Chat** (respuestas, reacciones, @menciones, sin leer), **Tablero** (tareas con arrastrar y soltar), **Votaciones** (anónimas, cierre automático, resultados en vivo), **Media Review** (comentarios en el momento exacto de un vídeo/audio o en un punto de una imagen),
+Además de Archivos, Pizarra y Notas, cada sala tiene: **Chat** (General, grupos con ajustes y mensajes directos en tiempo real, con un dock abajo a la derecha y una vista completa tipo Telegram Web), **Tablero** (tareas con arrastrar y soltar), **Votaciones** (anónimas, cierre automático, resultados en vivo), **Media Review** (comentarios en el momento exacto de un vídeo/audio o en un punto de una imagen),
 **Calendario** (mes y agenda, respuestas «Voy», `.ics`, recordatorios), **Enlaces** (marcadores compartidos con etiquetas), **Foco** (Pomodoro compartido con grupo de enfocados), **Reproductor** (cola sincronizada de YouTube, enlaces directos y archivos de la sala, sin cortar el sonido al cerrar la ventana) y **Asistencia** (ver/controlar pantallas).
 Con la IA activa (opcional) casi todas incorporan ayuda: resumir el chat, crear tareas o eventos desde un texto, sugerir opciones de votación, resumir comentarios de revisión… Detalles y permisos en [docs/HERRAMIENTAS.md](docs/HERRAMIENTAS.md).
 

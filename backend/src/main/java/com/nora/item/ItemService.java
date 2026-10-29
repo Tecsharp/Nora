@@ -33,7 +33,6 @@ public class ItemService {
 
     private static final Set<String> EDIT_ANY = Set.of("task"); // todo el que escribe puede editarlas (mover entre columnas, asignar…)
     private static final int MAX_PER_TOOL = 5000;
-    private static final int MAX_CHAT = 50_000;
     private static final Set<String> RSVP = Set.of("yes", "no", "maybe", "none");
 
     private final RoomItemRepository items;
@@ -62,13 +61,7 @@ public class ItemService {
         tool(tool);
         Room room = rooms.requireMember(p.userId(), code);
         int n = Math.max(1, Math.min(limit, 500));
-        List<RoomItem> found;
-        if ("chat".equals(tool)) {
-            found = new ArrayList<>(items.findBefore(room.getId(), tool, before == null ? Instant.now().plusSeconds(60) : before, PageRequest.of(0, n)));
-            java.util.Collections.reverse(found); // de más antiguo a más reciente
-        } else {
-            found = items.findOrdered(room.getId(), tool, PageRequest.of(0, Math.min(n * 4, 2000)));
-        }
+        List<RoomItem> found = items.findOrdered(room.getId(), tool, PageRequest.of(0, Math.min(n * 4, 2000)));
         return found.stream().map(i -> view(i, p.userId())).toList();
     }
 
@@ -76,7 +69,7 @@ public class ItemService {
     public ItemDto create(AuthPrincipal p, String code, String tool, Map<String, Object> data, Double sort) {
         tool(tool);
         Room room = rooms.requireWriter(p.userId(), p.role(), code);
-        if (items.countByRoomIdAndTool(room.getId(), tool) >= ("chat".equals(tool) ? MAX_CHAT : MAX_PER_TOOL)) throw ApiException.conflict("Se alcanzó el máximo de elementos de esta herramienta en la sala");
+        if (items.countByRoomIdAndTool(room.getId(), tool) >= MAX_PER_TOOL) throw ApiException.conflict("Se alcanzó el máximo de elementos de esta herramienta en la sala");
         Map<String, Object> clean = ItemSchemas.clean(tool, data, true);
         checkRefs(room, tool, clean);
         RoomItem it = new RoomItem(room.getId(), tool, p.userId(), users.findById(p.userId()).orElseThrow().getDisplayName(), clean,
@@ -98,7 +91,6 @@ public class ItemService {
             checkRefs(room, tool, clean);
             // lo que gestiona el servidor (votos, respuestas, reacciones) se conserva
             for (String f : ItemSchemas.SERVER_FIELDS.getOrDefault(tool, Set.of())) if (it.getData().containsKey(f)) clean.put(f, it.getData().get(f));
-            if ("chat".equals(tool) && !String.valueOf(clean.get("text")).equals(String.valueOf(it.getData().get("text")))) clean.put("edited", true);
             if ("poll".equals(tool)) dropOrphanVotes(clean);
             it.setData(clean);
         }
@@ -128,18 +120,6 @@ public class ItemService {
         String me = p.userId().toString();
         boolean writer = rooms.canWrite(room, p.userId(), p.role());
         switch (tool + "." + action) {
-            case "chat.react" -> {
-                String emoji = body.get("emoji") instanceof String s ? s.strip() : "";
-                if (emoji.isEmpty() || emoji.length() > 16) throw ApiException.badRequest("Reacción no válida");
-                Map<String, List<String>> r = reactions(d.get("reactions"));
-                List<String> who = r.computeIfAbsent(emoji, k -> new ArrayList<>());
-                if (!who.remove(me)) {
-                    if (r.size() > 12 && who.isEmpty()) throw ApiException.conflict("Este mensaje ya tiene muchas reacciones distintas");
-                    who.add(me);
-                }
-                if (who.isEmpty()) r.remove(emoji);
-                d.put("reactions", r);
-            }
             case "poll.vote" -> {
                 if (Boolean.TRUE.equals(d.get("closed"))) throw ApiException.conflict("La votación está cerrada");
                 if (d.get("closesAt") instanceof Number c && c.longValue() <= System.currentTimeMillis()) throw ApiException.conflict("La votación ya cerró");
@@ -237,19 +217,10 @@ public class ItemService {
                 throw ApiException.badRequest("Esa persona no participa en la sala");
             }
         }
-        if ("chat".equals(tool) && clean.get("replyTo") instanceof String r) {
-            if (items.findByIdAndRoomIdAndTool(UUID.fromString(r), room.getId(), "chat").isEmpty()) clean.remove("replyTo");
-        }
     }
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> castMap(Map<?, ?> m) { return (Map<String, Object>) m; }
-
-    private static Map<String, List<String>> reactions(Object o) {
-        Map<String, List<String>> r = new LinkedHashMap<>();
-        if (o instanceof Map<?, ?> m) m.forEach((k, v) -> r.put(String.valueOf(k), new ArrayList<>(((List<?>) v).stream().map(String::valueOf).toList())));
-        return r;
-    }
 
     private static Map<String, Object> votesOf(Map<String, Object> d) {
         return d.get("votes") instanceof Map<?, ?> m ? castMap(m) : Map.of();

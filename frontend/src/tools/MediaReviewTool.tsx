@@ -30,8 +30,8 @@ export default function MediaReviewTool({ room, focus }: { room: Room; focus?: F
   const { user } = useAuth()
   const toast = useToast()
   const dialogs = useDialogs()
-  const { files } = useRoomFiles(room.code)
-  const { items, create, update, remove, act } = useItems<ReviewData>(room.code, 'review')
+  const { files, loading: filesLoading } = useRoomFiles(room.code)
+  const { items, loading: itemsLoading, create, update, remove, act } = useItems<ReviewData>(room.code, 'review')
   const canWrite = canWriteIn(room, user)
   const staff = isStaffIn(room, user)
   const media = useMemo(() => files.filter((f) => mediaKind(f.name)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)), [files])
@@ -54,7 +54,7 @@ export default function MediaReviewTool({ room, focus }: { room: Room; focus?: F
   const kind = file ? mediaKind(file.name) : null
   useEffect(() => { if (!fileId && media[0]) setFileId(media[0].id) }, [media, fileId])
   // desde una notificación: se elige el archivo del comentario y se resalta el comentario
-  useFocusTarget(focus, media.length > 0 || items.length > 0, (f) => {
+  useFocusTarget(focus, !filesLoading && !itemsLoading, (f) => {
     const c = items.find((x) => x.id === f.item)
     const target = f.file ?? c?.data.fileId
     if (target) { setFileId(target); setFilter('all'); setQ('') }

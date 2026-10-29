@@ -21,10 +21,10 @@ final class ItemSchemas {
 
     private ItemSchemas() {}
 
-    static final Set<String> TOOLS = Set.of("chat", "task", "poll", "review", "event", "link", "player");
+    static final Set<String> TOOLS = Set.of("task", "poll", "review", "event", "link", "player");
 
     /** Campos que solo cambia el servidor mediante acciones (votar, reaccionar…). */
-    static final Map<String, Set<String>> SERVER_FIELDS = Map.of("chat", Set.of("reactions", "edited"), "poll", Set.of("votes"), "event", Set.of("rsvp"));
+    static final Map<String, Set<String>> SERVER_FIELDS = Map.of("poll", Set.of("votes"), "event", Set.of("rsvp"));
 
     private static final Pattern DATETIME = Pattern.compile("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$");
     private static final Pattern COLOR = Pattern.compile("^#[0-9a-fA-F]{6}$");
@@ -34,11 +34,6 @@ final class ItemSchemas {
         Map<String, Object> d = in == null ? Map.of() : in;
         Map<String, Object> out = new LinkedHashMap<>();
         switch (tool) {
-            case "chat" -> {
-                out.put("text", str(d, "text", 4000, true));
-                String reply = opt(d, "replyTo", 40);
-                if (reply != null) out.put("replyTo", uuid(reply));
-            }
             case "task" -> {
                 out.put("title", str(d, "title", 200, true));
                 out.put("description", str(d, "description", 5000, false));

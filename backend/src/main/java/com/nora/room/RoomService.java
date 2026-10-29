@@ -315,6 +315,12 @@ public class RoomService {
         return sysRole == Role.ADMIN || room.getOwnerId().equals(userId) || memberRole(room, userId) == RoomRole.MODERATOR;
     }
 
+    /** La sala por id, sin comprobar quién pregunta (uso interno de los servicios en vivo). */
+    @Transactional(readOnly = true)
+    public Room roomById(UUID id) {
+        return rooms.findById(id).orElse(null);
+    }
+
     private RoomRole memberRole(Room room, UUID userId) {
         return members.findById(new RoomMember.Key(room.getId(), userId)).map(RoomMember::getRole).orElse(RoomRole.MEMBER);
     }

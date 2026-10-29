@@ -3,6 +3,7 @@ package com.nora.ws;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nora.assist.AssistService;
+import com.nora.chat.ChatService;
 import com.nora.collab.CollabWs;
 import com.nora.live.LiveService;
 import com.nora.common.ApiException;
@@ -26,7 +27,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 /**
  * Canal en tiempo real. Protocolo JSON {"type": "...", "data": {...}}.
- * Cliente → servidor: join {code}, leave, ping.
+ * Cliente → servidor: join {code}, leave, ping, chat.typing {conv}.
  * Servidor → cliente: joined, presence, pong, error y los eventos de sala/usuario (ver {@link RealtimeBroadcaster}).
  */
 @Component
@@ -71,8 +72,10 @@ public class NoraWebSocketHandler extends TextWebSocketHandler implements Assist
     private final CollabWs collab;
     private final AssistService assist;
     private final LiveService live;
+    private final ChatService chat;
 
-    public NoraWebSocketHandler(ObjectMapper json, @Lazy RoomService rooms, PresenceService presence, @Lazy UploadService uploads, @Lazy CollabWs collab, @Lazy AssistService assist, @Lazy LiveService live) {
+    public NoraWebSocketHandler(ObjectMapper json, @Lazy RoomService rooms, PresenceService presence, @Lazy UploadService uploads, @Lazy CollabWs collab, @Lazy AssistService assist, @Lazy LiveService live, @Lazy ChatService chat) {
+        this.chat = chat;
         this.collab = collab;
         this.live = live;
         this.assist = assist;
@@ -147,6 +150,7 @@ public class NoraWebSocketHandler extends TextWebSocketHandler implements Assist
             case "join" -> join(conn, msg.path("code").asText(""));
             case "leave" -> leaveRoom(conn);
             case "upload.progress" -> relayUploadProgress(conn, msg);
+            case "chat.typing" -> typing(conn, msg);
             case "doc.join" -> withDoc(conn, msg, id -> collab.join(conn, id));
             case "doc.leave" -> withDoc(conn, msg, id -> collab.leave(conn, id));
             case "doc.update" -> withDoc(conn, msg, id -> collab.update(conn, id, msg.path("update").asText(""), msg.path("ref").asText("")));
@@ -159,6 +163,17 @@ public class NoraWebSocketHandler extends TextWebSocketHandler implements Assist
             case "assist.input" -> assist.input(conn, msg);
             case "assist.end" -> assist.end(conn, msg);
             default -> send(conn, "error", Map.of("message", "Tipo de mensaje desconocido"));
+        }
+    }
+
+    /** «Está escribiendo…» en una conversación del chat de la sala en la que se está. */
+    private void typing(Conn conn, JsonNode msg) {
+        UUID roomId = conn.roomId;
+        if (roomId == null) return;
+        try {
+            chat.typing(conn.userId, conn.displayName, roomId, UUID.fromString(msg.path("conv").asText("")));
+        } catch (IllegalArgumentException ignored) {
+            // conversación no válida
         }
     }
 
