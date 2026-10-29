@@ -33,6 +33,18 @@
 `GET /api/assist/rooms/{code}/agents` y los eventos `assist.agent.user {userId, online}` (solo para quienes comparten sala) dicen a quién se le puede pedir control:
 el botón **Controlar** solo se activa con las personas que tienen el agente conectado; las demás aparecen como «sin agente (solo ver)».
 
+## Firmar el agente de Windows (gratis, repositorio público)
+
+Un `.exe` sin firmar hace que Windows SmartScreen avise de que «puede ser peligroso». Para proyectos de código abierto, la **SignPath Foundation** firma gratis:
+
+1. Pide el alta en <https://signpath.org/foundation> (repositorio público con licencia de código abierto, como este con MIT). La revisan a mano y tarda unos días.
+2. Con la cuenta aprobada, en SignPath crea el proyecto `nora-agent` con la política `release-signing` y pega `agent/signpath-artifact-configuration.xml` como configuración del artefacto; conecta el repositorio de GitHub (_trusted build system_).
+3. En GitHub → Settings → Secrets and variables → Actions: secreto `SIGNPATH_API_TOKEN` y variable `SIGNPATH_ORGANIZATION_ID` (opcionales `SIGNPATH_PROJECT_SLUG` y `SIGNPATH_POLICY_SLUG` si usaste otros nombres).
+4. Publica una versión: `git tag agent-v0.1.0 && git push origin agent-v0.1.0`. El flujo `.github/workflows/agent.yml` compila, firma el de Windows y crea una Release con los tres archivos.
+5. Para que Nora ofrezca ese firmado, pon en `.env` `NORA_AGENT_WINDOWS_URL=https://github.com/Tecsharp/Nora/releases/download/agent-v0.1.0/nora-agent-windows.exe` y reconstruye (`docker compose up -d --build gateway`).
+
+Aun firmado, SmartScreen puede avisar los primeros días hasta que el archivo gane reputación por las descargas; el aviso cambia de «editor desconocido» al nombre del editor.
+
 ## Límites y decisiones
 
 - Cada persona puede tener como máximo 6 sesiones abiertas; las peticiones sin respuesta caducan a los 2 minutos.

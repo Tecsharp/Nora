@@ -109,6 +109,8 @@ services:
     build:
       context: .
       dockerfile: gateway/Dockerfile
+      args:
+        AGENT_WINDOWS_URL: ${NORA_AGENT_WINDOWS_URL:-}   # URL del nora-agent-windows.exe firmado de una Release (opcional)
     depends_on:
       backend: { condition: service_healthy }
       frontend: { condition: service_started }
