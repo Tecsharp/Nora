@@ -40,3 +40,10 @@ comentarios tiene pendientes (o un visto si todo está resuelto). Lectores: ven 
 
 **Reproducción:** el navegador no puede enviar el token de sesión desde `<video>`, así que `POST /api/rooms/{code}/files/{id}/stream` devuelve una dirección **firmada y de 6 horas** (`/api/media/{token}`) que el servidor atiende **por tramos (Range, 206)** para poder saltar sin bajar el archivo entero.
 Solo se sirven tipos de audio, vídeo e imagen raster conocidos (nunca SVG ni nada ejecutable), con `nosniff`.
+
+## Calendario
+
+Vista de **mes** (6 semanas, lunes primero, eventos con su hora y color, «+N más») y de **agenda** (próximos días agrupados: Hoy, Mañana…). Un clic en un día vacío crea un evento; los eventos tienen hora de inicio/fin o «todo el día»,
+lugar o enlace de reunión (clicable), descripción y color. Cada participante responde **Voy / Quizás / No voy** (también los lectores) y todos ven quién va, en vivo. **Exportar `.ics`** (todos o uno) para el calendario del móvil o del ordenador.
+La herramienta muestra una insignia con los **eventos de hoy** y avisa con un mensaje **10 minutos antes** de los que empiezan (salvo los que se han rechazado). Con la IA activa: **Crear desde texto** («mañana a las 17:00 reunión en la sala 2») con revisión antes de guardar.
+Las horas se guardan sin zona (hora local de quien las ve), pensado para equipos en la misma zona horaria.
