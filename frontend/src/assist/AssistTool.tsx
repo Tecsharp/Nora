@@ -15,7 +15,7 @@ const DOWNLOADS = [
 export default function AssistTool({ room, online }: { room: Room; online: Set<string> }) {
   const { user } = useAuth()
   const toast = useToast()
-  const { sessions, agent, ask, share } = useAssist()
+  const { sessions, agent, agents, ask, share } = useAssist()
   const [code, setCode] = useState<string | null>(null)
   const supported = screenSharingSupported()
   const others = room.participants.filter((p) => p.userId !== user?.id)
@@ -39,14 +39,15 @@ export default function AssistTool({ room, online }: { room: Room; online: Set<s
           {others.map((p) => {
             const on = online.has(p.userId)
             const busy = sessions.some((s) => s.peer.id === p.userId)
+            const hasAgent = agents.has(p.userId)
             const person = { id: p.userId, name: p.displayName }
             return (
               <div key={p.userId} className={`assist-row ${on ? '' : 'off'}`}>
                 <Avatar name={p.displayName} online={on} userId={p.userId} version={p.avatarVersion} />
-                <span className="truncate assist-name">{p.displayName}{!on && <small> · desconectado</small>}</span>
+                <span className="truncate assist-name">{p.displayName}{!on && <small> · desconectado</small>}{on && <small className={hasAgent ? 'ok' : ''}>{hasAgent ? ' · agente conectado' : ' · sin agente (solo ver)'}</small>}</span>
                 <span className="spacer" />
                 <button className="btn sm" disabled={!on || busy || !supported} onClick={() => ask(person, 'view')} title="Pedirle que te enseñe su pantalla"><Eye size={14} /> Ver su pantalla</button>
-                <button className="btn sm" disabled={!on || busy || !supported} onClick={() => ask(person, 'control')} title="Pedirle ver y controlar su equipo (necesita que tenga el agente de Nora)"><Hand size={14} /> Controlar</button>
+                <button className="btn sm" disabled={!on || busy || !supported || !hasAgent} onClick={() => ask(person, 'control')} title={hasAgent ? 'Pedirle ver y controlar su equipo' : `${p.displayName} no tiene el agente de Nora conectado: para controlar su equipo debe instalarlo (en Asistencia → Agente de escritorio)`}><Hand size={14} /> Controlar</button>
                 <button className="btn sm ghost" disabled={!on || busy || !supported} onClick={() => void share(person)} title="Enseñarle tu pantalla"><Share2 size={14} /> Compartir la mía</button>
               </div>
             )

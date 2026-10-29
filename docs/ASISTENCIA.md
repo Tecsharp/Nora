@@ -28,6 +28,11 @@
    `mm` mover, `md`/`mu` botón, `wh` rueda, `kd`/`ku` tecla. Posiciones normalizadas 0–1 sobre la imagen de la pantalla; el agente las aplica a la pantalla principal.
 5. `revoke` (cualquiera de los dos), terminar la sesión o caer el agente → `control.stop`: el agente suelta botones y teclas y deja de obedecer.
 
+## Quién tiene agente
+
+`GET /api/assist/rooms/{code}/agents` y los eventos `assist.agent.user {userId, online}` (solo para quienes comparten sala) dicen a quién se le puede pedir control:
+el botón **Controlar** solo se activa con las personas que tienen el agente conectado; las demás aparecen como «sin agente (solo ver)».
+
 ## Límites y decisiones
 
 - Cada persona puede tener como máximo 6 sesiones abiertas; las peticiones sin respuesta caducan a los 2 minutos.

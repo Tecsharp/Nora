@@ -55,6 +55,8 @@ public class AssistService {
     public interface Hub {
         List<Peer> peers(UUID roomId, UUID userId);
         List<Peer> userPeers(UUID userId);
+        /** Todas las pestañas que están en alguna de las salas donde esa persona está conectada. */
+        List<Peer> roomMates(UUID userId);
         Peer peer(String id);
     }
 
@@ -254,6 +256,9 @@ public class AssistService {
         if (hub == null) return;
         Map<String, Object> info = agentInfo(userId);
         for (Peer p : hub.userPeers(userId)) p.send("assist.agent", info);
+        // quienes comparten sala con esta persona saben si se le puede pedir control
+        Map<String, Object> ev = Map.of("userId", userId, "online", agentOnline(userId));
+        for (Peer p : hub.roomMates(userId)) p.send("assist.agent.user", ev);
     }
 
     private void toAgents(UUID userId, String payload) {

@@ -178,6 +178,12 @@ public class NoraWebSocketHandler extends TextWebSocketHandler implements Assist
     }
 
     @Override
+    public List<CollabWs.Peer> roomMates(UUID userId) {
+        var rooms = conns.values().stream().filter(c -> userId.equals(c.userId) && c.roomId != null).map(c -> c.roomId).collect(java.util.stream.Collectors.toSet());
+        return conns.values().stream().filter(c -> c.roomId != null && rooms.contains(c.roomId)).map(c -> (CollabWs.Peer) c).toList();
+    }
+
+    @Override
     public CollabWs.Peer peer(String id) {
         return id == null ? null : conns.get(id);
     }

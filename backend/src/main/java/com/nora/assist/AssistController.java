@@ -2,10 +2,12 @@ package com.nora.assist;
 
 import com.nora.auth.AuthPrincipal;
 import com.nora.common.ApiException;
+import com.nora.room.RoomService;
 import java.util.List;
 import java.util.Map;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,9 +18,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AssistController {
 
     private final AssistService assist;
+    private final RoomService rooms;
 
-    public AssistController(AssistService assist) {
+    public AssistController(AssistService assist, RoomService rooms) {
         this.assist = assist;
+        this.rooms = rooms;
     }
 
     /** Servidores STUN/TURN para la conexión directa entre los dos navegadores. */
@@ -48,8 +52,11 @@ public class AssistController {
         return Map.of("token", token);
     }
 
-    @GetMapping("/ping")
-    public List<String> ping() {
-        return List.of("assist");
+    /** Quién de esta sala tiene el agente conectado (a esas personas se les puede pedir el control). */
+    @GetMapping("/rooms/{code}/agents")
+    public Map<String, Object> roomAgents(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code) {
+        List<String> ids = rooms.get(p.userId(), code).participants().stream()
+                .filter(x -> assist.agentOnline(x.userId())).map(x -> x.userId().toString()).toList();
+        return Map.of("userIds", ids);
     }
 }

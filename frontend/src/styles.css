@@ -884,3 +884,4 @@ body.no-select, body.no-select * { user-select: none !important; -webkit-user-se
 .assist-hint { bottom: 10px; }
 .assist-screen:focus .assist-hint { display: none; }
 @media (max-width: 640px) { .assist-panel { right: 12px !important; bottom: 12px !important; } .assist-panel.big { inset: 8px; } }
+.assist-name small.ok { color: var(--green); }

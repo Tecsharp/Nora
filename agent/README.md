@@ -26,12 +26,14 @@ comparte tu navegador, no el agente.
 
 ## Compilar
 
+Windows y Linux se compilan solos al construir el gateway de Nora (`docker compose up -d --build`; ver `gateway/Dockerfile`) y se ofrecen en Asistencia → «Descárgalo». El de macOS no se puede compilar desde Linux:
+
 ```sh
 ./agent/build.sh          # deja el binario en agent/dist/ (Nora lo ofrece en /downloads/)
 ```
 
-Para los tres sistemas a la vez usa el flujo de GitHub Actions `.github/workflows/agent.yml` y copia los artefactos a `agent/dist/` como
-`nora-agent-windows.exe`, `nora-agent-macos` y `nora-agent-linux`.
+Para compilar los tres a la vez fuera de Docker usa el flujo de GitHub Actions `.github/workflows/agent.yml` y copia los artefactos a `agent/dist/` como
+`nora-agent-windows.exe`, `nora-agent-macos` y `nora-agent-linux` (lo que haya en `agent/dist/` también se sirve).
 
 ## Plataformas
 

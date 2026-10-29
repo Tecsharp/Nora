@@ -45,6 +45,8 @@ interface Api {
   sessions: AssistSession[]
   incoming: Incoming[]
   agent: AgentInfo
+  /** Personas de la sala con el agente de escritorio conectado (a ellas se les puede pedir el control). */
+  agents: Set<string>
   /** Pido ver (o controlar) la pantalla de otra persona. */
   ask: (to: Person, mode: Mode) => void
   /** Ofrezco mi pantalla a otra persona. */
@@ -59,7 +61,7 @@ interface Api {
 
 const noop = () => {}
 const Ctx = createContext<Api>({
-  sessions: [], incoming: [], agent: { online: false }, ask: noop, share: async () => {}, accept: async () => {}, decline: noop, end: noop,
+  sessions: [], incoming: [], agent: { online: false }, agents: new Set(), ask: noop, share: async () => {}, accept: async () => {}, decline: noop, end: noop,
   requestControl: noop, revokeControl: noop, input: noop,
 })
 export const useAssist = () => useContext(Ctx)
@@ -68,11 +70,12 @@ export const screenSharingSupported = () => typeof navigator !== 'undefined' && 
 
 const FALLBACK_ICE: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }]
 
-export function AssistProvider({ children }: { children: ReactNode }) {
+export function AssistProvider({ code, children }: { code: string; children: ReactNode }) {
   const toast = useToast()
   const [sessions, setSessions] = useState<AssistSession[]>([])
   const [incoming, setIncoming] = useState<Incoming[]>([])
   const [agent, setAgent] = useState<AgentInfo>({ online: false })
+  const [agents, setAgents] = useState<Set<string>>(new Set())
   const pcs = useRef(new Map<string, RTCPeerConnection>())
   const queued = useRef(new Map<string, RTCIceCandidateInit[]>())
   const shared = useRef<MediaStream | null>(null) // mi pantalla, compartida con una o varias personas
@@ -177,6 +180,13 @@ export function AssistProvider({ children }: { children: ReactNode }) {
   })
   useRealtime('assist.error', (d: { message: string }) => toast(d.message, 'error'))
   useRealtime('assist.agent', (d: AgentInfo) => setAgent(d))
+  useRealtime('assist.agent.user', (d: { userId: string; online: boolean }) => setAgents((s) => {
+    const n = new Set(s)
+    if (d.online) n.add(d.userId)
+    else n.delete(d.userId)
+    return n
+  }))
+  useRealtime('reconnected', () => api<{ userIds: string[] }>(`/assist/rooms/${encodeURIComponent(code)}/agents`).then((r) => setAgents(new Set(r.userIds))).catch(() => undefined))
   useRealtime('assist.started', (d: { session: string; role: 'viewer' | 'sharer'; peer: Person; mode: Mode }) => {
     pendingInvites.current.delete(d.session)
     setIncoming((l) => l.filter((i) => i.id !== d.session))
@@ -240,18 +250,20 @@ export function AssistProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     api<AgentInfo>('/assist/agent').then(setAgent).catch(() => undefined)
+    api<{ userIds: string[] }>(`/assist/rooms/${encodeURIComponent(code)}/agents`).then((r) => setAgents(new Set(r.userIds))).catch(() => undefined)
     return () => {
       sessionsRef.current.forEach((x) => send({ type: 'assist.end', session: x.id }))
       pcs.current.forEach((pc) => pc.close())
       pcs.current.clear()
       stopShared()
     }
-  }, [stopShared])
+  }, [stopShared, code])
 
   const value = useMemo<Api>(() => ({
     sessions,
     incoming,
     agent,
+    agents,
     ask: (to, mode) => send({ type: 'assist.request', to: to.id, mode }),
     share: async (to) => {
       const s = await grabScreen(false)
@@ -288,7 +300,7 @@ export function AssistProvider({ children }: { children: ReactNode }) {
     },
     revokeControl: (id) => send({ type: 'assist.control', session: id, action: 'revoke' }),
     input: (id, e) => send({ type: 'assist.input', session: id, e }),
-  }), [sessions, incoming, agent, grabScreen, patch])
+  }), [sessions, incoming, agent, agents, grabScreen, patch])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

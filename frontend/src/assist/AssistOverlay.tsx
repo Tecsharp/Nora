@@ -57,7 +57,7 @@ export default function AssistOverlay() {
 const THROTTLE_MS = 16
 
 function ViewerPanel({ s, index }: { s: AssistSession; index: number }) {
-  const { end, requestControl, revokeControl, input } = useAssist()
+  const { end, requestControl, revokeControl, input, agents } = useAssist()
   const video = useRef<HTMLVideoElement>(null)
   const box = useRef<HTMLDivElement>(null)
   const [big, setBig] = useState(false)
@@ -124,7 +124,7 @@ function ViewerPanel({ s, index }: { s: AssistSession; index: number }) {
         <span className="spacer" />
         {controlling
           ? <button className="btn sm danger" onClick={() => revokeControl(s.id)}>Dejar de controlar</button>
-          : <button className="btn sm" disabled={s.control === 'asked'} onClick={() => requestControl(s.id)} title="Pide permiso para usar su ratón y teclado (necesita el agente de Nora en su equipo)"><MousePointer2 size={14} /> Controlar</button>}
+          : <button className="btn sm" disabled={s.control === 'asked' || !agents.has(s.peer.id)} onClick={() => requestControl(s.id)} title={agents.has(s.peer.id) ? 'Pide permiso para usar su ratón y teclado' : `${s.peer.name} no tiene el agente de Nora conectado: sin él solo se puede ver su pantalla`}><MousePointer2 size={14} /> Controlar</button>}
         <button className="icon-btn" onClick={() => setBig((b) => !b)} aria-label={big ? 'Reducir' : 'Ampliar'} title={big ? 'Reducir' : 'Ampliar'}>{big ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button>
         <button className="icon-btn" onClick={() => end(s.id)} aria-label="Terminar" title="Terminar la asistencia"><X size={16} /></button>
       </div>

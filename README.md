@@ -70,7 +70,7 @@ puede cortar la sesión o el control cuando quiera; mientras alguien controla se
 - **Solo ver:** funciona con cualquier navegador de escritorio, sin instalar nada.
 - **Controlar:** un navegador no puede mover el ratón de un equipo, así que quien comparte instala el **agente de escritorio** (`agent/`, Rust, un ejecutable
   para Windows, macOS y Linux) que se vincula con su cuenta con un código de un solo uso y solo aplica clics/teclas mientras haya un control concedido desde Nora.
-  Los binarios se compilan con `agent/build.sh` o el flujo `.github/workflows/agent.yml` y se copian a `agent/dist/` (el gateway los sirve en `/downloads/`).
+  Los binarios de **Windows y Linux se compilan solos al construir el gateway** (`docker compose up -d --build`, la primera vez tarda unos minutos) y se descargan desde Asistencia; el de **macOS** hay que compilarlo en un Mac con `./agent/build.sh` (queda en `agent/dist/` y el gateway también lo sirve) o con el flujo `.github/workflows/agent.yml`.
 - **Redes:** por defecto usa un STUN público (`NORA_STUN_URLS`); para redes estrictas (empresas, 4G) activa el servidor TURN incluido:
   define `NORA_TURN_SECRET` y `NORA_TURN_URLS=turn:TU-IP:3478` en `.env` y arranca con `docker compose --profile turn up -d` (abre 3478 y 49160-49200 UDP).
 

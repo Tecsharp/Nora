@@ -240,7 +240,7 @@ export default function RoomPage() {
   const canAssign = room.isOwner || user?.role === 'ADMIN'
 
   return (
-    <AssistProvider>
+    <AssistProvider code={room.code}>
     <div className="room">
       <header className="room-top">
         <Link to="/" className="btn ghost sm"><ArrowLeft size={15} /> Mis salas</Link>
