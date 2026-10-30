@@ -2,7 +2,7 @@
 # Compila Nora Agent para ESTE equipo (Linux o macOS) y lo deja en agent/dist/ con el nombre que Nora ofrece para descargar.
 # Uso:  ./agent/build.sh            (requiere Rust: https://rustup.rs)
 #         · macOS: genera una app «universal» (Apple Silicon + Intel) lista para usar: agent/dist/nora-agent-macos.zip (contiene «Nora Agent.app»)
-#         · Linux: agent/dist/nora-agent-linux (necesita libxkbcommon-dev y libxdo-dev)
+#         · Linux: agent/dist/nora-agent-linux (necesita un compilador de C: build-essential)
 #       ./agent/build.sh windows    (desde Linux/macOS: compila el .exe de Windows; requiere el compilador mingw-w64)
 set -e
 cd "$(dirname "$0")"
@@ -20,6 +20,7 @@ fi
 
 case "$(uname -s)" in
   Linux)
+    command -v cc >/dev/null 2>&1 || { echo "Falta un compilador de C. En Debian/Ubuntu: sudo apt install build-essential pkg-config   ·   Fedora: sudo dnf install gcc pkgconf"; exit 1; }
     cargo build --release
     cp target/release/nora-agent dist/nora-agent-linux
     echo "Listo: agent/dist/nora-agent-linux"

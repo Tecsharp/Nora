@@ -40,7 +40,7 @@ si configuraste SignPath, ver `docs/ASISTENCIA.md`) y los publica en *Releases*.
 | --- | --- | --- |
 | Windows (PowerShell) | `.\agent\build.ps1` | `nora-agent-windows.exe` |
 | macOS | doble clic en `agent/build-macos.command`, o `./agent/build.sh` | `Nora Agent.app` **universal** (Apple Silicon + Intel) y `nora-agent-macos.zip` |
-| Linux | `./agent/build.sh` (necesita `libxkbcommon-dev` y `libxdo-dev`) | `nora-agent-linux` |
+| Linux | `./agent/build.sh` (necesita un compilador de C: `sudo apt install build-essential pkg-config`; si pide alguna librería más, `libx11-dev libxcb1-dev`) | `nora-agent-linux` |
 | Windows desde Linux/macOS | `./agent/build.sh windows` (necesita mingw-w64) | `nora-agent-windows.exe` |
 
 En macOS hace falta tener instaladas las herramientas de línea de comandos de Apple (`xcode-select --install`). La app se firma «ad hoc» (sin cuenta de Apple), así que **la primera vez**
