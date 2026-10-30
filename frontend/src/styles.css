@@ -924,7 +924,7 @@ body.no-select, body.no-select * { user-select: none !important; -webkit-user-se
 .chat-msg.head { margin-top: 10px; }
 .chat-msg.flash { background: var(--accent-soft); }
 .chat-av { flex: none; width: 34px; padding-top: 2px; }
-.chat-col { min-width: 0; max-width: min(820px, 94%); display: flex; flex-direction: column; }
+.chat-col { min-width: 0; max-width: min(540px, 82%); display: flex; flex-direction: column; }
 .chat-meta { display: flex; align-items: baseline; gap: 8px; font-size: 0.8rem; margin-bottom: 2px; }
 .chat-meta time { color: var(--muted); font-size: 0.7rem; }
 .chat-bubble-wrap { position: relative; display: block; max-width: 100%; }
