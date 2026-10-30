@@ -17,9 +17,12 @@ fn in_n(x: f32, y: f32) -> bool {
     stems || (x - dx).abs() <= t * 0.62
 }
 
-/// RGBA de `size` × `size` con bordes suavizados (4× de muestreo).
-pub fn rgba(size: u32) -> Vec<u8> {
+/// RGBA de `size` × `size` con bordes suavizados (4× de muestreo). `pad` es el margen transparente a cada lado como fracción del
+/// lado: macOS dibuja el icono tal cual y espera ese aire alrededor (si no, se ve mucho más grande que los demás en el Dock).
+pub fn rgba_padded(size: u32, pad: f32) -> Vec<u8> {
     let s = size as f32;
+    let m = s * pad;
+    let inner = s - 2.0 * m;
     let mut out = vec![0u8; (size * size * 4) as usize];
     let n = 4;
     for py in 0..size {
@@ -27,16 +30,16 @@ pub fn rgba(size: u32) -> Vec<u8> {
             let (mut a, mut white) = (0u32, 0u32);
             for sy in 0..n {
                 for sx in 0..n {
-                    let x = px as f32 + (sx as f32 + 0.5) / n as f32;
-                    let y = py as f32 + (sy as f32 + 0.5) / n as f32;
-                    if inside_round_rect(x, y, s, s * 0.225) {
+                    let x = px as f32 + (sx as f32 + 0.5) / n as f32 - m;
+                    let y = py as f32 + (sy as f32 + 0.5) / n as f32 - m;
+                    if x >= 0.0 && y >= 0.0 && x <= inner && y <= inner && inside_round_rect(x, y, inner, inner * 0.225) {
                         a += 1;
-                        if in_n(x / s, y / s) { white += 1; }
+                        if in_n(x / inner, y / inner) { white += 1; }
                     }
                 }
             }
             let total = (n * n) as f32;
-            let t = py as f32 / s;
+            let t = ((py as f32 - m) / inner).clamp(0.0, 1.0);
             // degradado violeta de Nora
             let (r0, g0, b0) = (150.0, 130.0, 255.0);
             let (r1, g1, b1) = (98.0, 80.0, 230.0);
@@ -51,6 +54,14 @@ pub fn rgba(size: u32) -> Vec<u8> {
     }
     out
 }
+
+/// Icono de pantalla completa (ventanas de Windows y Linux, logo dentro de la app).
+pub fn rgba(size: u32) -> Vec<u8> {
+    rgba_padded(size, 0.0)
+}
+
+/// Margen que macOS espera en los iconos de app (la plantilla de Apple deja ~10 % por lado).
+pub const MAC_PAD: f32 = 0.098;
 
 fn crc32(data: &[u8]) -> u32 {
     let mut crc = !0u32;
@@ -72,9 +83,9 @@ fn adler32(data: &[u8]) -> u32 {
     (b << 16) | a
 }
 
-/// PNG sin compresión (bloques «stored» de zlib): sirve para generar el icono de la app de macOS sin depender de nada.
+/// PNG sin compresión (bloques «stored» de zlib): sirve para generar el icono de la app de macOS (con su margen) sin depender de nada.
 pub fn png(size: u32) -> Vec<u8> {
-    let px = rgba(size);
+    let px = rgba_padded(size, MAC_PAD);
     let mut raw = Vec::with_capacity(px.len() + size as usize);
     for row in px.chunks((size * 4) as usize) {
         raw.push(0);
