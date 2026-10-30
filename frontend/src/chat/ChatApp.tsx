@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, BellOff, Info, MessageSquarePlus, Pin, Search, Sparkles, UserPlus } from 'lucide-react'
+import { ArrowLeft, BellOff, Info, MessageSquarePlus, Pin, Search, Sparkles, UserPlus, X } from 'lucide-react'
 import { useAuth } from '../auth'
 import AiAssist, { type AiAction } from '../ai/AiAssist'
 import { useToast } from '../toast'
@@ -8,7 +8,8 @@ import { ConvAvatar, relTime, useConvSubtitle } from './ChatBits'
 import ChatPane from './ChatPane'
 import { useChat } from './ChatProvider'
 import ConvInfo from './ConvInfo'
-import { chatApi, type Conv } from './chatApi'
+import SearchResults from './SearchResults'
+import { chatApi, type Conv, type Message } from './chatApi'
 import { NewDmDialog, NewGroupDialog } from './GroupDialogs'
 import { useMessages } from './useMessages'
 
@@ -25,7 +26,8 @@ export default function ChatApp({ focus }: { focus?: FocusTarget | null }) {
   const [sel, setSel] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
   const [q, setQ] = useState('')
-  const [info, setInfo] = useState(false)
+  const [panel, setPanel] = useState<'none' | 'info' | 'search'>('none')
+  const [inQ, setInQ] = useState('') // búsqueda dentro de la conversación abierta
   const [newGroup, setNewGroup] = useState(false)
   const [newDm, setNewDm] = useState(false)
   const [target, setTarget] = useState<{ id: string; nonce: number } | null>(null)
@@ -56,6 +58,12 @@ export default function ChatApp({ focus }: { focus?: FocusTarget | null }) {
   }), [convs, search, filter, chat, user?.id])
   const current = convs.find((c) => c.id === sel) ?? null
 
+  // un resultado de búsqueda: se abre su conversación y se va al mensaje (si hace falta se carga una ventana alrededor de él)
+  const pick = (m: Message) => {
+    setSel(m.conv)
+    setTarget({ id: m.id, nonce: Date.now() })
+  }
+
   const openDm = async (userId: string) => {
     setNewDm(false)
     try {
@@ -66,7 +74,7 @@ export default function ChatApp({ focus }: { focus?: FocusTarget | null }) {
   }
 
   return (
-    <div className={`capp ${current ? 'has-conv' : ''} ${info ? 'with-info' : ''}`}>
+    <div className={`capp ${current ? 'has-conv' : ''} ${panel !== 'none' ? 'with-info' : ''}`}>
       <aside className="capp-side" aria-label="Conversaciones">
         <div className="capp-side-head">
           <h3>Chats</h3>
@@ -77,6 +85,7 @@ export default function ChatApp({ focus }: { focus?: FocusTarget | null }) {
         <div className="capp-filters" role="tablist">
           {FILTERS.map((f) => <button key={f.id} role="tab" aria-selected={filter === f.id} className={filter === f.id ? 'on' : ''} onClick={() => setFilter(f.id)}>{f.label}</button>)}
         </div>
+        <div className="capp-scroll">
         <ul className="capp-list">
           {!loaded && <li className="muted small capp-none">Cargando…</li>}
           {list.map((c) => (
@@ -96,14 +105,30 @@ export default function ChatApp({ focus }: { focus?: FocusTarget | null }) {
           ))}
           {loaded && list.length === 0 && <li className="muted small capp-none">{search || filter !== 'all' ? 'Nada que coincida' : 'Aún no hay conversaciones'}</li>}
         </ul>
+        {search.length >= 2 && (
+          <section className="capp-msgs" aria-label="Mensajes encontrados">
+            <h5>Mensajes</h5>
+            <SearchResults q={q} onPick={pick} />
+          </section>
+        )}
+        </div>
       </aside>
       <section className="capp-main">
-        {current ? <Conversation key={current.id} conv={current} info={info} onInfo={() => setInfo((v) => !v)} onBack={() => setSel(null)} focusMsg={target} />
+        {current ? <Conversation key={current.id} conv={current} panel={panel} onPanel={(p) => setPanel((cur) => (cur === p ? 'none' : p))} onBack={() => setSel(null)} focusMsg={target} />
           : <div className="capp-blank"><Sparkles size={34} /><strong>Elige una conversación</strong><span className="small muted">O empieza un grupo o un mensaje directo con las personas de la sala.</span></div>}
       </section>
-      {info && current && (
+      {panel === 'info' && current && (
         <aside className="capp-info" aria-label="Ajustes de la conversación">
-          <ConvInfo conv={current} onClose={() => setInfo(false)} onGone={() => { setInfo(false); setSel(null) }} />
+          <ConvInfo conv={current} onClose={() => setPanel('none')} onGone={() => { setPanel('none'); setSel(null) }} />
+        </aside>
+      )}
+      {panel === 'search' && current && (
+        <aside className="capp-info capp-find" aria-label="Buscar en la conversación">
+          <header className="capp-find-head">
+            <label className="kb-search"><Search size={15} /><input autoFocus value={inQ} onChange={(e) => setInQ(e.target.value)} placeholder="Buscar en esta conversación" aria-label="Buscar en esta conversación" onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setPanel('none') } }} /></label>
+            <button className="icon-btn sm" aria-label="Cerrar la búsqueda" onClick={() => setPanel('none')}><X size={16} /></button>
+          </header>
+          <SearchResults q={inQ} conv={current.id} onPick={pick} />
         </aside>
       )}
       {newGroup && <NewGroupDialog onClose={() => setNewGroup(false)} onCreated={(c) => { setNewGroup(false); setSel(c.id) }} />}
@@ -112,7 +137,7 @@ export default function ChatApp({ focus }: { focus?: FocusTarget | null }) {
   )
 }
 
-function Conversation({ conv, info, onInfo, onBack, focusMsg }: { conv: Conv; info: boolean; onInfo: () => void; onBack: () => void; focusMsg: { id: string; nonce: number } | null }) {
+function Conversation({ conv, panel, onPanel, onBack, focusMsg }: { conv: Conv; panel: 'none' | 'info' | 'search'; onPanel: (p: 'info' | 'search') => void; onBack: () => void; focusMsg: { id: string; nonce: number } | null }) {
   const chat = useChat()
   const store = useMessages(chat.room.code, conv.id)
   const sub = useConvSubtitle(conv)
@@ -121,13 +146,14 @@ function Conversation({ conv, info, onInfo, onBack, focusMsg }: { conv: Conv; in
     <>
       <header className="capp-head">
         <button className="icon-btn capp-back" aria-label="Volver a los chats" onClick={onBack}><ArrowLeft size={18} /></button>
-        <button className="capp-who" onClick={onInfo} aria-label="Ver ajustes de la conversación">
+        <button className="capp-who" onClick={() => onPanel('info')} aria-label="Ver ajustes de la conversación">
           <ConvAvatar conv={conv} size={40} />
           <span><b className="truncate">{chat.title(conv)}</b><small className="truncate">{sub}</small></span>
         </button>
         <span className="spacer" />
         <AiAssist actions={SUMMARY} getText={text} label="Resumir" title="Resumir la conversación con IA" disabled={store.items.length < 3} />
-        <button className={`icon-btn ${info ? 'on' : ''}`} aria-label="Ajustes de la conversación" aria-pressed={info} title="Ajustes" onClick={onInfo}><Info size={18} /></button>
+        <button className={`icon-btn ${panel === 'search' ? 'on' : ''}`} aria-label="Buscar en la conversación" aria-pressed={panel === 'search'} title="Buscar en la conversación" onClick={() => onPanel('search')}><Search size={18} /></button>
+        <button className={`icon-btn ${panel === 'info' ? 'on' : ''}`} aria-label="Ajustes de la conversación" aria-pressed={panel === 'info'} title="Ajustes" onClick={() => onPanel('info')}><Info size={18} /></button>
       </header>
       <ChatPane conv={conv} store={store} variant="full" focusMsg={focusMsg} />
     </>

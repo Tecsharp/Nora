@@ -17,8 +17,16 @@ public final class ChatDtos {
                           Instant createdAt, Instant lastMessageAt, LastMessage last, List<MemberDto> members, String role, boolean muted,
                           boolean pinned, long unread, Instant lastReadAt, UUID otherUserId) {}
 
-    public record MessageDto(UUID id, UUID conv, UUID authorId, String authorName, String kind, String text, UUID replyTo,
+    /** Lo que se cita al responder (autor y un trozo del texto), para que se vea aunque el mensaje original no esté cargado. */
+    public record ReplyPreview(UUID id, String authorName, String text) {}
+
+    public record MessageDto(UUID id, UUID conv, UUID authorId, String authorName, String kind, String text, UUID replyTo, ReplyPreview reply,
                              Map<String, List<String>> reactions, boolean edited, Instant createdAt, Instant updatedAt) {}
+
+    /** Una ventana de mensajes y si hay más hacia atrás o hacia delante (para ir a un mensaje antiguo sin cargar todo lo de en medio). */
+    public record WindowDto(List<MessageDto> items, boolean hasOlder, boolean hasNewer) {}
+
+    public record SearchDto(List<MessageDto> items, boolean more) {}
 
     public record CreateGroup(String name, String description, String color, List<UUID> members) {}
 
