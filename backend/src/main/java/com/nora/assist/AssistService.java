@@ -242,6 +242,13 @@ public class AssistService {
         announceAgent(userId);
     }
 
+    /** La persona detuvo el control desde su agente (panel o icono): se corta en todas sus sesiones y se avisa a quien controlaba. */
+    public void agentRevoke(UUID userId) {
+        for (Session s : List.copyOf(sessions.values())) {
+            if (s.sharerId.equals(userId)) revokeControl(s, "Se quitó el control desde el agente");
+        }
+    }
+
     public boolean agentOnline(UUID userId) { return agents.containsKey(userId); }
 
     public Map<String, Object> agentInfo(UUID userId) {

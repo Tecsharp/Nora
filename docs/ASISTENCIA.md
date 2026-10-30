@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | Interfaz | `frontend/src/assist/` | `AssistProvider` (lógica WebRTC y estado), `AssistOverlay` (peticiones, pantalla que veo, avisos), `AssistTool` (la herramienta de la sala). |
 | Señalización | `AssistService` + `NoraWebSocketHandler` | Mensajes `assist.*` por el WebSocket de la sala. Comprueba sala, membresía, quién es quién y el permiso de control. |
-| Agente | `agent/` | Programa de escritorio (Rust + enigo) que aplica ratón y teclado. Canal propio `/ws/agent`. |
+| Agente | `agent/` | Programa de escritorio con ventana (Rust + egui + enigo) que aplica ratón y teclado. Motor en `core.rs` (vinculación, canal `/ws/agent`), ventana en `gui.rs`. Canal propio `/ws/agent`. |
 | Red | `NORA_STUN_URLS`, `NORA_TURN_*`, servicio `coturn` | Servidores para que los navegadores se encuentren. |
 
 ## Flujo de ver la pantalla
@@ -27,6 +27,7 @@
 4. Mientras `control` esté activo, `assist.input` de **la pestaña que ve** se reenvía al agente de **quien comparte** como `{type: "input", t, x, y, b, dx, dy, k}`:
    `mm` mover, `md`/`mu` botón, `wh` rueda, `kd`/`ku` tecla. Posiciones normalizadas 0–1 sobre la imagen de la pantalla; el agente las aplica a la pantalla principal.
 5. `revoke` (cualquiera de los dos), terminar la sesión o caer el agente → `control.stop`: el agente suelta botones y teclas y deja de obedecer.
+   Si quien comparte pulsa **Detener control** en la ventana del agente, este manda `control.revoke` por su canal y el servidor corta el control en todas sus sesiones y avisa a quien controlaba.
 
 ## Quién tiene agente
 

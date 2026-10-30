@@ -19,7 +19,7 @@ jobs:
       matrix:
         include:
           - { os: windows-latest, bin: nora-agent.exe, out: nora-agent-windows.exe }
-          - { os: macos-latest, bin: nora-agent, out: nora-agent-macos }
+          - { os: macos-latest, bin: nora-agent, out: nora-agent-macos.zip }
           - { os: ubuntu-22.04, bin: nora-agent, out: nora-agent-linux }
     runs-on: ${{ matrix.os }}
     defaults:
@@ -29,11 +29,19 @@ jobs:
       - uses: actions/checkout@v4
       - name: Dependencias de Linux (X11)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libxdo-dev
-      - run: cargo build --release
-      - name: Renombrar
+        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libxdo-dev libx11-dev libxcb1-dev
+      - name: Compilar (Windows y Linux)
+        if: runner.os != 'macOS'
         shell: bash
-        run: cp "target/release/${{ matrix.bin }}" "${{ matrix.out }}"
+        run: |
+          cargo build --release
+          cp "target/release/${{ matrix.bin }}" "${{ matrix.out }}"
+      - name: Compilar (macOS: universal Apple Silicon + Intel, empaquetado como «Nora Agent.app»)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          ./build.sh
+          cp dist/nora-agent-macos.zip nora-agent-macos.zip
       - uses: actions/upload-artifact@v4
         id: upload
         with:

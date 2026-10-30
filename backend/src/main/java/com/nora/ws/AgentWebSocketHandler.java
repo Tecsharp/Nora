@@ -18,7 +18,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 /**
  * Canal del agente de escritorio (/ws/agent). Se autentica con el token que recibió al emparejarse (cabecera Authorization).
- * Servidor → agente: control.start {session, controller}, control.stop, input {t, x, y, …}. Agente → servidor: hello {os, screen, version}, ping.
+ * Servidor → agente: control.start {session, controller}, control.stop, input {t, x, y, …}. Agente → servidor: hello {os, screen, version}, ping, control.revoke (la persona detuvo el control desde el agente).
  */
 @Component
 public class AgentWebSocketHandler extends TextWebSocketHandler {
@@ -68,6 +68,7 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
         }
         switch (msg.path("type").asText("")) {
             case "ping" -> e.link().send("{\"type\":\"pong\"}");
+            case "control.revoke" -> assist.agentRevoke(e.userId());
             case "hello" -> {
                 Map<String, Object> info = (Map<String, Object>) raw.getAttributes().get("info");
                 info.put("os", trunc(msg.path("os").asText("")));

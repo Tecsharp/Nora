@@ -8,7 +8,7 @@ import { screenSharingSupported, useAssist } from './AssistProvider'
 
 const DOWNLOADS = [
   { os: 'Windows', file: 'nora-agent-windows.exe' },
-  { os: 'macOS', file: 'nora-agent-macos' },
+  { os: 'macOS', file: 'nora-agent-macos.zip' },
   { os: 'Linux', file: 'nora-agent-linux' },
 ]
 
@@ -85,15 +85,15 @@ export default function AssistTool({ room, online }: { room: Room; online: Set<s
             ? <span className="muted" title="Este instalador no está en el servidor todavía"><Download size={12} /> {d.os} (no disponible)</span>
             : <a href={`/downloads/${d.file}`} download><Download size={12} /> {d.os}</a>}</span>)}
           {anyMissing && <small className="muted"> — quien administra Nora debe dejarlos en <code>agent/dist/</code>: bájalos de las <a href="https://github.com/Tecsharp/Nora/releases" target="_blank" rel="noopener noreferrer">Releases de GitHub</a> o compílalos con <code>agent/build.sh</code> (ver <code>agent/README.md</code>).</small>}</li>
-          <li>Pulsa «Generar código» y ejecuta el programa; escribe la dirección de esta Nora y el código.</li>
-          <li>Déjalo abierto. Aquí arriba verás «Conectado».</li>
+          <li>Pulsa «Generar código», abre <strong>Nora Agent</strong> y escribe la dirección de esta Nora y el código en su ventana.</li>
+          <li>Déjalo abierto (puedes minimizarlo). Aquí arriba verás «Conectado»; la propia ventana te avisa y te deja detener el control.</li>
         </ol>
         <div className="row">
           <button className="btn sm" onClick={() => void newCode()}><Plug size={14} /> Generar código</button>
           {code && <code className="assist-code" aria-label="Código de vinculación">{code}</code>}
           {code && <small className="muted">Vale 10 minutos y una sola vez. Dirección: <code>{window.location.origin}</code></small>}
         </div>
-        <p className="muted small">En Linux hace falta una sesión X11 (Wayland no permite controlar el equipo). En macOS concede el permiso de Accesibilidad al programa. Al compartir, elige la <strong>pantalla completa</strong> para que se pueda controlar.</p>
+        <p className="muted small">En Linux hace falta una sesión X11 (Wayland no permite controlar el equipo). En macOS descomprime el .zip, mueve «Nora Agent» a Aplicaciones, ábrelo con clic derecho → Abrir la primera vez y concede el permiso de Accesibilidad. Al compartir, elige la <strong>pantalla completa</strong> para que se pueda controlar.</p>
       </section>
     </div>
   )
