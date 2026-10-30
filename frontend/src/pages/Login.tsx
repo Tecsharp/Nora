@@ -6,12 +6,24 @@ import Brand from '../components/Brand'
 import LegalLinks from '../components/LegalLinks'
 import { ThemeToggle } from '../theme'
 
+const EMAIL_KEY = 'nora-login-email'
+const read = (k: string) => {
+  try {
+    return localStorage.getItem(k)
+  } catch {
+    return null
+  }
+}
+
 export default function Login() {
   const { user, login } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const [email, setEmail] = useState('')
+  const saved = read(EMAIL_KEY)
+  const [email, setEmail] = useState(saved ?? '')
   const [password, setPassword] = useState('')
+  const [remember, setRemember] = useState(true) // mantiene la sesión un mes
+  const [rememberEmail, setRememberEmail] = useState(saved !== null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [registration, setRegistration] = useState(true)
@@ -28,7 +40,11 @@ export default function Login() {
     setError('')
     setBusy(true)
     try {
-      await login(email, password)
+      await login(email, password, remember)
+      try {
+        if (rememberEmail) localStorage.setItem(EMAIL_KEY, email.trim())
+        else localStorage.removeItem(EMAIL_KEY)
+      } catch { /* sin almacenamiento */ }
       navigate(from, { replace: true })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo conectar con el servidor')
@@ -54,8 +70,14 @@ export default function Login() {
           Contraseña
           <input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
         </label>
+        <div className="stack tight" style={{ gap: 6 }}>
+          <label className="check"><input type="checkbox" checked={rememberEmail} onChange={(e) => setRememberEmail(e.target.checked)} /> Recordar mi correo en este equipo</label>
+          <label className="check"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> Mantener la sesión iniciada durante un mes</label>
+          {!remember && <span className="muted small">La sesión se cerrará al cerrar el navegador (o tras unos días sin usar Nora).</span>}
+        </div>
         {error && <p className="error small" role="alert">{error}</p>}
         <button className="btn primary block" disabled={busy}>{busy ? 'Entrando…' : 'Entrar'}</button>
+        <p className="muted small center-text">¿Olvidaste tu contraseña? Pide a un administrador un enlace para cambiarla.</p>
         {registration && (
           <p className="muted small center-text">
             ¿No tienes cuenta? <Link to="/register">Regístrate</Link>

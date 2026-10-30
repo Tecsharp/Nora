@@ -32,7 +32,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             jwt.parse(header.substring(7)).ifPresent(p -> {
                 // Se consulta el usuario para que desactivar una cuenta o cambiar su rol surta efecto de inmediato.
                 User user = users.findById(p.userId()).orElse(null);
-                if (user != null && user.isEnabled()) {
+                boolean revoked = user != null && user.getTokensValidAfter() != null && p.issuedAt().isBefore(user.getTokensValidAfter().truncatedTo(java.time.temporal.ChronoUnit.SECONDS));
+                if (user != null && user.isEnabled() && !revoked) {
                     var auth = new UsernamePasswordAuthenticationToken(
                             new AuthPrincipal(user.getId(), user.getRole()), null,
                             List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())));

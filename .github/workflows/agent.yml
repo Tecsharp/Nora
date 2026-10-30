@@ -1,0 +1,90 @@
+name: Agente de Asistencia
+
+# Compila el agente de escritorio para Windows, macOS y Linux.
+#  - En cada cambio de agent/** o a mano: deja los binarios como artefactos del flujo.
+#  - Al subir una etiqueta «agent-vX.Y.Z»: además firma el de Windows con SignPath (gratis para código abierto) y publica una «Release»
+#    con los tres archivos (ver docs/ASISTENCIA.md → «Firmar el agente de Windows»).
+on:
+  workflow_dispatch:
+  push:
+    paths: ["agent/**"]
+    tags: ["agent-v*"]
+
+permissions:
+  contents: write # solo para publicar la Release de una etiqueta
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - { os: windows-latest, bin: nora-agent.exe, out: nora-agent-windows.exe }
+          - { os: macos-latest, bin: nora-agent, out: nora-agent-macos.zip }
+          - { os: ubuntu-22.04, bin: nora-agent, out: nora-agent-linux }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencias de Linux (X11)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libxdo-dev libx11-dev libxcb1-dev
+      - name: Compilar (Windows y Linux)
+        if: runner.os != 'macOS'
+        shell: bash
+        run: |
+          cargo build --release
+          cp "target/release/${{ matrix.bin }}" "${{ matrix.out }}"
+      - name: "Compilar en macOS (universal Apple Silicon + Intel, empaquetado como Nora Agent.app)"
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          ./build.sh
+          cp dist/nora-agent-macos.zip nora-agent-macos.zip
+      - uses: actions/upload-artifact@v4
+        id: upload
+        with:
+          name: ${{ matrix.out }}
+          path: agent/${{ matrix.out }}
+
+      # Firma de Windows con SignPath Foundation. Solo se ejecuta con una etiqueta y si ya configuraste los secretos (si no, se publica sin firmar).
+      - name: Firmar con SignPath
+        id: sign
+        if: runner.os == 'Windows' && startsWith(github.ref, 'refs/tags/agent-v') && vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'nora-agent' }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG || 'release-signing' }}
+          github-artifact-id: ${{ steps.upload.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+      - name: Usar el ejecutable firmado
+        if: steps.sign.outcome == 'success'
+        shell: bash
+        run: |
+          # SignPath devuelve el artefacto con la estructura definida en su configuración (ver agent/signpath-artifact-configuration.xml)
+          f=$(find signed -name 'nora-agent-windows.exe' | head -1)
+          cp "$f" nora-agent-windows.exe
+      - uses: actions/upload-artifact@v4
+        if: steps.sign.outcome == 'success'
+        with:
+          name: nora-agent-windows.exe-firmado
+          path: agent/nora-agent-windows.exe
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/agent-v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Quedarse con la versión firmada de Windows si existe
+        run: ls -R dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*

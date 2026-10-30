@@ -1,3 +1,7 @@
+import { useDialogs } from '../dialogs'
+import AiAssist, { TEXT_ACTIONS, type AiAction, type ApplyMode } from '../ai/AiAssist'
+import { markdownToHtml } from '../ai/AiMarkdown'
+import { useAi } from '../ai/AiProvider'
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -189,9 +193,31 @@ function FindBar({ editor, editable, onClose }: { editor: Editor; editable: bool
   )
 }
 
+const DOC_ACTIONS: AiAction[] = TEXT_ACTIONS
+
+function AiGroup({ editor }: { editor: Editor }) {
+  const ai = useAi()
+  if (!ai.enabled) return null
+  const sel = editor.state.selection
+  const hasSel = !sel.empty
+  const getText = () => (hasSel ? editor.state.doc.textBetween(sel.from, sel.to, '\n\n') : editor.getText({ blockSeparator: '\n\n' }))
+  const onApply = (out: string, mode: ApplyMode) => {
+    const html = markdownToHtml(out)
+    const { from, to } = editor.state.selection
+    if (mode === 'replace' && from !== to) editor.chain().focus().insertContentAt({ from, to }, html).run()
+    else editor.chain().focus().insertContentAt(hasSel ? to : editor.state.doc.content.size, html).run()
+  }
+  return (
+    <Group title="IA">
+      <AiAssist actions={DOC_ACTIONS} getText={getText} onApply={onApply} applyModes={hasSel ? ['replace', 'insert'] : ['insert']} label="Asistente" title={hasSel ? 'Asistente de IA (sobre lo seleccionado)' : 'Asistente de IA (sobre todo el documento)'} />
+    </Group>
+  )
+}
+
 function TextRibbon({ editor, zoom, setZoom, outline, setOutline, onFind, onChart }: {
   editor: Editor; zoom: number; setZoom: (z: number) => void; outline: boolean; setOutline: (b: boolean) => void; onFind: () => void; onChart: () => void
 }) {
+  const dialogs = useDialogs()
   const chain = () => editor.chain().focus()
   const ts = editor.getAttributes('textStyle') as { color?: string; fontFamily?: string; fontSize?: string }
   const family = ts.fontFamily ? ts.fontFamily.split(',')[0]!.replace(/['"]/g, '').trim() : ''
@@ -214,9 +240,10 @@ function TextRibbon({ editor, zoom, setZoom, outline, setOutline, onFind, onChar
     chain().setImage({ src, alt: file.name }).run()
   }
 
-  function setLink() {
+  async function setLink() {
     const prev = editor.getAttributes('link').href as string | undefined
-    const url = window.prompt('Dirección del enlace (vacío para quitarlo)', prev ?? 'https://')
+    const url = await dialogs.prompt({ title: 'Insertar enlace', message: 'Déjalo vacío para quitar el enlace.', label: 'Dirección', initial: prev ?? 'https://', allowEmpty: true, confirmLabel: 'Aplicar',
+      validate: (v) => (v === '' || /^(https?:|mailto:)/i.test(v) ? null : 'Debe empezar por http://, https:// o mailto:') })
     if (url === null) return
     if (url.trim() === '') chain().extendMarkRange('link').unsetLink().run()
     else if (/^(https?:|mailto:)/i.test(url.trim())) chain().extendMarkRange('link').setLink({ href: url.trim() }).run()
@@ -274,6 +301,7 @@ function TextRibbon({ editor, zoom, setZoom, outline, setOutline, onFind, onChar
             <Group title="Edición">
               <TB label="Buscar y reemplazar (Ctrl+F)" icon={<Search size={16} />} text="Buscar" onClick={onFind} />
             </Group>
+            <AiGroup editor={editor} />
           </>
         ),
       },

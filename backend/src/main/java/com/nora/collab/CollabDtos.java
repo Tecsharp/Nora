@@ -13,11 +13,13 @@ public final class CollabDtos {
 
     public record CreateRequest(Kind kind, @NotBlank(message = "El nombre es obligatorio") @Size(max = 120, message = "Máximo 120 caracteres") String name, UUID folderId) {}
 
+    public record MoveRequest(UUID folderId) {}
+
     public record RenameRequest(@NotBlank(message = "El nombre es obligatorio") @Size(max = 120, message = "Máximo 120 caracteres") String name) {}
 
     public record DocDto(UUID id, String kind, String name, UUID createdBy, String createdByName, Instant createdAt, Instant updatedAt,
                          UUID sourceFileId, String sourceExt, boolean canEdit,
-                         long seq, long savedSeq, Instant savedAt, String savedByName, Instant thumbAt) {}
+                         long seq, long savedSeq, Instant savedAt, String savedByName, Instant thumbAt, UUID folderId) {}
 
     public record UpdateDto(long seq, String data) {}
 

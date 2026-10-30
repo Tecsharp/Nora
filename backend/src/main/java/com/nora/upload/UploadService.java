@@ -176,6 +176,10 @@ public class UploadService {
 
     /** Al destruir una sala se descartan los multipart pendientes (las filas se borran en cascada). */
     @Transactional
+    public void abortAllForUser(UUID userId) {
+        for (UploadSession s : sessions.findByUserId(userId)) storage.abortMultipart(s.getObjectKey(), s.getS3UploadId());
+    }
+
     public void abortAllForRoom(UUID roomId) {
         for (UploadSession s : sessions.findByRoomId(roomId)) storage.abortMultipart(s.getObjectKey(), s.getS3UploadId());
     }

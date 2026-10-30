@@ -28,7 +28,10 @@ public final class AuthDtos {
 
     public record LoginRequest(
             @NotBlank @Email @Size(max = 254) String email,
-            @NotBlank @Size(max = 72) String password) {}
+            @NotBlank @Size(max = 72) String password,
+            Boolean remember) {}
+
+    public record ResetRequest(@NotBlank @Size(max = 200) String token, @NotBlank @Size(max = 72) String password) {}
 
     public record AuthResponse(String accessToken, long expiresInSeconds, UserDto user) {}
 }

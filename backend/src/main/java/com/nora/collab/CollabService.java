@@ -4,6 +4,8 @@ import com.nora.collab.CollabDtos.*;
 import com.nora.collab.CollabRepository.DocRow;
 import com.nora.common.ApiException;
 import com.nora.file.FileService;
+import com.nora.folder.FolderService;
+import com.nora.folder.RoomFolder;
 import com.nora.file.FileService.FileDto;
 import com.nora.room.Room;
 import com.nora.room.RoomMemberRepository;
@@ -68,17 +70,19 @@ public class CollabService {
     private final RoomMemberRepository members;
     private final UserRepository users;
     private final FileService files;
+    private final FolderService folders;
     private final ConverterClient converter;
     private final ApplicationEventPublisher events;
 
     public CollabService(CollabRepository repo, RoomService rooms, RoomRepository roomRepo, RoomMemberRepository members, UserRepository users,
-                         FileService files, ConverterClient converter, ApplicationEventPublisher events) {
+                         FileService files, FolderService folders, ConverterClient converter, ApplicationEventPublisher events) {
         this.repo = repo;
         this.rooms = rooms;
         this.roomRepo = roomRepo;
         this.members = members;
         this.users = users;
         this.files = files;
+        this.folders = folders;
         this.converter = converter;
         this.events = events;
     }
@@ -125,15 +129,16 @@ public class CollabService {
         String title = clean(name);
         String ext = DEFAULT_EXT.get(kind);
         byte[] blank = kind == Kind.BOARD ? utf8(seed) : converter.export(kind.name(), ext, utf8(seed), 0); // lento: fuera de transacción
+        folders.requireIn(room.getId(), RoomFolder.Kind.FILE, folderId); // Archivos y Pizarra comparten carpetas
         FileDto file = files.saveGenerated(room.getId(), userId, title + "." + ext, MIME.get(ext), blank, folderId);
         UUID id = UUID.randomUUID();
-        repo.insert(id, room.getId(), kind.name(), title, userId, file.id(), ext, seed);
+        repo.insert(id, room.getId(), kind.name(), title, userId, file.id(), ext, seed, null);
         repo.markSaved(id, 0, userId);
         return created(room, id);
     }
 
     /** Abre un archivo de oficina de la sala para editarlo: lo convierte una sola vez y lo deja listo para sembrar. */
-    public DocDto fromFile(Room room, UUID userId, Role sys, UUID fileId) {
+    public DocDto fromFile(Room room, UUID userId, Role sys, UUID fileId, UUID boardFolderId) {
         FileDto file = files.info(room.getId(), fileId);
         String ext = file.name().contains(".") ? file.name().substring(file.name().lastIndexOf('.') + 1).toLowerCase() : "";
         Kind kind = KIND_OF_EXT.get(ext);
@@ -152,7 +157,7 @@ public class CollabService {
         String seed = kind == Kind.BOARD ? normalizeBoard(content) : converter.importFile(content, ext); // lento: fuera de transacción
         UUID id = UUID.randomUUID();
         try {
-            repo.insert(id, room.getId(), kind.name(), clean(base), userId, fileId, ext, seed);
+            repo.insert(id, room.getId(), kind.name(), clean(base), userId, fileId, ext, seed, null);
         } catch (org.springframework.dao.DuplicateKeyException e) {
             return repo.findBySource(room.getId(), fileId).map(d -> dto(d, repo.creatorName(d.createdBy()), true)).orElseThrow();
         }
@@ -179,6 +184,19 @@ public class CollabService {
         }
         DocDto dto = dto(repo.find(docId).orElseThrow(), repo.creatorName(d.createdBy()), true);
         events.publishEvent(new RoomEvent(room.getId(), "doc.renamed", dto));
+        return dto;
+    }
+
+    /** Mueve una pizarra a otra carpeta (null = raíz): en realidad mueve su archivo, así que se ve igual en Archivos y en Pizarra. */
+    @Transactional
+    public DocDto move(Room room, UUID docId, UUID userId, Role sys, UUID folderId) {
+        DocRow d = docIn(room, docId);
+        if (!"BOARD".equals(d.kind())) throw ApiException.badRequest("Solo las pizarras se organizan en carpetas aquí");
+        folders.requireIn(room.getId(), RoomFolder.Kind.FILE, folderId);
+        if (d.sourceFileId() == null) throw ApiException.badRequest("Esta pizarra no tiene archivo");
+        files.update(room.getId(), d.sourceFileId(), userId, true, true, folderId, null);
+        DocDto dto = dto(repo.find(docId).orElseThrow(), repo.creatorName(d.createdBy()), true);
+        events.publishEvent(new RoomEvent(room.getId(), "doc.moved", dto));
         return dto;
     }
 
@@ -381,7 +399,7 @@ public class CollabService {
 
     private DocDto dto(DocRow d, String creatorName, boolean canEdit) {
         return new DocDto(d.id(), d.kind(), d.name(), d.createdBy(), creatorName, d.createdAt(), d.updatedAt(), d.sourceFileId(), d.sourceExt(), canEdit,
-                d.seq(), d.savedSeq(), d.savedAt(), d.savedBy() == null ? null : repo.creatorName(d.savedBy()), d.thumbAt());
+                d.seq(), d.savedSeq(), d.savedAt(), d.savedBy() == null ? null : repo.creatorName(d.savedBy()), d.thumbAt(), d.folderId());
     }
 
     static byte[] utf8(String s) {

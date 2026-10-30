@@ -10,6 +10,8 @@ public interface UploadSessionRepository extends JpaRepository<UploadSession, UU
     List<UploadSession> findByRoomIdAndUserIdOrderByCreatedAtDesc(UUID roomId, UUID userId);
     java.util.Optional<UploadSession> findFirstByRoomIdAndUserIdAndFingerprint(UUID roomId, UUID userId, String fingerprint);
     List<UploadSession> findByRoomId(UUID roomId);
+
+    List<UploadSession> findByUserId(UUID userId);
     List<UploadSession> findByUpdatedAtBefore(Instant before);
     long countByUserId(UUID userId);
 

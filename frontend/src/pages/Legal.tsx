@@ -18,9 +18,10 @@ function Terms() {
         <li>Debes facilitar datos veraces y mantener tu contraseña en secreto. Eres responsable de la actividad de tu cuenta.</li>
         <li>Tras varios intentos fallidos de acceso la cuenta se bloquea temporalmente por seguridad.</li>
         <li>Un administrador puede modificar tus límites o desactivar tu cuenta si incumples estos términos.</li>
+        <li><strong>Puedes borrar tu cuenta cuando quieras</strong> desde Ajustes → Cuenta. Al hacerlo se eliminan de forma definitiva y completa tus datos (ver «Manejo de datos»). No se puede deshacer.</li>
       </ul>
       <h2>3. Salas temporales: tu contenido no es permanente</h2>
-      <p>Cada sala tiene una duración. Cuando expira, o cuando se cierra, se eliminan de forma definitiva sus archivos, carpetas, notas y portapapeles. <strong>Descarga lo que quieras conservar antes de que termine la sala.</strong> Nora no es un servicio de copia de seguridad.</p>
+      <p>Cada sala tiene una duración. Cuando expira, o cuando se cierra, se eliminan de forma definitiva sus archivos, carpetas, notas, documentos y pizarras. <strong>Descarga lo que quieras conservar antes de que termine la sala.</strong> Nora no es un servicio de copia de seguridad.</p>
       <h2>4. Uso aceptable</h2>
       <p>No puedes usar Nora para:</p>
       <ul>
@@ -53,8 +54,8 @@ function Privacy() {
       <p>Nora está pensada para recoger lo mínimo imprescindible. No usamos analítica, publicidad ni servicios de terceros para rastrearte.</p>
       <h2>Qué datos tratamos</h2>
       <ul>
-        <li><strong>Cuenta:</strong> tu nombre visible, tu correo electrónico y tu contraseña (guardada únicamente como hash BCrypt, nunca en claro).</li>
-        <li><strong>Contenido de las salas:</strong> archivos, carpetas, notas y textos del portapapeles que tú subes o escribes.</li>
+        <li><strong>Cuenta:</strong> tu nombre visible, tu correo electrónico, tu foto de perfil si decides subirla y tu contraseña (guardada únicamente como hash BCrypt, nunca en claro). También se guardan tus sesiones abiertas (dispositivo y fechas de uso) para que puedas verlas y cerrarlas, y la fecha de tu último acceso.</li>
+        <li><strong>Contenido de las salas:</strong> archivos, carpetas, notas, documentos, pizarras y bibliotecas de elementos que tú subes o creas.</li>
         <li><strong>Actividad en la sala:</strong> a qué salas perteneces y si estás conectado en este momento (solo en memoria mientras dura la conexión).</li>
         <li><strong>Registros técnicos:</strong> el servidor puede guardar la dirección IP, la fecha y la ruta solicitada para seguridad y para limitar abusos.</li>
       </ul>
@@ -77,7 +78,7 @@ function Privacy() {
         <li>El operador de esta instancia, que administra el servidor y las cuentas. El contenido <strong>no está cifrado de extremo a extremo</strong>, así que el operador puede técnicamente acceder al almacenamiento.</li>
       </ul>
       <h2>Tus derechos</h2>
-      <p>Puedes pedir acceso, rectificación o eliminación de tus datos, y oponerte a su tratamiento, contactando con el administrador de esta instancia. Puedes borrar tus archivos y notas en cualquier momento desde la sala.</p>
+      <p>Puedes <strong>modificar tus datos</strong> (nombre, correo, foto y contraseña) y <strong>eliminar tu cuenta y todos tus datos</strong> tú mismo en cualquier momento desde Ajustes, sin intermediarios. También puedes pedir acceso o oponerte a su tratamiento contactando con el administrador de esta instancia, y borrar tus archivos y notas desde la sala cuando quieras.</p>
       <h2>Menores</h2>
       <p>Nora no está dirigido a menores de 14 años.</p>
     </>
@@ -109,7 +110,7 @@ function DataHandling() {
         <li><strong>Archivos individuales y carpetas:</strong> hasta que alguien con permiso los borra. Al borrar una carpeta se elimina todo su contenido.</li>
         <li><strong>Subidas incompletas:</strong> se descartan automáticamente tras 24 horas sin actividad.</li>
         <li><strong>Salas sin expiración:</strong> algunas cuentas pueden tener salas sin límite de tiempo; permanecen hasta que se cierran.</li>
-        <li><strong>Datos de cuenta:</strong> mientras la cuenta exista. Puedes solicitar su eliminación al administrador.</li>
+        <li><strong>Datos de cuenta:</strong> mientras la cuenta exista. Al borrarla (Ajustes → Cuenta, o a petición tuya al administrador) se eliminan de forma definitiva: tu perfil y foto, tus sesiones, las salas de las que eres propietario con todo su contenido, los archivos, notas, documentos y pizarras que creaste en otras salas, tus bibliotecas y tu pertenencia a salas. Los archivos también se borran del almacenamiento de objetos. Nada se conserva «por si acaso» ni se anonimiza para guardarlo: no hay copias de seguridad.</li>
       </ul>
       <h2>Copias de seguridad</h2>
       <p>Nora no realiza copias de seguridad del contenido de las salas: lo que se borra no se puede recuperar.</p>

@@ -1,6 +1,8 @@
 package com.nora.ws;
 
+import com.nora.assist.AssistService;
 import com.nora.config.AppProperties;
+import org.springframework.web.socket.server.HandshakeInterceptor;
 import com.nora.user.UserRepository;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
@@ -15,12 +17,16 @@ import org.springframework.web.socket.server.standard.ServletServerContainerFact
 public class WsConfig implements WebSocketConfigurer {
 
     private final NoraWebSocketHandler handler;
+    private final AgentWebSocketHandler agentHandler;
+    private final AssistService assist;
     private final WsTicketService tickets;
     private final UserRepository users;
     private final AppProperties props;
 
-    public WsConfig(NoraWebSocketHandler handler, WsTicketService tickets, UserRepository users, AppProperties props) {
+    public WsConfig(NoraWebSocketHandler handler, AgentWebSocketHandler agentHandler, AssistService assist, WsTicketService tickets, UserRepository users, AppProperties props) {
         this.handler = handler;
+        this.agentHandler = agentHandler;
+        this.assist = assist;
         this.tickets = tickets;
         this.users = users;
         this.props = props;
@@ -34,6 +40,24 @@ public class WsConfig implements WebSocketConfigurer {
         registry.addHandler(handler, "/ws")
                 .addInterceptors(new WsHandshakeInterceptor(tickets, users))
                 .setAllowedOrigins(origins.toArray(String[]::new));
+        // El agente de escritorio (no es un navegador): se autentica con su token en la cabecera Authorization.
+        registry.addHandler(agentHandler, "/ws/agent")
+                .addInterceptors(new HandshakeInterceptor() {
+                    @Override
+                    public boolean beforeHandshake(org.springframework.http.server.ServerHttpRequest request, org.springframework.http.server.ServerHttpResponse response, org.springframework.web.socket.WebSocketHandler h, java.util.Map<String, Object> attributes) {
+                        String auth = request.getHeaders().getFirst("Authorization");
+                        var user = auth != null && auth.startsWith("Bearer ") ? assist.userForAgentToken(auth.substring(7).trim()).orElse(null) : null;
+                        if (user == null) {
+                            response.setStatusCode(org.springframework.http.HttpStatus.UNAUTHORIZED);
+                            return false;
+                        }
+                        attributes.put("userId", user.getId());
+                        return true;
+                    }
+
+                    @Override
+                    public void afterHandshake(org.springframework.http.server.ServerHttpRequest request, org.springframework.http.server.ServerHttpResponse response, org.springframework.web.socket.WebSocketHandler h, Exception ex) {}
+                });
     }
 
     @Bean

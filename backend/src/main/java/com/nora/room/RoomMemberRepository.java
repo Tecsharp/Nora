@@ -7,4 +7,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface RoomMemberRepository extends JpaRepository<RoomMember, RoomMember.Key> {
     List<RoomMember> findByRoomId(UUID roomId);
     long countByRoomId(UUID roomId);
+    List<RoomMember> findByUserId(UUID userId);
 }

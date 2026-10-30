@@ -93,7 +93,8 @@ public class NoteController {
         Room room = rooms.requireWriter(p.userId(), p.role(), code);
         RoomNote n = notes.findById(id).filter(x -> x.getRoomId().equals(room.getId()))
                 .orElseThrow(() -> ApiException.notFound("Elemento no encontrado"));
-        if (!n.getAuthorId().equals(p.userId()) && !rooms.canModerate(room, p.userId(), p.role())) {
+        // Mover de carpeta lo puede hacer cualquiera que pueda escribir; editar el texto, solo su autor o quien modera
+        if (body.containsKey("content") && !n.getAuthorId().equals(p.userId()) && !rooms.canModerate(room, p.userId(), p.role())) {
             throw ApiException.forbidden("No puedes modificar este elemento");
         }
         // Solo se tocan los campos presentes: "folderId" mueve de categoría y "content" edita el texto

@@ -2,7 +2,10 @@ package com.nora.ws;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nora.assist.AssistService;
+import com.nora.chat.ChatService;
 import com.nora.collab.CollabWs;
+import com.nora.live.LiveService;
 import com.nora.common.ApiException;
 import com.nora.room.Room;
 import com.nora.room.RoomService;
@@ -24,16 +27,17 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 /**
  * Canal en tiempo real. Protocolo JSON {"type": "...", "data": {...}}.
- * Cliente → servidor: join {code}, leave, ping.
+ * Cliente → servidor: join {code}, leave, ping, chat.typing {conv}.
  * Servidor → cliente: joined, presence, pong, error y los eventos de sala/usuario (ver {@link RealtimeBroadcaster}).
  */
 @Component
-public class NoraWebSocketHandler extends TextWebSocketHandler {
+public class NoraWebSocketHandler extends TextWebSocketHandler implements AssistService.Hub {
 
     private static final Logger log = LoggerFactory.getLogger(NoraWebSocketHandler.class);
     private static final int MAX_SESSIONS_PER_USER = 10;
     private static final int MAX_MESSAGES_PER_10S = 60;
     private static final int MAX_DOC_MESSAGES_PER_10S = 1500;
+    private static final int MAX_ASSIST_MESSAGES_PER_10S = 3000; // señalización y, sobre todo, el movimiento del ratón al controlar
 
     static final class Conn implements CollabWs.Peer {
         final WebSocketSession session;
@@ -56,6 +60,8 @@ public class NoraWebSocketHandler extends TextWebSocketHandler {
         NoraWebSocketHandler owner;
         long docWindowStart = System.currentTimeMillis();
         int docWindowCount;
+        long assistWindowStart = System.currentTimeMillis();
+        int assistWindowCount;
     }
 
     private final Map<String, Conn> conns = new ConcurrentHashMap<>();
@@ -64,9 +70,16 @@ public class NoraWebSocketHandler extends TextWebSocketHandler {
     private final PresenceService presence;
     private final UploadService uploads;
     private final CollabWs collab;
+    private final AssistService assist;
+    private final LiveService live;
+    private final ChatService chat;
 
-    public NoraWebSocketHandler(ObjectMapper json, @Lazy RoomService rooms, PresenceService presence, @Lazy UploadService uploads, @Lazy CollabWs collab) {
+    public NoraWebSocketHandler(ObjectMapper json, @Lazy RoomService rooms, PresenceService presence, @Lazy UploadService uploads, @Lazy CollabWs collab, @Lazy AssistService assist, @Lazy LiveService live, @Lazy ChatService chat) {
+        this.chat = chat;
         this.collab = collab;
+        this.live = live;
+        this.assist = assist;
+        assist.setHub(this);
         this.json = json;
         this.rooms = rooms;
         this.presence = presence;
@@ -96,7 +109,17 @@ public class NoraWebSocketHandler extends TextWebSocketHandler {
         String payload = message.getPayload();
         // Los mensajes de edición (una pulsación de tecla puede generar varios) tienen su propio presupuesto
         boolean docMsg = payload.startsWith("{\"type\":\"doc.");
-        if (docMsg) {
+        boolean assistMsg = payload.startsWith("{\"type\":\"assist.");
+        if (assistMsg) {
+            if (now - conn.assistWindowStart > 10_000) {
+                conn.assistWindowStart = now;
+                conn.assistWindowCount = 0;
+            }
+            if (++conn.assistWindowCount > MAX_ASSIST_MESSAGES_PER_10S) {
+                conn.session.close(CloseStatus.POLICY_VIOLATION.withReason("Demasiados mensajes"));
+                return;
+            }
+        } else if (docMsg) {
             if (now - conn.docWindowStart > 10_000) {
                 conn.docWindowStart = now;
                 conn.docWindowCount = 0;
@@ -127,12 +150,60 @@ public class NoraWebSocketHandler extends TextWebSocketHandler {
             case "join" -> join(conn, msg.path("code").asText(""));
             case "leave" -> leaveRoom(conn);
             case "upload.progress" -> relayUploadProgress(conn, msg);
+            case "chat.typing" -> typing(conn, msg);
             case "doc.join" -> withDoc(conn, msg, id -> collab.join(conn, id));
             case "doc.leave" -> withDoc(conn, msg, id -> collab.leave(conn, id));
             case "doc.update" -> withDoc(conn, msg, id -> collab.update(conn, id, msg.path("update").asText(""), msg.path("ref").asText("")));
             case "doc.awareness" -> withDoc(conn, msg, id -> collab.awareness(conn, id, msg.path("update").asText(""), msg.path("clientId").asLong(0)));
+            case "assist.request" -> inRoom(conn, id -> assist.request(conn, id, msg));
+            case "assist.invite" -> inRoom(conn, id -> assist.invite(conn, id, msg));
+            case "assist.respond" -> assist.respond(conn, msg);
+            case "assist.signal" -> assist.signal(conn, msg);
+            case "assist.control" -> assist.control(conn, msg);
+            case "assist.input" -> assist.input(conn, msg);
+            case "assist.end" -> assist.end(conn, msg);
             default -> send(conn, "error", Map.of("message", "Tipo de mensaje desconocido"));
         }
+    }
+
+    /** «Está escribiendo…» en una conversación del chat de la sala en la que se está. */
+    private void typing(Conn conn, JsonNode msg) {
+        UUID roomId = conn.roomId;
+        if (roomId == null) return;
+        try {
+            chat.typing(conn.userId, conn.displayName, roomId, UUID.fromString(msg.path("conv").asText("")));
+        } catch (IllegalArgumentException ignored) {
+            // conversación no válida
+        }
+    }
+
+    private void inRoom(Conn conn, java.util.function.Consumer<UUID> action) {
+        UUID roomId = conn.roomId;
+        if (roomId == null) send(conn, "assist.error", Map.of("message", "Entra primero en la sala"));
+        else action.accept(roomId);
+    }
+
+    // ---- AssistService.Hub ----
+
+    @Override
+    public List<CollabWs.Peer> peers(UUID roomId, UUID userId) {
+        return conns.values().stream().filter(c -> userId.equals(c.userId) && roomId.equals(c.roomId)).map(c -> (CollabWs.Peer) c).toList();
+    }
+
+    @Override
+    public List<CollabWs.Peer> userPeers(UUID userId) {
+        return conns.values().stream().filter(c -> userId.equals(c.userId)).map(c -> (CollabWs.Peer) c).toList();
+    }
+
+    @Override
+    public List<CollabWs.Peer> roomMates(UUID userId) {
+        var rooms = conns.values().stream().filter(c -> userId.equals(c.userId) && c.roomId != null).map(c -> c.roomId).collect(java.util.stream.Collectors.toSet());
+        return conns.values().stream().filter(c -> c.roomId != null && rooms.contains(c.roomId)).map(c -> (CollabWs.Peer) c).toList();
+    }
+
+    @Override
+    public CollabWs.Peer peer(String id) {
+        return id == null ? null : conns.get(id);
     }
 
     private void withDoc(Conn conn, JsonNode msg, java.util.function.Consumer<UUID> action) {
@@ -180,7 +251,10 @@ public class NoraWebSocketHandler extends TextWebSocketHandler {
         UUID roomId = conn.roomId;
         if (roomId == null) return;
         conn.roomId = null;
+        assist.peerGone(conn);
         if (presence.leave(roomId, conn.userId, conn.id())) {
+            assist.userLeftRoom(roomId, conn.userId);
+            live.userLeft(roomId, conn.userId);
             sendToRoom(roomId, "presence",
                     Map.of("userId", conn.userId, "displayName", conn.displayName, "online", false));
         }
@@ -220,6 +294,16 @@ public class NoraWebSocketHandler extends TextWebSocketHandler {
             if (roomId.equals(c.roomId)) c.roomId = null;
         }
         presence.clearRoom(roomId);
+    }
+
+    /** Expulsado de la sala: sus conexiones dejan de estar dentro de ella y de sus documentos abiertos. */
+    void evict(UUID roomId, UUID userId) {
+        for (Conn c : List.copyOf(conns.values())) {
+            if (c.userId.equals(userId) && roomId.equals(c.roomId)) {
+                collab.leaveAll(c);
+                leaveRoom(c);
+            }
+        }
     }
 
     void closeUser(UUID userId) {

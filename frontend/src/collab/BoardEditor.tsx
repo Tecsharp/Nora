@@ -1,24 +1,61 @@
+import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  CaptureUpdateAction, Excalidraw, MainMenu, convertToExcalidrawElements, exportToBlob, exportToSvg, getCommonBounds, loadFromBlob, reconcileElements, viewportCoordsToSceneCoords,
+  CaptureUpdateAction, DefaultSidebar, Excalidraw, MainMenu, Sidebar, convertToExcalidrawElements, exportToBlob, exportToSvg, getCommonBounds, loadFromBlob, reconcileElements, restoreElements, viewportCoordsToSceneCoords,
 } from '@excalidraw/excalidraw'
 import '@excalidraw/excalidraw/index.css'
 import type { BinaryFileData, Collaborator, ExcalidrawImperativeAPI, SocketId } from '@excalidraw/excalidraw/types'
 import type { ExcalidrawElement, OrderedExcalidrawElement } from '@excalidraw/excalidraw/element/types'
-import { FileDown, Upload } from 'lucide-react'
+import {
+  AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalDistributeCenter, AlignStartHorizontal, AlignStartVertical, AlignVerticalDistributeCenter, ChevronDown, FileDown, Library as LibraryIcon, Magnet, Upload,
+  type LucideIcon,
+} from 'lucide-react'
 import type { CollabProvider } from './provider'
 import { BoardStore, MAX_FILE_CHARS, type BoardElement } from './boardModel'
 import { blobToDataURL, jpegToPdf, newId, reidElements, shrinkDataURL, type BoardHandle } from './boardIO'
 import { useTheme } from '../theme'
 import { useToast } from '../toast'
+import { api as http } from '../api'
+import SystemLibrary, { type SysGroup, type SysItem } from './SystemLibrary'
 
+type LibItem = { id: string; status?: 'published' | 'unpublished'; elements: unknown[]; created?: number; name?: string }
 const LOCAL = 'board-local'
 const keyOf = (e: { version: number; versionNonce: number }) => `${e.version}:${e.versionNonce}`
 const LIBRARY_KEY = 'nora-board-library'
 
+const SNAP_KEY = 'nora-board-snap'
+/** El imán (ajustar al centro y a los bordes de los demás elementos) viene activado; se recuerda si alguien lo apaga. */
+const readSnap = () => {
+  try {
+    return localStorage.getItem(SNAP_KEY) !== 'off'
+  } catch {
+    return true
+  }
+}
+const saveSnap = (on: boolean) => {
+  try {
+    localStorage.setItem(SNAP_KEY, on ? 'on' : 'off')
+  } catch { /* sin almacenamiento: solo dura esta sesión */ }
+}
+
+/** Botones de alineación. Los nombres son los de Excalidraw en español: se usan para pulsar su botón nativo, que mueve también el texto ligado, las flechas y los grupos. */
+const ALIGN: ({ label: string; icon: LucideIcon; hint?: string } | null)[] = [
+  { label: 'Alinear a la izquierda', icon: AlignStartVertical, hint: 'Ctrl+Mayús+←' },
+  { label: 'Centrar horizontalmente', icon: AlignCenterVertical, hint: 'quedan en columna, con el mismo centro' },
+  { label: 'Alinear a la derecha', icon: AlignEndVertical, hint: 'Ctrl+Mayús+→' },
+  null,
+  { label: 'Alineación superior', icon: AlignStartHorizontal, hint: 'Ctrl+Mayús+↑' },
+  { label: 'Centrar verticalmente', icon: AlignCenterHorizontal, hint: 'quedan en fila, con el mismo centro' },
+  { label: 'Alineación inferior', icon: AlignEndHorizontal, hint: 'Ctrl+Mayús+↓' },
+]
+const DISTRIBUTE: { label: string; icon: LucideIcon }[] = [
+  { label: 'Distribuir horizontalmente', icon: AlignHorizontalDistributeCenter },
+  { label: 'Distribuir verticalmente', icon: AlignVerticalDistributeCenter },
+]
+
 function readLibrary() {
   try {
-    return JSON.parse(localStorage.getItem(LIBRARY_KEY) ?? '[]') as never[]
+    return JSON.parse(localStorage.getItem(LIBRARY_KEY) ?? '[]') as LibItem[]
   } catch {
     return []
   }
@@ -31,6 +68,10 @@ interface Props {
   /** El editor pide importar un archivo (menú de Excalidraw). */
   onImportRequest: () => void
   onSaveCopy: () => void
+  /** Con la barra superior del editor oculta: pulsarlo la vuelve a mostrar (el botón sale junto al imán). */
+  onShowBar?: () => void
+  /** Código de la sala: la biblioteca personal se guarda por persona y sala. */
+  roomCode: string
 }
 
 /**
@@ -40,7 +81,7 @@ interface Props {
  * Excalidraw, igual que en su colaboración oficial. Los cursores, selecciones y el puntero láser de los demás llegan por la
  * presencia (awareness) del documento.
  */
-export default function BoardEditor({ provider, editable, onHandle, onImportRequest, onSaveCopy }: Props) {
+export default function BoardEditor({ provider, editable, onHandle, onImportRequest, onSaveCopy, onShowBar, roomCode }: Props) {
   const doc = provider.doc
   const store = useMemo(() => new BoardStore(doc), [doc])
   const toast = useToast()
@@ -54,37 +95,78 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
   const root = useRef<HTMLDivElement>(null)
   const editableRef = useRef(editable)
   editableRef.current = editable
+  const snapSeen = useRef<boolean | null>(null)
+  const [sel, setSel] = useState({ n: 0, frame: false }) // lo seleccionado: decide si se ofrece la barra de alineación
+  const [snap, setSnap] = useState(() => readSnap() && typeof store.meta.get('grid') !== 'number')
+  const [sbWidth, setSbWidth] = useState(() => {
+    try {
+      return Math.min(760, Math.max(260, Number(localStorage.getItem('nora-board-sidebar')) || 302))
+    } catch {
+      return 302
+    }
+  })
+  const [sbEl, setSbEl] = useState<HTMLElement | null>(null)
+  const [phone, setPhone] = useState(false) // diseño de móvil de Excalidraw: sin panel de propiedades a mano, la barra no puede pulsar sus botones
 
   const initialData = useMemo(() => {
+    const grid = typeof store.meta.get('grid') === 'number'
     const els = store.ordered()
     els.forEach((e) => synced.current.set(e.id, keyOf(e)))
     return {
       elements: els as unknown as ExcalidrawElement[],
-      appState: { viewBackgroundColor: store.background, gridModeEnabled: typeof store.meta.get('grid') === 'number' },
+      appState: { viewBackgroundColor: store.background, gridModeEnabled: grid, objectsSnapModeEnabled: !grid && readSnap() },
       files: Object.fromEntries([...store.files.entries()].map(([id, f]) => [id, f])) as unknown as Record<string, BinaryFileData>,
-      libraryItems: readLibrary(),
       scrollToContent: true,
     }
   }, [store])
+
+  // Excalidraw mide dónde está el lienzo al montarse; si el contenedor aún se está animando o redimensionando mide mal y los clics
+  // (selección, mover, dibujar sobre lo existente) caen desplazados. Se vuelve a medir cuando termina y un poco después.
+  useEffect(() => {
+    if (!api) return
+    const box = root.current?.closest('.docapp') ?? root.current
+    const again = () => api.refresh()
+    const timers = [60, 300, 700, 1500].map((ms) => setTimeout(again, ms))
+    box?.addEventListener('animationend', again)
+    return () => {
+      timers.forEach(clearTimeout)
+      box?.removeEventListener('animationend', again)
+    }
+  }, [api])
 
   // ---- Yjs → escena ----
   useEffect(() => {
     if (!api) return
     let raf = 0
+    let fallback: ReturnType<typeof setTimeout> | undefined
+    let all = true // la primera vez se reconcilia todo; después solo lo que cambió
+    const dirty = new Set<string>()
     const apply = () => {
+      cancelAnimationFrame(raf)
+      clearTimeout(fallback)
       raf = 0
-      const remote = store.ordered()
+      fallback = undefined
+      const remote = all ? store.ordered() : [...dirty].map((id) => store.elements.get(id)).filter((e): e is BoardElement => !!e)
+      const ids = all ? null : [...dirty]
+      all = false
+      dirty.clear()
+      if (!remote.length) return
       const local = api.getSceneElementsIncludingDeleted()
       const reconciled = reconcileElements(local, remote as never, api.getAppState())
       for (const e of reconciled) {
+        if (ids && !ids.includes(e.id)) continue
         const r = store.elements.get(e.id)
         if (r && r.version === e.version && r.versionNonce === e.versionNonce) synced.current.set(e.id, keyOf(e))
       }
       api.updateScene({ elements: reconciled, captureUpdate: CaptureUpdateAction.NEVER })
     }
-    const onElements = (_ev: unknown, txn: { origin: unknown }) => {
+    const onElements = (ev: { keysChanged?: Set<string> }, txn: { origin: unknown }) => {
       if (txn.origin === LOCAL) return
+      ev.keysChanged?.forEach((k) => dirty.add(k))
+      if (!ev.keysChanged) all = true
+      // en el siguiente fotograma; si la pestaña está oculta o tapada el navegador no los da, y no se puede quedar sin verse
       if (!raf) raf = requestAnimationFrame(apply)
+      if (fallback === undefined) fallback = setTimeout(apply, 50)
     }
     const onFiles = () => {
       const have = api.getFiles()
@@ -106,8 +188,100 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
       store.files.unobserve(onFiles)
       store.meta.unobserve(onMeta)
       cancelAnimationFrame(raf)
+      clearTimeout(fallback)
     }
   }, [api, store])
+
+  // Pizarra en vivo: los cambios y los cursores salen casi sin espera (el resto de documentos agrupa más)
+  useEffect(() => {
+    const before = { flush: provider.flushMs, aw: provider.awarenessMs }
+    provider.flushMs = 8
+    provider.awarenessMs = 16
+    return () => {
+      provider.flushMs = before.flush
+      provider.awarenessMs = before.aw
+    }
+  }, [provider])
+
+  // ---- biblioteca: las del sistema (solo lectura, de todos) + la propia de esta persona en esta sala (se guarda en el servidor) ----
+  const [sysGroups, setSysGroups] = useState<SysGroup[]>([])
+  const [sysLoading, setSysLoading] = useState(true)
+  const libReady = useRef(false)
+  const libSaved = useRef('')
+  const libTimer = useRef<ReturnType<typeof setTimeout>>()
+  useEffect(() => {
+    if (!api) return
+    let alive = true
+    void (async () => {
+      try {
+        const [system, mine] = await Promise.all([
+          http<{ id: string; name: string; items: LibItem[] }[]>('/libraries/system'),
+          http<{ items: LibItem[] }>(`/rooms/${roomCode}/library`),
+        ])
+        if (!alive) return
+        let own = (mine.items ?? []).map((i) => ({ ...i, status: 'unpublished' as const }))
+        if (!own.length) { // primera vez en el servidor: se traen las de este navegador (las que había antes de esta versión)
+          own = readLibrary().map((i: LibItem) => ({ ...i, status: 'unpublished' as const }))
+        }
+        setSysGroups(system.map((l) => ({ id: l.id, name: l.name, items: l.items.map((i) => ({ id: i.id, name: i.name, elements: i.elements })) })))
+        libSaved.current = JSON.stringify(mine.items ?? [])
+        await api.updateLibrary({ libraryItems: own as never, merge: false, defaultStatus: 'unpublished' }) // las del sistema van en su propia pestaña
+        setSysLoading(false)
+        libReady.current = true
+        if (own.length && !mine.items?.length) saveLibrary(own)
+      } catch {
+        setSysLoading(false)
+        libReady.current = false // sin conexión con el servidor: se queda con lo que haya en el navegador
+        const local = readLibrary()
+        if (local.length) await api.updateLibrary({ libraryItems: local as never, merge: false, defaultStatus: 'unpublished' }).catch(() => undefined)
+      }
+    })()
+    return () => { alive = false }
+  }, [api, roomCode]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function saveLibrary(items: LibItem[]) {
+    const body = JSON.stringify(items)
+    if (body === libSaved.current) return
+    if (body.length > 100 * 1024 * 1024) return toast('Tu biblioteca de esta sala supera el máximo de 100 MB', 'error')
+    clearTimeout(libTimer.current)
+    libTimer.current = setTimeout(() => {
+      http(`/rooms/${roomCode}/library`, 'PUT', items)
+        .then(() => { libSaved.current = body })
+        .catch((e) => toast(e instanceof Error ? e.message : 'No se pudo guardar tu biblioteca', 'error'))
+    }, 1500)
+  }
+  useEffect(() => () => clearTimeout(libTimer.current), [])
+
+  /** Añade un elemento de una biblioteca del sistema en el centro de lo que se está viendo (con ids nuevos). */
+  const insertSystem = useCallback((item: SysItem) => {
+    if (!api) return
+    if (!editableRef.current) return toast('Solo lectura: no puedes añadir elementos', 'warning')
+    // las bibliotecas (sobre todo las antiguas) pueden traer elementos sin campos que hoy son obligatorios (groupIds, version, index…):
+    // se completan igual que hace Excalidraw al cargar un archivo, y se desbloquean para que el elemento insertado se pueda mover
+    const fresh = restoreElements(
+      reidElements((item.elements as (Record<string, unknown> & { id: string })[]).filter((e) => !e.isDeleted)) as never,
+      null,
+      { refreshDimensions: false, repairBindings: true },
+    ).map((e) => ({ ...e, locked: false })) as unknown as ExcalidrawElement[]
+    if (!fresh.length) return
+    const s = api.getAppState()
+    const c = viewportCoordsToSceneCoords({ clientX: s.offsetLeft + s.width / 2, clientY: s.offsetTop + s.height / 2 }, s)
+    const [x1, y1, x2, y2] = getCommonBounds(fresh)
+    const dx = c.x - (x1 + x2) / 2
+    const dy = c.y - (y1 + y2) / 2
+    const placed = fresh.map((e) => ({ ...e, x: e.x + dx, y: e.y + dy }))
+    api.updateScene({
+      elements: [...api.getSceneElementsIncludingDeleted(), ...placed] as never,
+      // Si el elemento viene agrupado, Excalidraw espera también el grupo exterior en `selectedGroupIds`; sin él la
+      // selección queda "a medias" y no se puede deseleccionar ni seleccionar otra cosa.
+      appState: {
+        selectedElementIds: Object.fromEntries(placed.map((e) => [e.id, true as const])),
+        selectedGroupIds: Object.fromEntries(placed.map((e) => e.groupIds[e.groupIds.length - 1]).filter((g): g is string => !!g).map((g) => [g, true as const])),
+        editingGroupId: null,
+      },
+      captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+    })
+  }, [api, toast])
 
   // ---- escena → Yjs ----
   const timer = useRef<ReturnType<typeof setTimeout>>()
@@ -142,20 +316,32 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
     }, LOCAL)
   }, [doc, store, toast])
 
-  const onChange = useCallback((elements: readonly OrderedExcalidrawElement[], appState: { viewBackgroundColor: string; selectedElementIds: Record<string, true> }, files: Record<string, BinaryFileData>) => {
+  const onChange = useCallback((elements: readonly OrderedExcalidrawElement[], appState: { viewBackgroundColor: string; selectedElementIds: Record<string, true>; objectsSnapModeEnabled: boolean; gridModeEnabled: boolean; openSidebar?: { name: string } | null }, files: Record<string, BinaryFileData>) => {
     if (root.current) {
       const live = elements.filter((e) => !e.isDeleted)
       root.current.dataset.count = String(live.length) // útil para accesibilidad y para las pruebas automáticas
       root.current.dataset.types = live.map((e) => e.type).join(',')
+      root.current.dataset.sig = String(Math.round(live.reduce((a, e) => a + e.x + e.y, 0))) // para las pruebas automáticas: cambia cuando algo se mueve
     }
     if (editableRef.current) {
       latest.current = { elements, bg: appState.viewBackgroundColor, files }
-      if (!timer.current) timer.current = setTimeout(flush, 60)
+      if (!timer.current) timer.current = setTimeout(flush, 0)
     }
-    const sel = appState.selectedElementIds
-    if (JSON.stringify(sel) !== JSON.stringify(board.current.selectedElementIds ?? {})) {
-      board.current.selectedElementIds = sel
+    const picked = appState.selectedElementIds
+    if (JSON.stringify(picked) !== JSON.stringify(board.current.selectedElementIds ?? {})) {
+      board.current.selectedElementIds = picked
       publish()
+    }
+    if (!appState.openSidebar) setSbEl(null)
+    else requestAnimationFrame(() => setSbEl((cur) => document.querySelector<HTMLElement>('.default-sidebar') ?? cur))
+    const n = Object.keys(picked).length
+    const frame = n > 1 && elements.some((e) => picked[e.id] && (e.type === 'frame' || e.type === 'magicframe'))
+    setSel((s) => (s.n === n && s.frame === frame ? s : { n, frame }))
+    // la preferencia del imán es lo que se ve en pantalla (con la cuadrícula activa, Excalidraw lo apaga solo y eso no cuenta)
+    if (snapSeen.current !== appState.objectsSnapModeEnabled) {
+      if (snapSeen.current !== null && !appState.gridModeEnabled) saveSnap(appState.objectsSnapModeEnabled)
+      snapSeen.current = appState.objectsSnapModeEnabled
+      setSnap(appState.objectsSnapModeEnabled)
     }
   }, [flush]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -173,8 +359,8 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
       pubTimer.current = undefined
       provider.awareness.setLocalStateField('board', { ...board.current })
     }
-    if (now - lastPub.current > 40) send()
-    else if (!pubTimer.current) pubTimer.current = setTimeout(send, 40)
+    if (now - lastPub.current > 16) send()
+    else if (!pubTimer.current) pubTimer.current = setTimeout(send, 16)
   }
 
   useEffect(() => {
@@ -298,6 +484,8 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
         elements: [...dead, ...fresh] as never,
         appState: {
           selectedElementIds: Object.fromEntries(fresh.map((e) => [e.id, true as const])),
+          selectedGroupIds: Object.fromEntries(fresh.map((e) => e.groupIds[e.groupIds.length - 1]).filter((g): g is string => !!g).map((g) => [g, true as const])),
+          editingGroupId: null,
           viewBackgroundColor: mode === 'replace' && restored.appState?.viewBackgroundColor ? restored.appState.viewBackgroundColor : s.viewBackgroundColor,
         },
         captureUpdate: CaptureUpdateAction.IMMEDIATELY,
@@ -309,12 +497,57 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
   }, [api])
 
   useEffect(() => {
+    const el = root.current
+    if (!el) return
+    const read = () => requestAnimationFrame(() => setPhone(!!el.querySelector('.excalidraw--mobile')))
+    const ro = new ResizeObserver(read)
+    ro.observe(el)
+    read()
+    return () => ro.disconnect()
+  }, [])
+
+  /** Ensancha la barra lateral de las bibliotecas arrastrando su borde izquierdo (se recuerda el ancho). */
+  const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    const box = root.current!.getBoundingClientRect()
+    let last = sbWidth
+    const move = (ev: PointerEvent) => {
+      last = Math.round(Math.min(Math.min(760, box.width - 320), Math.max(260, box.right - ev.clientX)))
+      setSbWidth(last)
+    }
+    const up = () => {
+      document.removeEventListener('pointermove', move)
+      document.removeEventListener('pointerup', up)
+      document.body.classList.remove('no-select')
+      try {
+        localStorage.setItem('nora-board-sidebar', String(last))
+      } catch { /* sin almacenamiento */ }
+    }
+    document.body.classList.add('no-select')
+    document.addEventListener('pointermove', move)
+    document.addEventListener('pointerup', up)
+  }
+
+  /** Imán: igual que Alt+S de Excalidraw (y, como él, apaga la cuadrícula). */
+  const toggleSnap = useCallback(() => {
+    if (!api) return
+    api.updateScene({ appState: { objectsSnapModeEnabled: !api.getAppState().objectsSnapModeEnabled, gridModeEnabled: false }, captureUpdate: CaptureUpdateAction.NEVER })
+  }, [api])
+
+  /** Pulsa el botón de alineación de Excalidraw (el panel de propiedades): así se mueven también el texto ligado, las flechas y los grupos. */
+  const align = useCallback((label: string) => {
+    const btn = root.current?.querySelector<HTMLButtonElement>(`.excalidraw button[aria-label="${label}"]`)
+    if (btn) btn.click()
+    else toast('No se pudo alinear. Selecciona de nuevo los elementos', 'error')
+  }, [toast])
+
+  useEffect(() => {
     onHandle(handle)
     return () => onHandle(null)
   }, [handle, onHandle])
 
   return (
-    <div className="board-editor" ref={root}>
+    <div className="board-editor" ref={root} style={{ ['--nora-sb' as string]: `${sbWidth}px` }}>
       <Excalidraw
         excalidrawAPI={setApi}
         initialData={initialData}
@@ -328,19 +561,43 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
           publish()
         }}
         onLibraryChange={(items) => {
-          try {
-            localStorage.setItem(LIBRARY_KEY, JSON.stringify(items))
-          } catch { /* sin almacenamiento: la biblioteca solo dura esta sesión */ }
+          const mine = (items as unknown as LibItem[]).filter((i) => i.status !== 'published') // las del sistema no se guardan como propias
+          if (libReady.current) saveLibrary(mine)
+          else try {
+            localStorage.setItem(LIBRARY_KEY, JSON.stringify(mine)) // sin servidor, al menos en este navegador
+          } catch { /* sin almacenamiento */ }
         }}
         langCode="es-ES"
         theme={dark ? 'dark' : 'light'}
         aiEnabled={false}
         name="Pizarra"
         UIOptions={{ canvasActions: { loadScene: false, saveToActiveFile: false, export: { saveFileToDisk: true }, toggleTheme: true } }}
+        renderTopRightUI={() => (
+          <>
+            {onShowBar && (
+              <button type="button" className="board-chip on show-bar" aria-label="Mostrar la barra superior" title="Mostrar la barra superior" onClick={onShowBar}>
+                <ChevronDown size={16} /><span>Barra</span>
+              </button>
+            )}
+            {editable && (
+              <button type="button" className={`board-chip ${snap ? 'on' : ''}`} aria-pressed={snap} onClick={toggleSnap}
+                title="Imán: al mover o dibujar, los elementos se ajustan al centro y a los bordes de los demás y aparecen guías (Alt+S)">
+                <Magnet size={15} /><span>Imán</span>
+              </button>
+            )}
+          </>
+        )}
       >
+        <DefaultSidebar>
+          <DefaultSidebar.TabTriggers>
+            <Sidebar.TabTrigger tab="sistema"><span title="Bibliotecas del sistema" aria-label="Bibliotecas del sistema" style={{ display: 'grid', placeItems: 'center' }}><LibraryIcon size={16} /></span></Sidebar.TabTrigger>
+          </DefaultSidebar.TabTriggers>
+          <Sidebar.Tab tab="sistema"><SystemLibrary loading={sysLoading} groups={sysGroups} dark={dark} onInsert={insertSystem} /></Sidebar.Tab>
+        </DefaultSidebar>
         <MainMenu>
           <MainMenu.Item icon={<Upload size={16} />} onSelect={onImportRequest}>Importar archivo…</MainMenu.Item>
           <MainMenu.Item icon={<FileDown size={16} />} onSelect={onSaveCopy}>Guardar copia en la sala…</MainMenu.Item>
+          {editable && <MainMenu.Item icon={<Magnet size={16} />} onSelect={toggleSnap} selected={snap} shortcut="Alt+S">Imán: ajustar al centro y bordes</MainMenu.Item>}
           <MainMenu.DefaultItems.Export />
           <MainMenu.DefaultItems.SaveAsImage />
           <MainMenu.Separator />
@@ -352,6 +609,30 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
           <MainMenu.DefaultItems.ChangeCanvasBackground />
         </MainMenu>
       </Excalidraw>
+      {sbEl && !phone && createPortal(
+        // dentro de la propia barra: así Excalidraw no la cierra al pulsar el asa (lo haría con un clic «fuera»)
+        <div className="board-sb-handle" role="separator" aria-orientation="vertical" aria-label="Cambiar el ancho de la barra de bibliotecas" title="Arrastra para cambiar el ancho (doble clic: ancho original)"
+          onPointerDown={startResize} onDoubleClick={() => { setSbWidth(302); try { localStorage.removeItem('nora-board-sidebar') } catch { /* nada */ } }} />,
+        sbEl,
+      )}
+      {editable && !phone && sel.n > 1 && !sel.frame && (
+        <div className="board-align" role="toolbar" aria-label="Alinear los elementos seleccionados" onMouseDown={(e) => e.preventDefault()}>
+          <span className="board-align-title">Alinear</span>
+          {ALIGN.map((a, i) => a ? (
+            <button key={a.label} type="button" className="board-align-btn" aria-label={a.label} title={a.hint ? `${a.label} (${a.hint})` : a.label} onClick={() => align(a.label)}>
+              <a.icon size={17} />
+            </button>
+          ) : <span key={`sep${i}`} className="board-align-sep" />)}
+          {sel.n > 2 && (
+            <>
+              <span className="board-align-sep" />
+              {DISTRIBUTE.map((a) => (
+                <button key={a.label} type="button" className="board-align-btn" aria-label={a.label} title={a.label} onClick={() => align(a.label)}><a.icon size={17} /></button>
+              ))}
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }

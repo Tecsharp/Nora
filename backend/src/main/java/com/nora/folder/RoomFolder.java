@@ -8,7 +8,7 @@ import java.util.UUID;
 @Table(name = "room_folders")
 public class RoomFolder {
 
-    public enum Kind { FILE, NOTE, CLIPBOARD }
+    public enum Kind { FILE, NOTE, CLIPBOARD, BOARD }
 
     @Id
     private UUID id = UUID.randomUUID();
