@@ -80,6 +80,8 @@ services:
       NORA_AGENT_URL_WINDOWS: ${NORA_AGENT_URL_WINDOWS:-}
       NORA_AGENT_URL_MACOS: ${NORA_AGENT_URL_MACOS:-}
       NORA_AGENT_URL_LINUX: ${NORA_AGENT_URL_LINUX:-}
+      # Chat: pasado este tiempo sin leer un mensaje se avisa en la campana (no al instante)
+      NORA_CHAT_NOTIFY_AFTER_MINUTES: ${NORA_CHAT_NOTIFY_AFTER_MINUTES:-120}
       NORA_STUN_URLS: ${NORA_STUN_URLS:-stun:stun.l.google.com:19302}
       NORA_TURN_URLS: ${NORA_TURN_URLS:-}
       NORA_TURN_SECRET: ${NORA_TURN_SECRET:-}

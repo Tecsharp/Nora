@@ -30,6 +30,9 @@ pub enum Status {
 pub struct State {
     pub status: Status,
     pub server: String,
+    /// Quién es el usuario de Nora al que está vinculado este equipo (lo manda Nora al conectar).
+    pub user_name: String,
+    pub user_email: String,
     /// Mensaje de error de la última acción (vincular…).
     pub error: String,
     /// Quién está controlando el equipo ahora mismo.
@@ -86,6 +89,20 @@ fn save_config(c: &Config) {
     }
 }
 
+/// Guarda el nombre y el correo para enseñarlos también cuando aún no hay conexión.
+fn save_profile(name: &str, email: &str) {
+    let path = config_path();
+    let Some(mut v) = std::fs::read_to_string(&path).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok()) else { return };
+    v["name"] = json!(name);
+    v["email"] = json!(email);
+    let _ = std::fs::write(&path, v.to_string());
+}
+
+fn load_profile() -> (String, String) {
+    let v: Value = std::fs::read_to_string(config_path()).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or(Value::Null);
+    (v["name"].as_str().unwrap_or("").to_string(), v["email"].as_str().unwrap_or("").to_string())
+}
+
 pub fn forget_config() {
     let _ = std::fs::remove_file(config_path());
 }
@@ -122,9 +139,12 @@ enum Outcome {
 impl Worker {
     pub fn new(wake: impl Fn() + Send + 'static) -> Self {
         let paired = load_config().filter(|c| !c.token.is_empty());
+        let (user_name, user_email) = if paired.is_some() { load_profile() } else { Default::default() };
         let state = State {
             status: if paired.is_some() { Status::Connecting } else { Status::Unpaired },
             server: paired.as_ref().map(|c| c.server.clone()).unwrap_or_default(),
+            user_name,
+            user_email,
             error: String::new(),
             controlled_by: None,
             screen: (0, 0),
@@ -216,7 +236,7 @@ impl Worker {
                 Outcome::Reset => {
                     forget_config();
                     cfg = None;
-                    self.set(|s| { s.status = Status::Unpaired; s.server.clear(); s.controlled_by = None; s.error.clear(); });
+                    self.set(|s| { s.status = Status::Unpaired; s.server.clear(); s.user_name.clear(); s.user_email.clear(); s.controlled_by = None; s.error.clear(); });
                     continue;
                 }
                 Outcome::Unauthorized => {
@@ -247,7 +267,7 @@ impl Worker {
                 forget_config();
                 *cfg = None;
                 if let Some(k) = ctl.as_mut() { k.stop(); }
-                self.set(|s| { s.status = Status::Unpaired; s.server.clear(); s.controlled_by = None; s.error.clear(); });
+                self.set(|s| { s.status = Status::Unpaired; s.server.clear(); s.user_name.clear(); s.user_email.clear(); s.controlled_by = None; s.error.clear(); });
                 false
             }
             Ok(_) | Err(RecvTimeoutError::Timeout) => false,
@@ -329,6 +349,12 @@ impl Worker {
                 self.set(|s| s.controlled_by = None);
             }
             "input" => ctl.apply(&v),
+            "welcome" => {
+                let name = v["name"].as_str().unwrap_or("").to_string();
+                let email = v["email"].as_str().unwrap_or("").to_string();
+                save_profile(&name, &email);
+                self.set(|s| { s.user_name = name; s.user_email = email; });
+            }
             _ => {}
         }
     }

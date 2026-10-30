@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { ArrowDown, Check, CornerUpLeft, Copy, Pencil, Send, Smile, SmilePlus, Sparkles, Trash2, X } from 'lucide-react'
 import { useAuth } from '../auth'
 import Avatar from '../components/Avatar'
@@ -55,6 +56,8 @@ interface Props {
   focusMsg?: { id: string; nonce: number } | null
 }
 
+interface Row { key: string; type: 'top' | 'end' | 'day' | 'unread' | 'sys' | 'msg'; m?: Message; head?: boolean; label?: string }
+
 /** Mensajes y caja de escritura de una conversación. La usan la ventana del dock y la vista completa. */
 export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
   const { user } = useAuth()
@@ -62,7 +65,7 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
   const dialogs = useDialogs()
   const chat = useChat()
   const { room, online } = chat
-  const { items, loading, error, hasMore } = store
+  const { items, loading, error } = store
   const [draft, setDraft] = useState('')
   const [replyTo, setReplyTo] = useState<Message | null>(null)
   const [editing, setEditing] = useState<Message | null>(null)
@@ -75,8 +78,15 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
   const [pick, setPick] = useState(0)
   const list = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLTextAreaElement>(null)
+  const vbox = useRef<HTMLDivElement>(null)
   const stick = useRef(true)
-  const count = useRef(0)
+  const lastId = useRef<string | null>(null)
+  const anchor = useRef<{ key: string; start: number; top: number; view: number } | null>(null)
+  const busy = useRef({ older: false, newer: false })
+  const pendingJump = useRef<string | null>(null)
+  const pinned = useRef(true) // pegada al final: las filas se miden después de pintarse y se sigue al final hasta que la persona mueva la lista
+  const userAt = useRef(0) // última vez que la persona movió la lista (rueda, tacto, teclado, barra): solo eso la «despega» del final
+  const [jumpTick, setJumpTick] = useState(0)
   const lastTyping = useRef(0)
   const firstUnread = useRef<string | null | undefined>(undefined) // se fija al abrir: «Mensajes nuevos» no se mueve mientras se lee
   const initial = useRef(true)
@@ -102,33 +112,99 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
   }, [draft, caret, mentionable])
   useEffect(() => setPick(0), [mention?.q])
 
-  const toBottom = useCallback((smooth = false) => {
-    const el = list.current
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' })
+  // «Mensajes nuevos»: se fija al abrir y no se mueve mientras se lee
+  if (!loading && firstUnread.current === undefined) {
+    const mark = conv.lastReadAt
+    firstUnread.current = conv.unread > 0 && mark ? items.find((m) => m.kind === 'TEXT' && m.createdAt > mark && m.authorId !== user?.id)?.id ?? null : null
+  }
+  const firstUnreadId = firstUnread.current ?? null
+
+  // La lista es virtual: solo se pintan los mensajes que se ven (más unos pocos de margen), aunque la conversación tenga miles.
+  const rows = useMemo<Row[]>(() => {
+    // la primera fila es el botón de «anteriores» (o un hueco) y la última, un hueco: así los desplazamientos de la lista empiezan en cero y cuadran con la lista virtual
+    const out: Row[] = [{ key: 'top', type: 'top' }]
+    let prev: Message | null = null
+    for (const m of items) {
+      const at = new Date(m.createdAt)
+      const newDay = !prev || !sameDay(new Date(prev.createdAt), at)
+      if (newDay) out.push({ key: `d${m.id}`, type: 'day', label: dayLabel(at) })
+      if (firstUnreadId === m.id) out.push({ key: `u${m.id}`, type: 'unread' })
+      if (m.kind === 'SYSTEM') {
+        out.push({ key: m.id, type: 'sys', m })
+        prev = null
+        continue
+      }
+      const head = newDay || !prev || prev.authorId !== m.authorId || prev.authorName !== m.authorName || at.getTime() - new Date(prev.createdAt).getTime() > GROUP_GAP_MS
+      out.push({ key: m.id, type: 'msg', m, head })
+      prev = m
+    }
+    out.push({ key: 'end', type: 'end' })
+    return out
+  }, [items, firstUnreadId])
+  const rowsRef = useRef(rows)
+  rowsRef.current = rows
+  const virtualizer = useVirtualizer({ count: rows.length, getScrollElement: () => list.current, estimateSize: () => 76, overscan: 8, getItemKey: (i) => rows[i]?.key ?? i })
+
+  const toBottom = useCallback(() => {
+    const n = rowsRef.current.length
+    if (n) virtualizer.scrollToIndex(n - 1, { align: 'end' })
     stick.current = true
+    pinned.current = true
     setUnseen(0)
-  }, [])
+    // los mensajes se miden al pintarse: se corrige unos fotogramas para quedar de verdad al final
+    let k = 0
+    const fix = () => { const el = list.current; if (el && pinned.current) el.scrollTop = el.scrollHeight; if (++k < 5) requestAnimationFrame(fix) }
+    requestAnimationFrame(fix)
+  }, [virtualizer])
+
+  // Las filas se miden al pintarse y la altura total cambia: si se estaba al final, se sigue al final
+  useEffect(() => {
+    const box = vbox.current
+    if (!box || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => { const el = list.current; if (el && pinned.current) el.scrollTop = el.scrollHeight })
+    ro.observe(box)
+    return () => ro.disconnect()
+  }, [loading])
 
   useLayoutEffect(() => {
     if (loading) return
-    if (firstUnread.current === undefined) {
-      const mark = conv.lastReadAt
-      firstUnread.current = conv.unread > 0 && mark ? items.find((m) => m.kind === 'TEXT' && m.createdAt > mark && m.authorId !== user?.id)?.id ?? null : null
-    }
-    const added = items.length - count.current
+    const el = list.current
     const last = items[items.length - 1]
+    // se acaban de cargar mensajes anteriores: se mantiene en pantalla lo que se estaba leyendo
+    if (anchor.current && el) {
+      const a = anchor.current
+      anchor.current = null
+      const idx = rows.findIndex((r) => r.key === a.key)
+      const start = idx >= 0 ? virtualizer.measurementsCache[idx]?.start : undefined
+      if (start != null) el.scrollTop += start - a.start // lo añadido por encima (con alturas estimadas)
+      // al pintarse las filas nuevas se miden y cambian de altura: unos fotogramas se recoloca lo leído en su sitio exacto
+      const t0 = Date.now()
+      const settle = () => {
+        const list0 = list.current
+        const node = list0?.querySelector<HTMLElement>(`[data-rowkey="${a.key}"]`)
+        if (!list0 || !node || userAt.current > t0) return
+        const diff = node.getBoundingClientRect().top - list0.getBoundingClientRect().top - a.view
+        if (Math.abs(diff) > 1) list0.scrollTop += diff
+        if (Date.now() - t0 < 700) requestAnimationFrame(settle)
+      }
+      requestAnimationFrame(settle)
+      lastId.current = last?.id ?? null
+      return
+    }
     if (initial.current && items.length) {
       initial.current = false
-      const first = firstUnread.current && list.current?.querySelector<HTMLElement>(`[data-msg="${firstUnread.current}"]`)
-      if (first) { first.scrollIntoView({ block: 'center' }); stick.current = false } else toBottom()
-    } else if (added > 0 && last) {
-      if (stick.current || last.authorId === user?.id) toBottom(true)
-      else setUnseen((n) => n + added)
+      const idx = firstUnreadId ? rows.findIndex((r) => r.key === firstUnreadId) : -1
+      if (idx >= 0) { virtualizer.scrollToIndex(idx, { align: 'center' }); stick.current = false; pinned.current = false } else toBottom()
+    } else if (last && last.id !== lastId.current && !store.hasNewer) {
+      const was = lastId.current ? items.findIndex((m) => m.id === lastId.current) : -1
+      const added = was >= 0 ? items.length - 1 - was : 1
+      if (stick.current || pinned.current || last.authorId === user?.id) toBottom()
+      else if (added > 0) setUnseen((n) => n + added)
     }
-    count.current = items.length
-  }, [items, loading, toBottom, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+    lastId.current = last?.id ?? null
+  }, [items, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { firstUnread.current = undefined; initial.current = true; count.current = 0; setDraft(''); setReplyTo(null); setEditing(null) }, [conv.id])
+  useEffect(() => { firstUnread.current = undefined; initial.current = true; lastId.current = null; setDraft(''); setReplyTo(null); setEditing(null) }, [conv.id])
 
   // lo que se está leyendo se marca como leído (si la pestaña está a la vista)
   useEffect(() => {
@@ -145,27 +221,56 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
     return () => window.removeEventListener('focus', on)
   }, [conv.id, conv.unread, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ir a un mensaje concreto (notificaciones, citas)
-  const jump = useCallback((id: string) => flash(`[data-msg="${id}"]`), [])
+  // ir a un mensaje concreto (notificaciones, citas, resultados de búsqueda): si no está cargado se pide una ventana centrada en él
+  const goTo = useCallback(async (id: string) => {
+    const ok = await store.jump(id)
+    if (!ok) return toast('Ese mensaje ya no existe', 'info')
+    pendingJump.current = id
+    setJumpTick((n) => n + 1)
+  }, [store.jump, toast]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const id = pendingJump.current
+    if (!id) return
+    const idx = rows.findIndex((r) => r.key === id)
+    if (idx < 0) return // la ventana aún no se pintó: se vuelve a intentar al cambiar las filas
+    pendingJump.current = null
+    stick.current = false
+    pinned.current = false
+    virtualizer.scrollToIndex(idx, { align: 'center' })
+    setTimeout(() => flash(`[data-msg="${id}"]`), 140)
+  }, [rows, jumpTick]) // eslint-disable-line react-hooks/exhaustive-deps
   const done = useRef(0)
   useEffect(() => {
     if (!focusMsg || loading || done.current === focusMsg.nonce) return
-    if (byId.has(focusMsg.id)) { done.current = focusMsg.nonce; setTimeout(() => jump(focusMsg.id), 80) }
-    else if (hasMore) void store.older()
-    else done.current = focusMsg.nonce
-  }, [focusMsg, loading, byId, hasMore, jump, store])
+    done.current = focusMsg.nonce
+    void goTo(focusMsg.id)
+  }, [focusMsg, loading, goTo])
+
+  const older = useCallback(async () => {
+    const el = list.current
+    const first = virtualizer.getVirtualItems().find((v) => String(v.key) !== 'top' && v.end > (el?.scrollTop ?? 0))
+    const node = first ? el?.querySelector<HTMLElement>(`[data-rowkey="${String(first.key)}"]`) : null
+    if (el && first) anchor.current = { key: String(first.key), start: first.start, top: el.scrollTop, view: node ? node.getBoundingClientRect().top - el.getBoundingClientRect().top : first.start - el.scrollTop }
+    try { await store.older() } finally { setTimeout(() => { anchor.current = null }, 80) }
+  }, [store.older, virtualizer]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const onScroll = () => {
     const el = list.current
     if (!el) return
-    stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    const dist = el.scrollHeight - el.scrollTop - el.clientHeight
+    stick.current = dist < 80 && !store.hasNewer
+    if (dist >= 80 && Date.now() - userAt.current < 700) pinned.current = false // la persona subió: se suelta del final
     if (stick.current) setUnseen(0)
+    // al acercarse a un extremo se piden más mensajes solos
+    if (el.scrollTop < 500 && store.hasMore && !busy.current.older) { busy.current.older = true; void older().finally(() => { busy.current.older = false }) }
+    if (dist < 700 && store.hasNewer && !busy.current.newer) { busy.current.newer = true; void store.newer().finally(() => { busy.current.newer = false }) }
   }
-  const older = async () => {
-    const el = list.current
-    const before = el ? el.scrollHeight - el.scrollTop : 0
-    await store.older()
-    requestAnimationFrame(() => { if (el) el.scrollTop = el.scrollHeight - before })
+  const goLatest = async () => {
+    if (store.hasNewer) {
+      stick.current = true
+      await store.latest()
+      initial.current = true // al terminar de cargar se baja al final
+    } else toBottom()
   }
 
   const grow = () => {
@@ -196,7 +301,7 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
       setEditing(null)
       setEmojis(false)
       lastTyping.current = 0
-      if (!editing) requestAnimationFrame(() => toBottom(true))
+      if (!editing) requestAnimationFrame(() => toBottom())
     } catch (e) {
       toast(e instanceof Error ? e.message : 'No se pudo enviar el mensaje', 'error')
     } finally {
@@ -260,26 +365,22 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
     requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(a + e.length, a + e.length) })
   }
 
-  const rows: ReactNode[] = []
-  let prev: Message | null = null
-  for (const m of items) {
+  const renderRow = (row: Row) => {
+    if (row.type === 'top') return store.hasMore ? <button className="btn ghost sm chat-older" onClick={() => void older()}>Cargar mensajes anteriores</button> : null
+    if (row.type === 'end') return null
+    if (row.type === 'day') return <div className="chat-day"><span>{row.label}</span></div>
+    if (row.type === 'unread') return <div className="chat-unread"><span>Mensajes nuevos</span></div>
+    const m = row.m!
+    if (row.type === 'sys') return <div data-msg={m.id} className="chat-sys"><span>{m.text}</span></div>
+    const head = !!row.head
     const at = new Date(m.createdAt)
-    const newDay = !prev || !sameDay(new Date(prev.createdAt), at)
-    if (newDay) rows.push(<div key={`d${m.id}`} className="chat-day"><span>{dayLabel(at)}</span></div>)
-    if (firstUnread.current === m.id) rows.push(<div key={`u${m.id}`} className="chat-unread"><span>Mensajes nuevos</span></div>)
-    if (m.kind === 'SYSTEM') {
-      rows.push(<div key={m.id} data-msg={m.id} className="chat-sys"><span>{m.text}</span></div>)
-      prev = null
-      continue
-    }
-    const head = newDay || !prev || prev.authorId !== m.authorId || prev.authorName !== m.authorName || at.getTime() - new Date(prev.createdAt).getTime() > GROUP_GAP_MS
     const mine = m.authorId === user?.id
     const author = m.authorId ? who.get(m.authorId) : undefined
-    const quoted = m.replyTo ? byId.get(m.replyTo) : undefined
+    const quoted = m.reply ?? (m.replyTo ? byId.get(m.replyTo) : undefined) // la cita viene resuelta del servidor, aunque el original no esté cargado
     const reactions = Object.entries(m.reactions ?? {})
     const showName = head && !mine && conv.kind !== 'DM'
-    rows.push(
-      <div key={m.id} data-msg={m.id} className={`chat-msg ${mine ? 'mine' : ''} ${head ? 'head' : 'cont'}`}>
+    return (
+      <div data-msg={m.id} className={`chat-msg ${mine ? 'mine' : ''} ${head ? 'head' : 'cont'}`}>
         <div className="chat-av">{head && !mine && <Avatar name={m.authorName} userId={m.authorId ?? undefined} version={author?.avatarVersion} online={m.authorId ? online.has(m.authorId) : false} size={variant === 'window' ? 28 : 34} />}</div>
         <div className="chat-col">
           {showName && <div className="chat-meta"><strong>{m.authorName}</strong><time title={at.toLocaleString('es')}>{clock(at)}</time></div>}
@@ -287,7 +388,7 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
           <div className={`chat-bubble-wrap ${activeMsg === m.id || pickFor === m.id ? 'show' : ''}`} onClick={() => setActiveMsg((a) => (a === m.id ? null : m.id))}>
             <div className="chat-bubble">
               {m.replyTo && (quoted
-                ? <button type="button" className="chat-quote" onClick={() => jump(quoted.id)}><strong>{quoted.authorName}</strong><span>{quoted.text}</span></button>
+                ? <button type="button" className="chat-quote" onClick={() => void goTo(quoted.id)}><strong>{quoted.authorName}</strong><span>{quoted.text}</span></button>
                 : <div className="chat-quote gone"><span>Mensaje borrado</span></div>)}
               <p>{rich(m.text, names, user?.displayName ?? '')}{m.edited && <small className="chat-edited"> (editado)</small>}</p>
             </div>
@@ -314,9 +415,8 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
             </div>
           )}
         </div>
-      </div>,
+      </div>
     )
-    prev = m
   }
 
   const roLabel = !canWriteIn(room, user)
@@ -325,8 +425,7 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
 
   return (
     <div className={`chat ${variant}`}>
-      <div className="chat-list" ref={list} onScroll={onScroll} aria-live="polite" aria-label="Mensajes">
-        {hasMore && <button className="btn ghost sm chat-older" onClick={() => void older()}>Cargar mensajes anteriores</button>}
+      <div className="chat-list" ref={list} onScroll={onScroll} onWheel={() => { userAt.current = Date.now() }} onTouchMove={() => { userAt.current = Date.now() }} onPointerDown={() => { userAt.current = Date.now() }} onKeyDown={() => { userAt.current = Date.now() }} aria-live="polite" aria-label="Mensajes">
         {loading && <p className="muted small center-text">Cargando mensajes…</p>}
         {error && <p className="error small center-text">{error}</p>}
         {!loading && !items.length && !error && (
@@ -336,9 +435,21 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
             <span className="small">{canWrite ? 'Escribe el primer mensaje: llegará en tiempo real.' : 'Todavía no hay mensajes.'}</span>
           </div>
         )}
-        {rows}
+        <div ref={vbox} className="chat-vbox" style={{ height: virtualizer.getTotalSize() }}>
+          {virtualizer.getVirtualItems().map((v) => {
+            const row = rows[v.index]
+            if (!row) return null
+            return (
+              <div key={v.key} data-index={v.index} data-rowkey={row.key} ref={virtualizer.measureElement} className={`chat-vrow ${row.type} ${row.head ? 'head' : ''}`} style={{ transform: `translateY(${v.start}px)` }}>
+                {renderRow(row)}
+              </div>
+            )
+          })}
+        </div>
       </div>
-      {unseen > 0 && <button className="chat-new" onClick={() => toBottom(true)}><ArrowDown size={14} /> {unseen} {unseen === 1 ? 'nuevo' : 'nuevos'}</button>}
+      {(store.hasNewer || unseen > 0) && (
+        <button className="chat-new" onClick={() => void goLatest()}><ArrowDown size={14} /> {store.hasNewer ? 'Ir a los mensajes recientes' : `${unseen} ${unseen === 1 ? 'nuevo' : 'nuevos'}`}</button>
+      )}
       <div className="chat-typing" aria-live="polite">{typers.length > 0 && <><span className="dots"><i /><i /><i /></span> {typers.length === 1 ? `${typers[0]} está escribiendo…` : `${typers.slice(0, 2).join(' y ')} están escribiendo…`}</>}</div>
       {canWrite ? (
         <div className="chat-composer">

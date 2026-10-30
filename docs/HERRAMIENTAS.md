@@ -30,7 +30,12 @@ autocompletado, enlaces pulsables, editar/borrar los propios (y borrar quien mod
 silenciar y fijar (por persona); salir y borrar el grupo. El grupo nunca se queda sin administración (si sale la última persona administradora, pasa a la más antigua). Los cambios quedan como mensajes de sistema.
 Quien sale de la sala o es expulsado deja también sus grupos y directos.
 
-**Avisos:** los directos y los grupos no silenciados llegan a la campana (agrupados por conversación, con enlace al mensaje); en la General solo cuando te mencionan.
+**Historial grande:** todos los mensajes se guardan en la base de datos mientras exista la sala (sin límite ni retención) y se cargan por páginas de 50; al subir con la rueda se piden los anteriores solos y lo que lees no se mueve.
+La lista es **virtual**: solo se pintan los mensajes que se ven (unas decenas), así que una conversación de miles de mensajes va igual de fluida. **Buscar** (lupa de la cabecera de una conversación, o el buscador de la lista de chats para todas las que ves) usa un índice de trigramas de PostgreSQL (`pg_trgm`, migración `V21`): encuentra texto parcial, sin distinguir mayúsculas, y los resultados llegan por páginas.
+Pulsar un resultado (o una notificación o una cita) lleva al mensaje pidiendo **una ventana alrededor de él** (`GET …/conversations/{id}/window?around=`), no todo lo anterior; bajando se piden los siguientes (`?after=`) y «Ir a los mensajes recientes» vuelve al final.
+Las citas de respuestas llegan ya resueltas por el servidor, aunque el mensaje original no esté cargado. Para salas grandes, el reparto en vivo va por un índice de conexiones por persona, la lista de conversaciones se calcula con unas pocas consultas, y las menciones y avisos de grupo se escriben por lotes.
+
+**Avisos:** los mensajes nuevos **no** llegan a la campana: ya tienes el contador y la ventana del dock. Solo avisa cuando un mensaje lleva **más de 2 horas sin leerse** (`NORA_CHAT_NOTIFY_AFTER_MINUTES`, 120 por defecto): un único aviso por conversación («Ana te escribió», «3 mensajes sin leer en el grupo…») con enlace al mensaje, que no se repite y desaparece al leerla. No avisa de conversaciones silenciadas ni de mensajes que ya viste. Las menciones y los avisos de grupo siguen llegando al momento.
 
 Datos: `chat_conversations`, `chat_members` (rol, silenciar, fijar, última lectura) y `chat_messages` (migración `V19`, que además convierte el chat antiguo de cada sala en su conversación General).
 API: `/api/rooms/{code}/chat/…` (`conversations`, `dm`, `messages`, `members`, `read`…); «escribiendo» es el mensaje WebSocket `chat.typing {conv}`.

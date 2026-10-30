@@ -51,9 +51,11 @@ public class ChatService {
     private final UserRepository users;
     private final NotificationService notifications;
     private final ApplicationEventPublisher events;
+    private final com.nora.config.AppProperties props;
 
     public ChatService(ChatConversationRepository convs, ChatMemberRepository members, ChatMessageRepository messages, RoomService rooms,
-                       RoomMemberRepository roomMembers, UserRepository users, NotificationService notifications, ApplicationEventPublisher events) {
+                       RoomMemberRepository roomMembers, UserRepository users, NotificationService notifications, ApplicationEventPublisher events, com.nora.config.AppProperties props) {
+        this.props = props;
         this.convs = convs;
         this.members = members;
         this.messages = messages;
@@ -76,9 +78,39 @@ public class ChatService {
         member(general, p.userId()); // la general siempre me pertenece (para llevar mi lectura)
         List<ChatConversation> visible = convs.findVisible(room.getId(), p.userId());
         // un mensaje directo vacío solo lo ve quien lo abrió: a la otra persona le aparece con el primer mensaje
-        return visible.stream().map(c -> dto(c, p.userId(), room))
+        return dtos(visible, p.userId()).stream()
                 .filter(c -> !ChatConversation.DM.equals(c.kind()) || c.last() != null || p.userId().equals(c.createdBy()))
                 .sorted(ORDER).toList();
+    }
+
+    /** Todas las conversaciones de una persona con unas pocas consultas en total (no una tanda por conversación). */
+    private List<ConvDto> dtos(List<ChatConversation> list, UUID viewer) {
+        if (list.isEmpty()) return List.of();
+        List<UUID> ids = list.stream().map(ChatConversation::getId).toList();
+        Map<UUID, ChatMember> mine = members.findByUserIdAndConversationIdIn(viewer, ids).stream().collect(Collectors.toMap(ChatMember::getConversationId, m -> m));
+        Map<UUID, ChatMessage> lasts = messages.latestOf(ids).stream().collect(Collectors.toMap(ChatMessage::getConversationId, m -> m, (a, b) -> a));
+        Map<UUID, Long> unread = new HashMap<>();
+        for (Object[] r : messages.unreadCounts(viewer, ids)) unread.put((UUID) r[0], ((Number) r[1]).longValue());
+        List<UUID> withMembers = list.stream().filter(c -> !c.isRoom()).map(ChatConversation::getId).toList();
+        Map<UUID, List<ChatMember>> byConv = withMembers.isEmpty() ? Map.of() : members.findByConversationIdIn(withMembers).stream().collect(Collectors.groupingBy(ChatMember::getConversationId));
+        List<ConvDto> out = new ArrayList<>();
+        for (ChatConversation c : list) {
+            ChatMember me = mine.get(c.getId());
+            ChatMessage last = lasts.get(c.getId());
+            List<ChatMember> cms = byConv.getOrDefault(c.getId(), List.of());
+            UUID other = null;
+            if (c.isDm()) for (ChatMember cm : cms) if (!cm.getUserId().equals(viewer)) other = cm.getUserId();
+            out.add(new ConvDto(c.getId(), c.getKind(), c.getName(), c.getDescription(), c.getColor(), c.getCreatedBy(), c.getPostPolicy(), c.getAddPolicy(),
+                    c.getCreatedAt(), c.getLastMessageAt(),
+                    last == null ? null : new LastMessage(last.getId(), last.getAuthorId(), last.getAuthorName(), last.getKind(), clip(last.getText(), 120), last.getCreatedAt()),
+                    c.isGroup() ? sortedMembers(cms) : List.of(), me == null ? "MEMBER" : me.getRole(), me != null && me.isMuted(), me != null && me.isPinned(),
+                    me == null ? 0 : unread.getOrDefault(c.getId(), 0L), me == null ? null : me.getLastReadAt(), other));
+        }
+        return out;
+    }
+
+    private static List<MemberDto> sortedMembers(List<ChatMember> l) {
+        return l.stream().sorted(java.util.Comparator.comparing((ChatMember m) -> !m.isAdmin()).thenComparing(ChatMember::getJoinedAt)).map(m -> new MemberDto(m.getUserId(), m.getRole())).toList();
     }
 
     private static final java.util.Comparator<ConvDto> ORDER = java.util.Comparator
@@ -257,7 +289,49 @@ public class ChatService {
         Ctx x = ctx(p, code, id);
         List<ChatMessage> found = new ArrayList<>(messages.findBefore(x.conv().getId(), before == null ? Instant.now().plusSeconds(60) : before, PageRequest.of(0, Math.max(1, Math.min(limit, 200)))));
         java.util.Collections.reverse(found); // de más antiguo a más reciente
-        return found.stream().map(ChatService::msg).toList();
+        return dtos(found);
+    }
+
+    /** Los posteriores a un mensaje, para bajar paso a paso desde una ventana que no llega al final. */
+    @Transactional(readOnly = true)
+    public List<MessageDto> messagesAfter(AuthPrincipal p, String code, UUID id, Instant after, int limit) {
+        Ctx x = ctx(p, code, id);
+        return dtos(messages.findAfter(x.conv().getId(), after, PageRequest.of(0, Math.max(1, Math.min(limit, 200)))));
+    }
+
+    /** Una ventana de mensajes centrada en uno concreto: sirve para ir a un mensaje antiguo sin cargar todo lo que hay entre medias. */
+    @Transactional(readOnly = true)
+    public WindowDto window(AuthPrincipal p, String code, UUID id, UUID around, int limit) {
+        Ctx x = ctx(p, code, id);
+        ChatMessage target = messages.findByIdAndConversationId(around, id).orElseThrow(() -> ApiException.notFound("Ese mensaje ya no existe"));
+        int half = Math.max(5, Math.min(limit, 100)) / 2;
+        List<ChatMessage> older = new ArrayList<>(messages.findBefore(id, target.getCreatedAt(), PageRequest.of(0, half)));
+        java.util.Collections.reverse(older);
+        List<ChatMessage> newer = messages.findFrom(id, target.getCreatedAt(), PageRequest.of(0, half + 1));
+        boolean hasNewer = newer.size() > half;
+        List<ChatMessage> all = new ArrayList<>(older);
+        all.addAll(newer.stream().limit(half).toList());
+        return new WindowDto(dtos(all), older.size() >= half, hasNewer);
+    }
+
+    /** Busca texto en el historial (en una conversación o en todas las que ve esta persona). Los resultados van de más reciente a más antiguo. */
+    @Transactional(readOnly = true)
+    public SearchDto search(AuthPrincipal p, String code, UUID conv, String query, Instant before, int limit) {
+        Room room = rooms.requireMember(p.userId(), code);
+        String q = query == null ? "" : query.strip();
+        if (q.length() < 2) return new SearchDto(List.of(), false);
+        if (q.length() > 100) q = q.substring(0, 100);
+        List<UUID> ids;
+        if (conv != null) {
+            ids = List.of(ctx(p, code, conv).conv().getId());
+        } else {
+            ids = convs.findVisible(room.getId(), p.userId()).stream().map(ChatConversation::getId).toList();
+        }
+        if (ids.isEmpty()) return new SearchDto(List.of(), false);
+        String pattern = "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+        int n = Math.max(1, Math.min(limit, 50));
+        List<ChatMessage> found = messages.search(ids, pattern, before == null ? Instant.now().plusSeconds(60) : before, n + 1);
+        return new SearchDto(dtos(found.stream().limit(n).toList()), found.size() > n);
     }
 
     @Transactional
@@ -278,9 +352,8 @@ public class ChatService {
         mine.setLastReadAt(m.getCreatedAt());
         members.save(mine);
         if (c.isRoom()) ensureRoomMembers(c, x.room(), m.getCreatedAt().minusMillis(1));
-        MessageDto dto = msg(m);
+        MessageDto dto = dto(m);
         deliver(x.room(), c, "chat.message", dto);
-        notifyMessage(x.room(), c, m, p.userId());
         return dto;
     }
 
@@ -292,7 +365,7 @@ public class ChatService {
         if (!"TEXT".equals(m.getKind()) || !p.userId().equals(m.getAuthorId())) throw ApiException.forbidden("Solo puedes editar tus mensajes");
         m.setText(text(newText));
         messages.save(m);
-        MessageDto dto = msg(m);
+        MessageDto dto = dto(m);
         deliver(x.room(), x.conv(), "chat.message.updated", dto);
         return dto;
     }
@@ -326,7 +399,7 @@ public class ChatService {
         if (who.isEmpty()) r.remove(emoji);
         m.setReactions(r);
         messages.save(m);
-        MessageDto dto = msg(m);
+        MessageDto dto = dto(m);
         deliver(x.room(), x.conv(), "chat.message.updated", dto);
         return dto;
     }
@@ -373,13 +446,7 @@ public class ChatService {
     }
 
     private void ensureRoomMembers(ChatConversation c, Room room, Instant readUntil) {
-        Set<UUID> have = members.findByConversationId(c.getId()).stream().map(ChatMember::getUserId).collect(Collectors.toSet());
-        for (RoomMember rm : roomMembers.findByRoomId(room.getId())) {
-            if (have.contains(rm.getUserId())) continue;
-            ChatMember m = new ChatMember(c.getId(), rm.getUserId(), "MEMBER");
-            m.setLastReadAt(readUntil);
-            members.save(m);
-        }
+        members.ensureRoomMembers(c.getId(), room.getId(), readUntil);
     }
 
     private List<UUID> recipients(ChatConversation c, Room room) {
@@ -405,31 +472,41 @@ public class ChatService {
         messages.save(m);
         c.setLastMessageAt(m.getCreatedAt());
         convs.save(c);
-        deliver(room, c, "chat.message", msg(m));
+        deliver(room, c, "chat.message", dto(m));
     }
 
-    /** Avisos persistentes (la campana): mensajes directos y de grupo, y en la general solo cuando te mencionan. */
-    private void notifyMessage(Room room, ChatConversation c, ChatMessage m, UUID author) {
-        String name = m.getAuthorName();
-        Map<String, Object> link = new LinkedHashMap<>();
-        link.put("tool", "chat");
-        link.put("conv", c.getId().toString());
-        link.put("msg", m.getId().toString());
-        if (c.isRoom()) {
-            String lower = m.getText().toLowerCase(Locale.ROOT);
-            for (RoomMember rm : roomMembers.findByRoomId(room.getId())) {
-                if (rm.getUserId().equals(author)) continue;
-                String dn = userName(rm.getUserId());
-                if (lower.contains("@" + dn.toLowerCase(Locale.ROOT))) {
-                    notifications.notify(rm.getUserId(), room, "chat", name + " te mencionó en el chat general", m.getText(), link, "chat:" + c.getId() + ":mention");
-                }
-            }
-            return;
-        }
-        String title = c.isGroup() ? name + " en " + c.getName() : name;
-        for (ChatMember cm : members.findByConversationId(c.getId())) {
-            if (cm.getUserId().equals(author) || cm.isMuted()) continue;
-            notifications.notify(cm.getUserId(), room, "chat", title, m.getText(), link, "chat:" + c.getId());
+    /**
+     * Avisos en la campana por mensajes de chat: no al instante, sino cuando llevan más de N minutos (por defecto 2 horas) sin leerse. Así el chat en
+     * vivo no llena la campana, y a quien no entró a verlo le llega un solo aviso por conversación con lo que se perdió.
+     */
+    @org.springframework.scheduling.annotation.Scheduled(fixedDelayString = "#{${app.chat.check-seconds:300} * 1000}", initialDelayString = "#{${app.chat.check-seconds:300} * 1000}")
+    @Transactional
+    public void notifyUnanswered() {
+        int mins = Math.max(1, props.chat() == null ? 120 : props.chat().notifyAfterMinutes());
+        Map<UUID, Room> roomCache = new HashMap<>();
+        Map<UUID, String> dmNames = new HashMap<>();
+        for (Object[] r : members.unansweredFor(mins)) {
+            UUID conv = (UUID) r[0];
+            UUID user = (UUID) r[1];
+            UUID roomId = (UUID) r[2];
+            String kind = (String) r[3];
+            String groupName = (String) r[4];
+            long n = ((Number) r[5]).longValue();
+            UUID lastId = (UUID) r[6];
+            String lastAuthor = (String) r[7];
+            String lastText = (String) r[8];
+            Instant lastAt = r[9] instanceof java.sql.Timestamp ts ? ts.toInstant() : (Instant) r[9];
+            Room room = roomCache.computeIfAbsent(roomId, rooms::roomById);
+            if (room == null || !roomMembers.existsById(new RoomMember.Key(roomId, user))) { members.markNotified(conv, user, lastAt); continue; }
+            String where = ChatConversation.ROOM.equals(kind) ? "el chat general" : ChatConversation.GROUP.equals(kind) ? "«" + groupName + "»" : lastAuthor;
+            String title = n == 1 ? (ChatConversation.DM.equals(kind) ? lastAuthor + " te escribió" : "Mensaje sin leer en " + where)
+                    : n + " mensajes sin leer " + (ChatConversation.DM.equals(kind) ? "de " + lastAuthor : "en " + where);
+            Map<String, Object> link = new LinkedHashMap<>();
+            link.put("tool", "chat");
+            link.put("conv", conv.toString());
+            link.put("msg", lastId.toString());
+            notifications.notify(user, room, "chat", title, (ChatConversation.DM.equals(kind) ? "" : lastAuthor + ": ") + lastText, link, "chat:" + conv);
+            members.markNotified(conv, user, lastAt);
         }
     }
 
@@ -451,14 +528,26 @@ public class ChatService {
     }
 
     private List<MemberDto> memberDtos(ChatConversation c) {
-        return members.findByConversationId(c.getId()).stream()
-                .sorted(java.util.Comparator.comparing((ChatMember m) -> !m.isAdmin()).thenComparing(ChatMember::getJoinedAt))
-                .map(m -> new MemberDto(m.getUserId(), m.getRole())).toList();
+        return sortedMembers(members.findByConversationId(c.getId()));
     }
 
-    private static MessageDto msg(ChatMessage m) {
-        return new MessageDto(m.getId(), m.getConversationId(), m.getAuthorId(), m.getAuthorName(), m.getKind(), m.getText(), m.getReplyTo(),
+    private static MessageDto msg(ChatMessage m, ReplyPreview reply) {
+        return new MessageDto(m.getId(), m.getConversationId(), m.getAuthorId(), m.getAuthorName(), m.getKind(), m.getText(), m.getReplyTo(), reply,
                 m.getReactions(), m.isEdited(), m.getCreatedAt(), m.getUpdatedAt());
+    }
+
+    /** Pasa mensajes a DTO resolviendo de una vez las citas de todos ellos (una consulta, no una por mensaje). */
+    private List<MessageDto> dtos(java.util.Collection<ChatMessage> list) {
+        java.util.Set<UUID> ids = list.stream().map(ChatMessage::getReplyTo).filter(java.util.Objects::nonNull).collect(Collectors.toSet());
+        Map<UUID, ChatMessage> cited = ids.isEmpty() ? Map.of() : messages.findAllById(ids).stream().collect(Collectors.toMap(ChatMessage::getId, m -> m));
+        return list.stream().map(m -> {
+            ChatMessage c = m.getReplyTo() == null ? null : cited.get(m.getReplyTo());
+            return msg(m, c == null ? null : new ReplyPreview(c.getId(), c.getAuthorName(), clip(c.getText(), 160)));
+        }).toList();
+    }
+
+    private MessageDto dto(ChatMessage m) {
+        return dtos(List.of(m)).get(0);
     }
 
     private void requireGroup(ChatConversation c) {

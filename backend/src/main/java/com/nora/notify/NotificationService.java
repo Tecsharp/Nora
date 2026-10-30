@@ -52,6 +52,30 @@ public class NotificationService {
         events.publishEvent(new UserEvent(userId, "notification.new", dto(n)));
     }
 
+    /** El mismo aviso para muchas personas con pocas consultas (una para ver cuáles ya tienen uno sin leer del mismo grupo y una escritura por lote). */
+    @Transactional
+    public void notifyMany(java.util.Collection<UUID> userIds, Room room, String kind, String title, String body, Map<String, Object> link, String groupKey) {
+        if (userIds.isEmpty()) return;
+        if (groupKey == null || userIds.size() == 1) {
+            for (UUID u : userIds) notify(u, room, kind, title, body, link, groupKey);
+            return;
+        }
+        String t = clip(title, 200);
+        String b = clip(body == null ? "" : body, 400);
+        Map<String, Object> l = link == null ? Map.of() : link;
+        Map<UUID, Notification> existing = new java.util.HashMap<>();
+        for (Notification n : repo.findByGroupKeyAndReadAtIsNullAndUserIdIn(groupKey, userIds)) existing.put(n.getUserId(), n);
+        List<Notification> toSave = new java.util.ArrayList<>();
+        for (UUID u : userIds) {
+            Notification n = existing.get(u);
+            if (n != null) n.bump(t, b, l);
+            else n = new Notification(u, room == null ? null : room.getCode(), room == null ? null : clip(room.getName(), 80), kind, t, b, l, groupKey);
+            toSave.add(n);
+        }
+        repo.saveAll(toSave);
+        for (Notification n : toSave) events.publishEvent(new UserEvent(n.getUserId(), "notification.new", dto(n)));
+    }
+
     /** A todas las personas de la sala menos a quien provocó el aviso. */
     @Transactional
     public void notifyRoom(Room room, UUID except, String kind, String title, String body, Map<String, Object> link, String groupKeyPrefix) {
