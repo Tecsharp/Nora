@@ -3,6 +3,7 @@
 //! este programa solo aplica los clics y las teclas autorizados.
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
+mod applog;
 mod core;
 mod gui;
 mod icon;
@@ -59,6 +60,7 @@ fn cli(args: &[String]) {
 }
 
 fn main() {
+    applog::install_panic_hook();
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.iter().any(|a| a == "--help" || a == "-h") {
         println!("nora-agent {}\n\nSin argumentos abre la ventana.\n\nOpciones:\n  --server URL    dirección de tu Nora\n  --code CODIGO   código de vinculación (Nora → Asistencia → Agente)\n  --cli           sin ventana: todo por consola\n  --reset         olvida la vinculación\n  --minimized     abre la ventana minimizada (lo usa «Iniciar con el sistema»)\n  --write-icon F  escribe el icono en un PNG\n", core::VERSION);

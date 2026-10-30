@@ -5,13 +5,26 @@ use std::process::Command;
 
 /// Aviso del sistema (mejor esfuerzo): que se note cuando alguien empieza o deja de controlar.
 pub fn notify(text: &str) {
-    println!("{text}");
-    #[cfg(target_os = "linux")]
-    let _ = Command::new("notify-send").args(["Nora", text]).status();
-    #[cfg(target_os = "macos")]
-    let _ = Command::new("osascript").args(["-e", &format!("display notification \"{}\" with title \"Nora\"", text.replace(['"', '\\'], "'"))]).status();
-    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
-    let _ = text;
+    crate::applog::log(text);
+    // en un hilo aparte: el aviso del sistema puede tardar (o quedarse esperando) y no debe frenar el canal con Nora
+    let text = text.to_string();
+    std::thread::spawn(move || {
+        #[cfg(target_os = "linux")]
+        let _ = Command::new("notify-send").args(["Nora", &text]).status();
+        #[cfg(target_os = "macos")]
+        let _ = Command::new("osascript").args(["-e", &format!("display notification \"{}\" with title \"Nora\"", text.replace(['"', '\\'], "'"))]).status();
+        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+        let _ = text;
+    });
+}
+
+/// `reg` sin que parpadee una ventana de consola (Windows).
+#[cfg(target_os = "windows")]
+fn reg(args: &[&str]) -> Command {
+    use std::os::windows::process::CommandExt;
+    let mut c = Command::new("reg");
+    c.args(args).creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    c
 }
 
 /// ¿Tiene este programa el permiso de Accesibilidad (macOS)? En el resto de sistemas no hace falta.
@@ -77,7 +90,7 @@ pub fn autostart_enabled() -> bool {
     }
     #[cfg(target_os = "windows")]
     {
-        Command::new("reg").args(["query", RUN_KEY, "/v", "NoraAgent"]).output().map(|o| o.status.success()).unwrap_or(false)
+        reg(&["query", RUN_KEY, "/v", "NoraAgent"]).output().map(|o| o.status.success()).unwrap_or(false)
     }
     #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
     {
@@ -110,9 +123,9 @@ pub fn set_autostart(on: bool) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         let status = if on {
-            Command::new("reg").args(["add", RUN_KEY, "/v", "NoraAgent", "/t", "REG_SZ", "/d", &format!("\"{exe_s}\" --minimized"), "/f"]).status()
+            reg(&["add", RUN_KEY, "/v", "NoraAgent", "/t", "REG_SZ", "/d", &format!("\"{exe_s}\" --minimized"), "/f"]).status()
         } else {
-            Command::new("reg").args(["delete", RUN_KEY, "/v", "NoraAgent", "/f"]).status()
+            reg(&["delete", RUN_KEY, "/v", "NoraAgent", "/f"]).status()
         };
         status.map_err(|e| e.to_string()).and_then(|s| if s.success() || !on { Ok(()) } else { Err("No se pudo registrar el arranque".into()) })
     }
