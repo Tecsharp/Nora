@@ -43,12 +43,12 @@ public class JwtService {
 
     public long accessTtlSeconds() { return accessTtl.toSeconds(); }
 
-    public record Parsed(UUID userId, Role role) {}
+    public record Parsed(UUID userId, Role role, Instant issuedAt) {}
 
     public Optional<Parsed> parse(String token) {
         try {
             Claims c = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
-            return Optional.of(new Parsed(UUID.fromString(c.getSubject()), Role.valueOf(c.get("role", String.class))));
+            return Optional.of(new Parsed(UUID.fromString(c.getSubject()), Role.valueOf(c.get("role", String.class)), c.getIssuedAt() == null ? Instant.EPOCH : c.getIssuedAt().toInstant()));
         } catch (JwtException | IllegalArgumentException e) {
             return Optional.empty();
         }

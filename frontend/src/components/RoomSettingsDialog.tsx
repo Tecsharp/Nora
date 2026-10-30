@@ -10,6 +10,7 @@ export default function RoomSettingsDialog({ room, onClose, onSaved }: { room: R
   const [approval, setApproval] = useState(room.settings.requireApproval)
   const [role, setRole] = useState(room.settings.defaultRole)
   const [max, setMax] = useState(room.settings.maxParticipants ? String(room.settings.maxParticipants) : '')
+  const [keep, setKeep] = useState(room.settings.keepWhenExpired)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const cap = user?.limits.maxParticipants
@@ -22,6 +23,7 @@ export default function RoomSettingsDialog({ room, onClose, onSaved }: { room: R
         requireApproval: approval,
         defaultRole: role,
         maxParticipants: max.trim() === '' ? 0 : Number(max),
+        keepWhenExpired: keep,
       })
       onSaved(updated)
       onClose()
@@ -40,9 +42,27 @@ export default function RoomSettingsDialog({ room, onClose, onSaved }: { room: R
           <button className="btn primary" disabled={busy} onClick={save}>{busy ? 'Guardando…' : 'Guardar'}</button>
         </>
       }>
+      <KeepRoomOption keep={keep} setKeep={setKeep} />
       <RoomOptions approval={approval} setApproval={setApproval} role={role} setRole={setRole} max={max} setMax={setMax} cap={cap} />
       {error && <p className="error small" role="alert">{error}</p>}
     </Modal>
+  )
+}
+
+/** «Mantener sala»: al expirar queda inactiva en lugar de borrarse. Por defecto está apagado (las salas se eliminan al expirar). */
+export function KeepRoomOption({ keep, setKeep }: { keep: boolean; setKeep: (v: boolean) => void }) {
+  return (
+    <label className="check opt keep-opt">
+      <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} />
+      <span>
+        <strong>Mantener la sala al expirar</strong>
+        <span className="muted small block">
+          {keep
+            ? 'Al terminar el tiempo no se borra nada: la sala queda inactiva (sin conexiones en vivo, para ahorrar recursos) y puedes reactivarla cuando quieras.'
+            : 'Por defecto, al expirar la sala se elimina con todos sus archivos y contenido.'}
+        </span>
+      </span>
+    </label>
   )
 }
 

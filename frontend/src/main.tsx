@@ -17,9 +17,12 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { AuthProvider } from './auth'
+import { AiProvider } from './ai/AiProvider'
 import { RealtimeProvider } from './realtime'
+import { NotificationsProvider } from './notifications'
 import { ThemeProvider } from './theme'
 import { ToastProvider } from './toast'
+import { DialogProvider } from './dialogs'
 import './styles.css'
 
 createRoot(document.getElementById('root')!).render(
@@ -27,11 +30,17 @@ createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <ThemeProvider>
       <ToastProvider>
+        <DialogProvider>
         <AuthProvider>
           <RealtimeProvider>
-            <App />
+            <AiProvider>
+              <NotificationsProvider>
+                <App />
+              </NotificationsProvider>
+            </AiProvider>
           </RealtimeProvider>
         </AuthProvider>
+        </DialogProvider>
       </ToastProvider>
       </ThemeProvider>
     </BrowserRouter>

@@ -10,7 +10,9 @@ public record UserDto(
         Role role,
         boolean enabled,
         Instant createdAt,
-        Limits limits) {
+        Limits limits,
+        int avatarVersion,
+        Instant lastLoginAt) {
 
     /** null = infinito. */
     public record Limits(
@@ -23,6 +25,7 @@ public record UserDto(
     public static UserDto of(User u) {
         return new UserDto(u.getId(), u.getEmail(), u.getDisplayName(), u.getRole(), u.isEnabled(), u.getCreatedAt(),
                 new Limits(u.getStorageQuotaBytes(), u.getMaxFileSizeBytes(), u.getMaxRoomMinutes(),
-                        u.getMaxActiveRooms(), u.getMaxParticipants()));
+                        u.getMaxActiveRooms(), u.getMaxParticipants()),
+                u.getAvatarVersion(), u.getLastLoginAt());
     }
 }

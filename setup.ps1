@@ -31,6 +31,37 @@ function Ensure-Var([string]$name, [string]$value) {
 Ensure-Var 'NORA_GARAGE_RPC_SECRET' (-join ((1..64) | ForEach-Object { '{0:x}' -f (Get-Random -Maximum 16) }))
 Ensure-Var 'NORA_GARAGE_ADMIN_TOKEN' (New-Secret 48)
 Ensure-Var 'NORA_CONVERTER_TOKEN' (New-Secret 40)
+# Cualquier variable de .env.example que falte en tu .env (DeepSeek, descargas del agente, etc.) se añade vacía o con su valor por defecto,
+# con sus comentarios, para que solo tengas que rellenarla. Nunca se toca lo que ya tienes.
+$have = @{}
+Get-Content .env | ForEach-Object { if ($_ -match '^([A-Za-z_][A-Za-z0-9_]*)=') { $have[$Matches[1]] = $true } }
+$buf = @(); $out = @(); $names = @()
+foreach ($line in Get-Content .env.example) {
+  if ($line -match '^#') { $buf += $line; continue }
+  if ($line -match '^([A-Za-z_][A-Za-z0-9_]*)=') {
+    # los secretos con valor de ejemplo («cambia…») nunca se copian: los genera este script
+    if (-not $have.ContainsKey($Matches[1]) -and $line -notmatch 'cambia|=0000000000') { if ($buf.Count) { $out += '' }; $out += $buf; $out += $line; $names += $Matches[1] }
+  }
+  $buf = @()
+}
+if ($out.Count -gt 0) {
+  Add-Content .env ''
+  Add-Content .env '# --- Añadido por setup.ps1: variables nuevas de esta versión ---'
+  Add-Content .env $out
+  Write-Host ("Añadido a .env: " + ($names -join ' '))
+}
+
+# El repositorio de GitHub (para ofrecer el agente de Asistencia) se toma solo de este clon, si no lo has puesto tú.
+if (-not (Select-String -Path .env -Pattern '^NORA_AGENT_REPO=.+' -Quiet)) {
+  $remote = (git remote get-url origin 2>$null)
+  if ($remote -match 'github\.com[:/]([^/]+/[^/]+?)(\.git)?$') {
+    $repo = $Matches[1]
+    $lines = @(Get-Content .env | Where-Object { $_ -notmatch '^NORA_AGENT_REPO=' })
+    $lines += "NORA_AGENT_REPO=$repo"
+    Set-Content .env $lines
+    Write-Host "NORA_AGENT_REPO=$repo (tomado de git)"
+  }
+}
 
 docker compose up -d --build
 if ($LASTEXITCODE -ne 0) {

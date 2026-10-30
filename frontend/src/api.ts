@@ -16,6 +16,9 @@ export interface User {
   enabled: boolean
   createdAt: string
   limits: Limits
+  /** 0 = sin foto; sube con cada cambio de foto (sirve para refrescarla). */
+  avatarVersion: number
+  lastLoginAt: string | null
 }
 
 export interface Participant {
@@ -24,6 +27,7 @@ export interface Participant {
   online: boolean
   owner: boolean
   role: RoomRole
+  avatarVersion: number
 }
 
 export interface Room {
@@ -36,7 +40,7 @@ export interface Room {
   isOwner: boolean
   /** Rol de la persona que consulta la sala */
   role: RoomRole
-  settings: { requireApproval: boolean; defaultRole: 'MEMBER' | 'VIEWER'; maxParticipants: number | null }
+  settings: { requireApproval: boolean; defaultRole: 'MEMBER' | 'VIEWER'; maxParticipants: number | null; keepWhenExpired: boolean }
   participants: Participant[]
 }
 
@@ -51,6 +55,19 @@ export interface RoomSummary {
   name: string
   expiresAt: string | null
   isOwner: boolean
+  keepWhenExpired: boolean
+  /** Expiró pero se conserva (sin sesiones en vivo); el propietario puede reactivarla. */
+  inactive: boolean
+}
+
+export interface RoomStatus {
+  code: string
+  name: string
+  expired: boolean
+  inactive: boolean
+  keepWhenExpired: boolean
+  isOwner: boolean
+  expiresAt: string | null
 }
 
 export class ApiError extends Error {

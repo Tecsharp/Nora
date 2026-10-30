@@ -129,11 +129,10 @@ public class CollabService {
         String title = clean(name);
         String ext = DEFAULT_EXT.get(kind);
         byte[] blank = kind == Kind.BOARD ? utf8(seed) : converter.export(kind.name(), ext, utf8(seed), 0); // lento: fuera de transacción
-        // en una pizarra la carpeta es de la herramienta Pizarra; en el resto, la de Archivos donde nace el archivo
-        if (kind == Kind.BOARD) folders.requireIn(room.getId(), RoomFolder.Kind.BOARD, folderId);
-        FileDto file = files.saveGenerated(room.getId(), userId, title + "." + ext, MIME.get(ext), blank, kind == Kind.BOARD ? null : folderId);
+        folders.requireIn(room.getId(), RoomFolder.Kind.FILE, folderId); // Archivos y Pizarra comparten carpetas
+        FileDto file = files.saveGenerated(room.getId(), userId, title + "." + ext, MIME.get(ext), blank, folderId);
         UUID id = UUID.randomUUID();
-        repo.insert(id, room.getId(), kind.name(), title, userId, file.id(), ext, seed, kind == Kind.BOARD ? folderId : null);
+        repo.insert(id, room.getId(), kind.name(), title, userId, file.id(), ext, seed, null);
         repo.markSaved(id, 0, userId);
         return created(room, id);
     }
@@ -157,9 +156,8 @@ public class CollabService {
         byte[] content = files.readAll(room.getId(), fileId);
         String seed = kind == Kind.BOARD ? normalizeBoard(content) : converter.importFile(content, ext); // lento: fuera de transacción
         UUID id = UUID.randomUUID();
-        if (kind == Kind.BOARD) folders.requireIn(room.getId(), RoomFolder.Kind.BOARD, boardFolderId);
         try {
-            repo.insert(id, room.getId(), kind.name(), clean(base), userId, fileId, ext, seed, kind == Kind.BOARD ? boardFolderId : null);
+            repo.insert(id, room.getId(), kind.name(), clean(base), userId, fileId, ext, seed, null);
         } catch (org.springframework.dao.DuplicateKeyException e) {
             return repo.findBySource(room.getId(), fileId).map(d -> dto(d, repo.creatorName(d.createdBy()), true)).orElseThrow();
         }
@@ -189,14 +187,14 @@ public class CollabService {
         return dto;
     }
 
-    /** Mueve una pizarra a una carpeta de la herramienta Pizarra (null = sin carpeta). */
+    /** Mueve una pizarra a otra carpeta (null = raíz): en realidad mueve su archivo, así que se ve igual en Archivos y en Pizarra. */
     @Transactional
     public DocDto move(Room room, UUID docId, UUID userId, Role sys, UUID folderId) {
         DocRow d = docIn(room, docId);
         if (!"BOARD".equals(d.kind())) throw ApiException.badRequest("Solo las pizarras se organizan en carpetas aquí");
-        if (!d.createdBy().equals(userId) && !rooms.canModerate(room, userId, sys)) throw ApiException.forbidden("No puedes mover esta pizarra");
-        folders.requireIn(room.getId(), RoomFolder.Kind.BOARD, folderId);
-        repo.setFolder(docId, folderId);
+        folders.requireIn(room.getId(), RoomFolder.Kind.FILE, folderId);
+        if (d.sourceFileId() == null) throw ApiException.badRequest("Esta pizarra no tiene archivo");
+        files.update(room.getId(), d.sourceFileId(), userId, true, true, folderId, null);
         DocDto dto = dto(repo.find(docId).orElseThrow(), repo.creatorName(d.createdBy()), true);
         events.publishEvent(new RoomEvent(room.getId(), "doc.moved", dto));
         return dto;

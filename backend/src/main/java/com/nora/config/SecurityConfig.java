@@ -44,6 +44,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/actuator/health/**").permitAll()
                         .requestMatchers("/ws").permitAll() // se autentica con ticket en el handshake
+                        .requestMatchers("/api/media/**").permitAll() // reproducción de audio/vídeo: se autoriza con la dirección firmada
+                        .requestMatchers("/ws/agent").permitAll() // el agente de escritorio se autentica con su token en el handshake
+                        .requestMatchers("/api/assist/agent/pair").permitAll() // el agente canjea aquí su código de emparejamiento
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/**").authenticated()

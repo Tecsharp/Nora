@@ -24,7 +24,9 @@ public class CollabRepository {
 
     public record VersionRow(UUID id, Instant createdAt, String createdByName, String label, long seq) {}
 
-    private static final String COLS = "id, room_id, kind, name, created_by, created_at, updated_at, source_file_id, source_ext, seq, snapshot_seq, seed_state, saved_seq, saved_at, saved_by, thumb_at, folder_id";
+    /** La carpeta de un documento es la de su archivo (Archivos y Pizarra comparten carpetas): moverlo en una herramienta lo mueve en la otra. */
+    private static final String FOLDER = "coalesce((select rf.folder_id from room_files rf where rf.id = d.source_file_id), d.folder_id) as folder_id";
+    private static final String COLS = "d.id, d.room_id, d.kind, d.name, d.created_by, d.created_at, d.updated_at, d.source_file_id, d.source_ext, d.seq, d.snapshot_seq, d.seed_state, d.saved_seq, d.saved_at, d.saved_by, d.thumb_at, " + FOLDER;
     private static final int KEEP_VERSIONS = 40;
 
     private final JdbcTemplate jdbc;
@@ -66,17 +68,17 @@ public class CollabRepository {
     }
 
     public Optional<DocRow> find(UUID id) {
-        return jdbc.query("select " + COLS + " from collab_docs where id = ?", CollabRepository::doc, id).stream().findFirst();
+        return jdbc.query("select " + COLS + " from collab_docs d where d.id = ?", CollabRepository::doc, id).stream().findFirst();
     }
 
     public Optional<DocRow> findBySource(UUID roomId, UUID fileId) {
-        return jdbc.query("select " + COLS + " from collab_docs where room_id = ? and source_file_id = ? order by created_at limit 1",
+        return jdbc.query("select " + COLS + " from collab_docs d where d.room_id = ? and d.source_file_id = ? order by d.created_at limit 1",
                 CollabRepository::doc, roomId, fileId).stream().findFirst();
     }
 
     public List<ListRow> list(UUID roomId) {
         return jdbc.query("select d.id, d.room_id, d.kind, d.name, d.created_by, d.created_at, d.updated_at, d.source_file_id, d.source_ext, d.seq, "
-                        + "d.snapshot_seq, d.seed_state, d.saved_seq, d.saved_at, d.saved_by, d.thumb_at, d.folder_id, u.display_name from collab_docs d join users u on u.id = d.created_by "
+                        + "d.snapshot_seq, d.seed_state, d.saved_seq, d.saved_at, d.saved_by, d.thumb_at, " + FOLDER + ", u.display_name from collab_docs d join users u on u.id = d.created_by "
                         + "where d.room_id = ? order by d.updated_at desc",
                 (r, i) -> new ListRow(doc(r, i), r.getString("display_name")), roomId);
     }

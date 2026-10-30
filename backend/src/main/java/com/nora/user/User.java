@@ -49,6 +49,16 @@ public class User {
     @Column(name = "max_participants")
     private Integer maxParticipants;
 
+    @Column(name = "avatar_version", nullable = false)
+    private int avatarVersion;
+
+    @Column(name = "last_login_at")
+    private Instant lastLoginAt;
+
+    /** Los tokens de acceso emitidos antes de este momento ya no valen (cierre de sesión forzado). */
+    @Column(name = "tokens_valid_after")
+    private Instant tokensValidAfter;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -85,4 +95,13 @@ public class User {
     public Integer getMaxParticipants() { return maxParticipants; }
     public void setMaxParticipants(Integer v) { this.maxParticipants = v; }
     public Instant getCreatedAt() { return createdAt; }
+    public void setEmail(String email) { this.email = email; }
+    public void setDisplayName(String displayName) { this.displayName = displayName; }
+    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+    public int getAvatarVersion() { return avatarVersion; }
+    public void setAvatarVersion(int avatarVersion) { this.avatarVersion = avatarVersion; }
+    public Instant getLastLoginAt() { return lastLoginAt; }
+    public void setLastLoginAt(Instant lastLoginAt) { this.lastLoginAt = lastLoginAt; }
+    public Instant getTokensValidAfter() { return tokensValidAfter; }
+    public void setTokensValidAfter(Instant tokensValidAfter) { this.tokensValidAfter = tokensValidAfter; }
 }

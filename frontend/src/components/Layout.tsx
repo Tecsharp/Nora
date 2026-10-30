@@ -5,6 +5,7 @@ import { useRealtime } from '../realtime'
 import { useToast } from '../toast'
 import { ThemeToggle } from '../theme'
 import { uploads } from '../uploadManager'
+import { NotificationBell } from '../notifications'
 import Avatar from './Avatar'
 import TopBar from './TopBar'
 import LegalLinks from './LegalLinks'
@@ -27,10 +28,11 @@ export default function Layout() {
         <ThemeToggle />
         {user && (
           <>
-            <span className="row nowrap hide-sm" title={user.email} style={{ gap: 8, marginLeft: 6 }}>
-              <Avatar name={user.displayName} />
-              <span className="small">{user.displayName}</span>
-            </span>
+            <NotificationBell />
+            <Link to="/settings" className="btn ghost sm profile-link" title={`${user.email} · Ajustes de la cuenta`} aria-label="Ajustes de la cuenta">
+              <Avatar name={user.displayName} userId={user.id} version={user.avatarVersion} size={26} />
+              <span className="hide-sm">{user.displayName}</span>
+            </Link>
             {user.role === 'ADMIN' && (
               <Link to="/admin" className="btn ghost sm">
                 <Shield size={15} /> <span className="hide-sm">Admin</span>
@@ -50,7 +52,7 @@ export default function Layout() {
           </>
         )}
       </TopBar>
-      <div className="shell">
+      <div className={`shell ${pathname.startsWith('/room/') ? 'room-shell' : ''}`}>
       <main>
         <div key={pathname} className="page-enter">
           <Outlet />

@@ -116,6 +116,11 @@ public class ObjectStorage {
         return client().getObject(GetObjectArgs.builder().bucket(cfg.bucket()).object(key).build());
     }
 
+    /** Un tramo del objeto (para reproducir audio y vídeo con saltos sin bajarlo entero). */
+    public InputStream getRange(String key, long offset, long length) throws Exception {
+        return client().getObject(GetObjectArgs.builder().bucket(cfg.bucket()).object(key).offset(offset).length(length).build());
+    }
+
     /** Objeto guardado, tal como lo ve Garage. */
     public record StoredObject(String key, long size, java.time.Instant lastModified) {}
 

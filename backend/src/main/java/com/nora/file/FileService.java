@@ -103,7 +103,8 @@ public class FileService {
     @Transactional
     public FileDto update(UUID roomId, UUID fileId, UUID userId, boolean staff, boolean moveRequested, UUID folderId, String name) {
         RoomFile f = find(roomId, fileId);
-        if (!f.getUploaderId().equals(userId) && !staff) {
+        // Mover de carpeta lo puede hacer cualquiera que pueda escribir (el controlador ya lo exige); renombrar, solo quien lo subió o quien modera
+        if (name != null && !f.getUploaderId().equals(userId) && !staff) {
             throw ApiException.forbidden("No puedes modificar este archivo");
         }
         if (moveRequested) f.setFolderId(folderId);
@@ -207,12 +208,25 @@ public class FileService {
         return dto;
     }
 
+    /** Borrado de cuenta: los archivos que subió la persona se quitan del almacén y avisan a las salas donde estaban. */
+    @Transactional
+    public void deleteAllForUser(UUID userId) {
+        for (RoomFile f : files.findByUploaderId(userId)) {
+            cleaner.schedule(f.getObjectKey());
+            files.delete(f);
+            events.publishEvent(new RoomEvent(f.getRoomId(), "file.deleted", Map.of("id", f.getId())));
+        }
+    }
+
     @Transactional
     public void deleteAllForRoom(UUID roomId) {
         for (RoomFile f : files.findByRoomIdOrderByCreatedAtDesc(roomId)) {
             cleaner.schedule(f.getObjectKey());
         }
     }
+
+    /** El archivo de la sala (para quien ya comprobó que la persona participa). */
+    public RoomFile meta(UUID roomId, UUID fileId) { return find(roomId, fileId); }
 
     private RoomFile find(UUID roomId, UUID fileId) {
         RoomFile f = files.findById(fileId).orElseThrow(() -> ApiException.notFound("Archivo no encontrado"));

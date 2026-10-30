@@ -8,10 +8,12 @@ import Avatar from '../components/Avatar'
 import Menu, { type MenuItem } from '../components/Menu'
 import { useRealtime } from '../realtime'
 import { useToast } from '../toast'
+import { useDialogs } from '../dialogs'
 import { useFullscreen } from '../fullscreen'
 import { CollabProvider, colorFor } from './provider'
 import type { BoardHandle } from './boardIO'
 import { readNativeForExport, restoreNonText, restoreText, seedNonText, type Kind, type Native } from './native'
+import { fmtDate, fmtDateTime } from '../dates'
 
 const TextEditor = lazy(() => import('./TextEditor'))
 const SheetEditor = lazy(() => import('./SheetEditor'))
@@ -424,7 +426,7 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
                 {everReady && (
                   doc.kind === 'DOC' ? <TextEditor provider={provider} editable={editable} onEditor={setEditor} />
                   : doc.kind === 'SHEET' ? <SheetEditor provider={provider} editable={editable} />
-                  : doc.kind === 'BOARD' ? <BoardEditor provider={provider} editable={editable} onHandle={setBoard} onImportRequest={() => fileInput.current?.click()} onSaveCopy={() => void exportAs('excalidraw', 'new')} onShowBar={barHidden ? () => setBar(false) : undefined} />
+                  : doc.kind === 'BOARD' ? <BoardEditor provider={provider} editable={editable} onHandle={setBoard} onImportRequest={() => fileInput.current?.click()} onSaveCopy={() => void exportAs('excalidraw', 'new')} onShowBar={barHidden ? () => setBar(false) : undefined} roomCode={code} />
                   : <SlidesEditor provider={provider} editable={editable} />
                 )}
               </Suspense>
@@ -487,17 +489,18 @@ function ago(iso: string) {
   if (s < 45) return 'ahora'
   if (s < 3600) return `hace ${Math.max(1, Math.round(s / 60))} min`
   if (s < 86400) return `hace ${Math.round(s / 3600)} h`
-  return new Date(iso).toLocaleDateString()
+  return fmtDate(iso)
 }
 
 function HistoryPanel({ code, doc, provider, editable, onClose }: { code: string; doc: DocInfo; provider: CollabProvider; editable: boolean; editor: Editor | null; onClose: () => void }) {
   const toast = useToast()
+  const dialogs = useDialogs()
   const [versions, setVersions] = useState<Version[] | null>(null)
   const load = useCallback(() => api<Version[]>(`/rooms/${code}/docs/${doc.id}/versions`).then(setVersions).catch(() => setVersions([])), [code, doc.id])
   useEffect(() => void load(), [load])
 
   async function save() {
-    const label = window.prompt('Nombre de la versión (opcional)', '')
+    const label = await dialogs.prompt({ title: 'Guardar versión', message: 'Podrás volver a ella desde el historial.', label: 'Nombre de la versión (opcional)', allowEmpty: true, confirmLabel: 'Guardar versión', maxLength: 80 })
     if (label === null) return
     try {
       await provider.saveVersion(label.trim() || null)
@@ -509,7 +512,7 @@ function HistoryPanel({ code, doc, provider, editable, onClose }: { code: string
   }
 
   async function restore(v: Version) {
-    if (!confirm('¿Restaurar esta versión? El contenido actual se sustituye (antes se guarda una copia, y puedes deshacerlo).')) return
+    if (!await dialogs.confirm({ title: '¿Restaurar esta versión?', message: 'El contenido actual se sustituye. Antes se guarda una copia, y puedes deshacerlo.', confirmLabel: 'Restaurar', tone: 'warning' })) return
     try {
       await provider.saveVersion('Antes de restaurar')
       const res = await fetch(`/api/rooms/${code}/docs/${doc.id}/versions/${v.id}`, { headers: { Authorization: `Bearer ${getAccessToken() ?? ''}` } })
@@ -534,7 +537,7 @@ function HistoryPanel({ code, doc, provider, editable, onClose }: { code: string
             <li key={v.id} className="version">
               <div className="grow" style={{ minWidth: 0 }}>
                 <strong className="small truncate" style={{ display: 'block' }}>{v.label ?? 'Versión automática'}</strong>
-                <span className="muted small">{new Date(v.createdAt).toLocaleString()} · {v.createdByName}</span>
+                <span className="muted small">{fmtDateTime(v.createdAt)} · {v.createdByName}</span>
               </div>
               {editable && <button className="btn sm" onClick={() => void restore(v)}>Restaurar</button>}
             </li>

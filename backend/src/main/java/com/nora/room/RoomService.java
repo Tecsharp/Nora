@@ -1,6 +1,7 @@
 package com.nora.room;
 
 import com.nora.common.ApiException;
+import com.nora.notify.NotificationService;
 import com.nora.file.FileService;
 import com.nora.upload.UploadService;
 import com.nora.ws.PresenceService;
@@ -43,10 +44,12 @@ public class RoomService {
     private final UploadService uploads;
     private final PresenceService presence;
     private final ApplicationEventPublisher events;
+    private final NotificationService notifications;
     private final SecureRandom random = new SecureRandom();
 
     public RoomService(RoomRepository rooms, RoomMemberRepository members, RoomJoinRequestRepository joinRequests, UserRepository users, FileService files,
-                       UploadService uploads, PresenceService presence, ApplicationEventPublisher events) {
+                       UploadService uploads, PresenceService presence, ApplicationEventPublisher events, NotificationService notifications) {
+        this.notifications = notifications;
         this.rooms = rooms;
         this.members = members;
         this.joinRequests = joinRequests;
@@ -78,6 +81,7 @@ public class RoomService {
         }
         Room room = saveWithUniqueCode(req.name().trim(), userId, expires);
         applyOptions(room, user, req.requireApproval(), req.defaultRole(), req.maxParticipants(), false);
+        room.setKeepWhenExpired(Boolean.TRUE.equals(req.keepWhenExpired()));
         rooms.save(room);
         members.save(new RoomMember(room.getId(), userId));
         return toDto(room, userId);
@@ -134,6 +138,9 @@ public class RoomService {
         members.save(m);
         events.publishEvent(new RoomEvent(room.getId(), "member.joined",
                 Map.of("userId", userId, "displayName", user(userId).getDisplayName())));
+        if (!userId.equals(room.getOwnerId())) {
+            notifications.notify(room.getOwnerId(), room, "member", user(userId).getDisplayName() + " entró a la sala", "", Map.of("tool", "members"), null);
+        }
     }
 
     /** Entra con el código. Si la sala pide aprobación, deja una solicitud y avisa al propietario. */
@@ -148,6 +155,7 @@ public class RoomService {
         if (isFull(room)) throw ApiException.forbidden("La sala está llena");
         if (joinRequests.findByRoomIdAndUserId(room.getId(), userId).isEmpty()) {
             joinRequests.save(new RoomJoinRequest(room.getId(), userId));
+            notifications.notify(room.getOwnerId(), room, "join", user(userId).getDisplayName() + " quiere entrar", "Solicitud pendiente en «" + room.getName() + "»", Map.of("tool", "members"), "join:" + room.getCode());
             events.publishEvent(new UserEvent(room.getOwnerId(), "join.requested",
                     Map.of("code", room.getCode(), "roomName", room.getName(), "userId", userId, "displayName", user(userId).getDisplayName())));
         }
@@ -204,6 +212,7 @@ public class RoomService {
     public RoomDto updateSettings(UUID actorId, Role sysRole, String code, SettingsRequest req) {
         Room room = ownedRoom(actorId, sysRole, code, "Solo el propietario cambia las opciones de la sala");
         applyOptions(room, user(room.getOwnerId()), req.requireApproval(), req.defaultRole(), req.maxParticipants(), true);
+        if (req.keepWhenExpired() != null) room.setKeepWhenExpired(req.keepWhenExpired());
         rooms.save(room);
         publishUpdate(room);
         return toDto(room, actorId);
@@ -217,7 +226,7 @@ public class RoomService {
     }
 
     private static RoomSettings settings(Room room) {
-        return new RoomSettings(room.isRequireApproval(), room.getDefaultRole().name(), room.getMaxParticipants());
+        return new RoomSettings(room.isRequireApproval(), room.getDefaultRole().name(), room.getMaxParticipants(), room.isKeepWhenExpired());
     }
 
     /** Devuelve la sala; la presencia ("conectado") la aporta el WebSocket. */
@@ -228,8 +237,8 @@ public class RoomService {
 
     @Transactional(readOnly = true)
     public List<RoomSummary> mine(UUID userId) {
-        return rooms.findActiveForMember(userId, Instant.now()).stream()
-                .map(r -> new RoomSummary(r.getCode(), r.getName(), r.getExpiresAt(), r.getOwnerId().equals(userId)))
+        return rooms.findVisibleForMember(userId, Instant.now()).stream()
+                .map(r -> new RoomSummary(r.getCode(), r.getName(), r.getExpiresAt(), r.getOwnerId().equals(userId), r.isKeepWhenExpired(), r.isExpired()))
                 .toList();
     }
 
@@ -306,6 +315,12 @@ public class RoomService {
         return sysRole == Role.ADMIN || room.getOwnerId().equals(userId) || memberRole(room, userId) == RoomRole.MODERATOR;
     }
 
+    /** La sala por id, sin comprobar quién pregunta (uso interno de los servicios en vivo). */
+    @Transactional(readOnly = true)
+    public Room roomById(UUID id) {
+        return rooms.findById(id).orElse(null);
+    }
+
     private RoomRole memberRole(Room room, UUID userId) {
         return members.findById(new RoomMember.Key(room.getId(), userId)).map(RoomMember::getRole).orElse(RoomRole.MEMBER);
     }
@@ -324,7 +339,33 @@ public class RoomService {
         members.save(m);
         String name = user(targetId).getDisplayName();
         events.publishEvent(new RoomEvent(room.getId(), "member.updated", Map.of("userId", targetId, "displayName", name, "role", role.name())));
-        return new ParticipantDto(targetId, name, presence.isOnline(room.getId(), targetId), false, role.name());
+        return new ParticipantDto(targetId, name, presence.isOnline(room.getId(), targetId), false, role.name(), user(targetId).getAvatarVersion());
+    }
+
+    /** El propietario (o un administrador) expulsa a un participante: deja de ser miembro y se le corta el acceso en vivo. */
+    @Transactional
+    public void removeMember(UUID actorId, Role sysRole, String code, UUID targetId) {
+        Room room = requireMember(actorId, code);
+        if (!room.getOwnerId().equals(actorId) && sysRole != Role.ADMIN) throw ApiException.forbidden("Solo el propietario puede expulsar a otras personas");
+        if (room.getOwnerId().equals(targetId)) throw ApiException.badRequest("No se puede expulsar al propietario de la sala");
+        if (actorId.equals(targetId)) throw ApiException.badRequest("No puedes expulsarte a ti mismo");
+        RoomMember m = members.findById(new RoomMember.Key(room.getId(), targetId))
+                .orElseThrow(() -> ApiException.notFound("Esa persona ya no participa en la sala"));
+        members.delete(m);
+        joinRequests.findByRoomIdAndUserId(room.getId(), targetId).ifPresent(joinRequests::delete);
+        String name = user(targetId).getDisplayName();
+        events.publishEvent(new UserEvent(targetId, "member.kicked", Map.of("code", room.getCode(), "roomName", room.getName())));
+        events.publishEvent(new RoomEvent(room.getId(), "member.removed", Map.of("userId", targetId, "displayName", name)));
+    }
+
+    /** Borrado de cuenta: se destruyen las salas de la persona (con sus archivos) y se la saca de las demás. */
+    @Transactional
+    public void removeAccountFromRooms(UUID userId) {
+        for (Room r : rooms.findByOwnerId(userId)) destroy(r, "closed");
+        for (RoomMember m : members.findByUserId(userId)) {
+            String name = user(userId).getDisplayName();
+            events.publishEvent(new RoomEvent(m.getRoomId(), "member.removed", Map.of("userId", userId, "displayName", name)));
+        }
     }
 
     private Room openRoom(String code) {
@@ -346,7 +387,7 @@ public class RoomService {
                 .sorted((a, b) -> a.getJoinedAt().compareTo(b.getJoinedAt()))
                 .map(m -> new ParticipantDto(m.getUserId(), byId.get(m.getUserId()).getDisplayName(),
                         presence.isOnline(room.getId(), m.getUserId()), m.getUserId().equals(room.getOwnerId()),
-                        m.getUserId().equals(room.getOwnerId()) ? "OWNER" : m.getRole().name()))
+                        m.getUserId().equals(room.getOwnerId()) ? "OWNER" : m.getRole().name(), byId.get(m.getUserId()).getAvatarVersion()))
                 .toList();
         String myRole = parts.stream().filter(p -> p.userId().equals(viewer)).map(ParticipantDto::role).findFirst().orElse("MEMBER");
         return new RoomDto(room.getId(), room.getCode(), room.getName(), room.getCreatedAt(), room.getExpiresAt(),
@@ -358,13 +399,61 @@ public class RoomService {
     }
 
     private void destroy(Room room, String reason) {
+        notifications.purgeRoom(room.getCode());
         files.deleteAllForRoom(room.getId());
         uploads.abortAllForRoom(room.getId());
         rooms.delete(room);
         events.publishEvent(new RoomEvent(room.getId(), "room.closed", Map.of("reason", reason, "name", room.getName())));
     }
 
-    /** Las salas expiradas se destruyen junto con todos sus archivos. */
+    /** Estado de la sala para quien participa, aunque ya haya expirado (el resto de endpoints responden «expirada»). */
+    @Transactional(readOnly = true)
+    public RoomStatus status(UUID userId, String code) {
+        Room room = rooms.findByCode(normalize(code)).orElseThrow(() -> ApiException.notFound("Sala no encontrada"));
+        if (!members.existsById(new RoomMember.Key(room.getId(), userId))) throw ApiException.forbidden("No participas en esta sala");
+        return new RoomStatus(room.getCode(), room.getName(), room.isExpired(), room.isExpired() && room.isKeepWhenExpired(), room.isKeepWhenExpired(), room.getOwnerId().equals(userId), room.getExpiresAt());
+    }
+
+    /** El propietario devuelve a la vida una sala inactiva (con una nueva duración, o sin expiración). Cuenta como sala activa de su cuenta. */
+    @Transactional
+    public RoomDto reactivate(UUID userId, Role role, String code, ReactivateRequest req) {
+        Room room = rooms.findByCode(normalize(code)).orElseThrow(() -> ApiException.notFound("Sala no encontrada"));
+        if (!room.getOwnerId().equals(userId) && role != Role.ADMIN) throw ApiException.forbidden("Solo el propietario puede reactivar la sala");
+        if (!room.isExpired()) throw ApiException.conflict("La sala ya está activa");
+        User owner = user(room.getOwnerId());
+        Instant now = Instant.now();
+        if (role != Role.ADMIN && owner.getMaxActiveRooms() != null && rooms.countActiveByOwner(owner.getId(), now) >= owner.getMaxActiveRooms()) {
+            throw ApiException.forbidden("Has alcanzado el máximo de salas activas (" + owner.getMaxActiveRooms() + ")");
+        }
+        Integer limit = role == Role.ADMIN ? null : owner.getMaxRoomMinutes();
+        int minutes = req == null || req.minutes() == null ? DEFAULT_MINUTES : req.minutes();
+        if (minutes == 0) {
+            if (limit != null) throw ApiException.forbidden("Tu cuenta no permite salas sin expiración");
+            room.setExpiresAt(null);
+        } else {
+            if (limit != null && minutes > limit) throw ApiException.forbidden("Tu cuenta permite salas de hasta " + limit + " minutos");
+            room.setExpiresAt(now.plus(Duration.ofMinutes(minutes)));
+        }
+        room.setInactiveSince(null);
+        rooms.save(room);
+        events.publishEvent(new RoomEvent(room.getId(), "room.reactivated", Map.of("name", room.getName(), "code", room.getCode())));
+        publishUpdate(room);
+        return toDto(room, userId);
+    }
+
+    /** Las salas con «mantener» que acaban de expirar pasan a inactivas: no se borra nada, pero se cierran las sesiones en vivo. */
+    @Scheduled(fixedDelay = 60_000, initialDelay = 20_000)
+    @Transactional
+    public void deactivateExpiredKept() {
+        for (Room room : rooms.findNewlyInactive(Instant.now())) {
+            room.setInactiveSince(Instant.now());
+            rooms.save(room);
+            events.publishEvent(new RoomEvent(room.getId(), "room.inactive", Map.of("name", room.getName(), "code", room.getCode())));
+            log.info("Sala conservada y dejada inactiva: {}", room.getCode());
+        }
+    }
+
+    /** Las salas expiradas (sin «mantener») se destruyen junto con todos sus archivos. */
     @Scheduled(fixedDelay = 60_000, initialDelay = 30_000)
     @Transactional
     public void purgeExpired() {

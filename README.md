@@ -60,6 +60,43 @@ Cada editor tiene una cinta de opciones al estilo Office: **texto** (fuentes, ta
 
 La herramienta **Pizarra** de cada sala es un lienzo infinito con el editor de **Excalidraw** (todas sus herramientas: formas, flechas ligadas, texto, dibujo libre, imágenes, marcos, láser, biblioteca…) sincronizado en tiempo real por el WebSocket de Nora, con cursores con nombre, selecciones, seguimiento de otra persona y permisos de la sala. Las figuras y textos se **alinean y centran** con el imán (guías al mover), con la barra «Alinear» y con las opciones de Excalidraw, y el editor tiene **pantalla completa**. Se guarda sola; **Guardar** escribe el archivo `.excalidraw` en Archivos; se puede **descargar** (`.excalidraw`, PNG y SVG con la escena incrustada, PDF), guardar copias en la sala e **importar** `.excalidraw`, PNG/SVG con escena e imágenes. Funciona sin Internet. Detalles en [docs/PIZARRA.md](docs/PIZARRA.md).
 
+### Asistencia (ver y controlar la pantalla de otra persona)
+
+La herramienta **Asistencia** de la sala permite **ver la pantalla** de otra persona (o enseñar la tuya) y, si esa persona lo acepta, **controlar su equipo**.
+La imagen viaja **directa entre los dos navegadores** (WebRTC); el servidor de Nora solo hace de «teléfono» (señalización por el WebSocket) y comprueba
+que ambos estén en la misma sala. **Quien comparte siempre decide**: acepta cada petición, elige qué pantalla enseña (para controlar, la completa) y
+puede cortar la sesión o el control cuando quiera; mientras alguien controla se ve un aviso rojo.
+
+- **Solo ver:** funciona con cualquier navegador de escritorio, sin instalar nada.
+- **Controlar:** un navegador no puede mover el ratón de un equipo, así que quien comparte instala el **agente de escritorio** (`agent/`, Rust, un ejecutable
+  para Windows, macOS y Linux) que se vincula con su cuenta con un código de un solo uso y solo aplica clics/teclas mientras haya un control concedido desde Nora.
+  Los binarios **no se compilan al construir con Docker**: se bajan de las *Releases* de GitHub o se compilan con un script (`agent/build.sh`, `agent/build.ps1` o doble clic en `agent/build-macos.command`) y se dejan en `agent/dist/`; el gateway los sirve en `/downloads/` (ver `agent/README.md`).
+- **Redes:** por defecto usa un STUN público (`NORA_STUN_URLS`); para redes estrictas (empresas, 4G) activa el servidor TURN incluido:
+  define `NORA_TURN_SECRET` y `NORA_TURN_URLS=turn:TU-IP:3478` en `.env` y arranca con `docker compose --profile turn up -d` (abre 3478 y 49160-49200 UDP).
+
+Detalles técnicos, protocolo y límites en [docs/ASISTENCIA.md](docs/ASISTENCIA.md).
+
+### IA con DeepSeek (opcional)
+
+Nora puede ayudar con IA (mejorar y traducir textos, resumir, extraer tareas, crear eventos desde una frase…) usando **DeepSeek**. Viene **desactivada** y sin rastro en la
+interfaz: se activa a mano en el `.env` (`NORA_AI_ENABLED=true` y `NORA_DEEPSEEK_API_KEY=…`, ya vienen ahí apagadas) y `docker compose up -d`. La clave solo vive en el servidor y
+solo se envía a DeepSeek el texto que cada persona decide procesar. Detalles en [docs/IA.md](docs/IA.md).
+
+### Mantener sala (inactiva en lugar de borrarse)
+
+Por defecto, al expirar una sala se **elimina con todos sus archivos**. Al crearla (o en sus opciones) el propietario puede activar **«Mantener la sala al expirar»**: entonces no se borra nada, pero la sala pasa a **inactiva** (se cierran sus conexiones en vivo y no gasta recursos) y aparece en Inicio → «Salas inactivas».
+El propietario puede **reactivarla** con una nueva duración (cuenta como sala activa de su cuenta) o eliminarla; el resto de participantes ven que está inactiva.
+
+### Herramientas de la sala
+
+La sala es un **espacio de trabajo**: una barra lateral con los datos de la sala (código y tiempo restante), las herramientas agrupadas (Trabajo, Planificación, Medios y enlaces, En directo) con las **fijadas** arriba, y las personas en línea; y un área principal donde cada herramienta se abre a pantalla completa, sin ventanas encima. La pantalla de **Resumen** reúne lo tuyo (tareas asignadas, próximos eventos, votaciones sin votar, mensajes sin leer y archivos recientes) con enlace al sitio exacto, y **Personas** gestiona roles, expulsiones y solicitudes de entrada. En el móvil la barra lateral es un menú deslizante.
+
+**Archivos y Pizarra comparten carpetas:** una pizarra es un archivo `.excalidraw`, así que vive en la misma carpeta en las dos herramientas; moverla, renombrarla o crear carpetas en una se ve al instante en la otra. Las imágenes, PDF y textos que ya se han visto se guardan en una caché en memoria (se vacía al cerrar sesión), por lo que volver a abrirlos desde Archivos o Media Review no los descarga otra vez.
+
+Además de Archivos, Pizarra y Notas, cada sala tiene: **Chat** (General, grupos con ajustes y mensajes directos en tiempo real, con un dock abajo a la derecha y una vista completa tipo Telegram Web), **Tablero** (tareas con arrastrar y soltar), **Votaciones** (anónimas, cierre automático, resultados en vivo), **Media Review** (comentarios en el momento exacto de un vídeo/audio o en un punto de una imagen),
+**Calendario** (mes y agenda, respuestas «Voy», `.ics`, recordatorios), **Enlaces** (marcadores compartidos con etiquetas), **Foco** (Pomodoro compartido con grupo de enfocados), **Reproductor** (cola sincronizada de YouTube, enlaces directos y archivos de la sala, sin cortar el sonido al cerrar la ventana) y **Asistencia** (ver/controlar pantallas).
+Con la IA activa (opcional) casi todas incorporan ayuda: resumir el chat, crear tareas o eventos desde un texto, sugerir opciones de votación, resumir comentarios de revisión… Detalles y permisos en [docs/HERRAMIENTAS.md](docs/HERRAMIENTAS.md).
+
 ### Subidas reanudables
 
 Los archivos se suben por trozos de 8 MiB con multipart de S3 (`POST /api/rooms/{code}/uploads`, `PUT …/parts/{n}`, `POST …/complete`). El servidor guarda qué trozos llegaron: si se corta internet, se cierra la pestaña o se reinicia el navegador, al volver a elegir el mismo archivo solo se envían los que faltan. El cliente sube 3 trozos en paralelo, reintenta con espera, se pausa sin conexión y detecta conexiones colgadas (20 s sin avance). Muestra porcentaje, velocidad y tiempo restante; el resto de la sala ve el avance en vivo. Las subidas abandonadas se limpian a las 24 h.
@@ -82,12 +119,27 @@ El creador de la sala asigna a cada participante uno de estos roles desde la lis
 
 | Rol | Puede |
 |---|---|
-| **Propietario** (el creador) | Todo: asignar roles, cambiar la duración y cerrar la sala |
+| **Propietario** (el creador) | Todo: asignar roles, **expulsar participantes**, cambiar la duración y cerrar la sala |
 | **Moderador** | Subir, crear y además editar, mover y borrar el contenido de cualquiera |
 | **Colaborador** (por defecto) | Subir, crear carpetas, notas y portapapeles, y gestionar lo suyo |
 | **Lector** | Solo ver, descargar y copiar |
 
+**Expulsar** (menú «⋯» de la persona → «Expulsar de la sala», `DELETE /api/rooms/{code}/members/{userId}`): solo el propietario o un administrador; la persona sale de la lista, pierde el acceso en vivo y a los documentos abiertos al instante y recibe un aviso. Lo que subió se queda; puede volver con el código (y con aprobación si la sala la pide).
+
 Los permisos se comprueban en el servidor (un lector recibe 403 al intentar subir o modificar) y el cambio de rol llega en vivo a la persona afectada. Un administrador del sistema conserva control sobre cualquier sala en la que participe.
+
+**Archivos grandes y carpetas:** si el navegador comprime lo elegido en un `.zip` (Safari lo hace con carpetas y paquetes como `.app`, `.pages` o `.key`) y tarda en entregarlo, Nora muestra «Comprimiendo lo que elegiste…» con un indicador y explica que se subirá como `.zip`; al soltar una carpeta muestra «Leyendo la carpeta…». La compresión la hace el navegador, no Nora, así que no hay porcentaje, solo el aviso de que está ocurriendo.
+
+**Notas con carpetas:** las notas se organizan igual que Archivos y Pizarra: carpetas anidadas con ruta, búsqueda, selección múltiple, arrastrar a una carpeta o a la ruta, y «Mover a…». **Mover** (archivos, pizarras y notas) lo puede hacer **cualquiera que pueda escribir** (colaborador, moderador, propietario), también con lo de otras personas; **renombrar, editar y borrar** siguen siendo de su autor o de quien modera. Los lectores no mueven nada.
+
+**Selección múltiple:** en Archivos (y en Pizarra) se seleccionan varios elementos con la casilla de cada uno, Ctrl/⌘+clic, Mayús+clic (rango) o **arrastrando un rectángulo con el ratón** sobre un hueco. La barra de selección ofrece Descargar, **Mover a…** (cualquier carpeta o la raíz) y Borrar (con confirmación); también se pueden **arrastrar todos los seleccionados a una carpeta** o a la ruta de arriba. Esc quita la selección. Mover y borrar solo afectan a lo propio (o a todo si moderas).
+
+### Cuentas, Ajustes y administración
+
+- **Iniciar sesión**: «Recordar mi correo» (se guarda en ese navegador) y «Mantener la sesión iniciada durante un mes» (cookie de 30 días; sin marcarla, la cookie acaba al cerrar el navegador y la sesión dura `NORA_REFRESH_TTL_DAYS`).
+- **Ajustes** (clic en tu nombre arriba): foto de perfil (se recorta a 256 px y se guarda en la base de datos; `PUT /api/me/avatar`), nombre, correo (pide la contraseña), contraseña (cierra las demás sesiones), **sesiones abiertas** con su dispositivo y «cerrar las demás», y **borrar mi cuenta** (`DELETE /api/me` con la contraseña): borra sus salas con todo su contenido, lo que subió o creó en salas ajenas (también del almacén Garage), su foto, sesiones y bibliotecas. El único administrador no puede borrarse.
+- **Administración** (`/admin`): *Resumen* (cuentas, altas, actividad, sesiones, salas, archivos), *Usuarios* (buscar, **crear**, editar nombre/correo/límites/rol, **desactivar = revocar el acceso**, **cerrar sus sesiones** al instante, **enlace de un solo uso (24 h) para cambiar la contraseña** → `/reset-password?token=…`, **borrar cuenta**), *Sistema* (permitir o no el registro y límites de las cuentas nuevas, en caliente), *Bibliotecas* de la pizarra y *Almacenamiento*.
+- Cerrar sesiones o desactivar una cuenta invalida también los tokens de acceso ya emitidos y corta el WebSocket. Un token de renovación cerrado a propósito solo se rechaza; reutilizar uno ya rotado sigue cerrando todas las sesiones (posible robo).
 
 ### Visor de documentos
 
@@ -133,4 +185,4 @@ cd frontend && npm install && npm run dev
 
 ## Estado
 
-Herramientas operativas: **Archivos**, **Notas** y **Pizarra** (colaborativa, estilo Excalidraw); la edición colaborativa de documentos vive dentro de **Archivos**. Votaciones, Media Review, Asistencia y Acciones aparecen como «Próximamente». La presencia y los eventos de la sala van por WebSocket.
+Herramientas operativas: **Archivos**, **Notas** y **Pizarra** (colaborativa, estilo Excalidraw); la edición colaborativa de documentos vive dentro de **Archivos**. Todas las herramientas de la sala están operativas (ver «Herramientas de la sala»). La presencia y los eventos de la sala van por WebSocket.

@@ -1,0 +1,23 @@
+[package]
+name = "nora-agent"
+version = "0.2.0"
+edition = "2021"
+description = "Agente de escritorio de Nora: permite que alguien de tu sala controle tu equipo mientras lo permites"
+license = "MIT"
+
+[dependencies]
+enigo = "0.6"
+tungstenite = { version = "0.30", features = ["rustls-tls-webpki-roots"] }
+ureq = { version = "2", features = ["json"] }
+serde_json = "1"
+dirs = "5"
+url = "2"
+# Interfaz: una ventana pequeña y nativa (OpenGL), sin navegador ni servidor local.
+eframe = { version = "0.31", default-features = false, features = ["glow", "x11", "wayland", "default_fonts"] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
+codegen-units = 1
+panic = "abort"

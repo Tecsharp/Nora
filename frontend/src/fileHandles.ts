@@ -65,7 +65,24 @@ export interface Picked {
 }
 
 /** Abre el selector de archivos. Con File System Access devuelve también el handle reutilizable. */
-export async function pickFiles(): Promise<Picked[]> {
+/**
+ * Algunos navegadores (Safari) comprimen en un .zip lo que se elige —carpetas y paquetes como .app, .pages o .key— antes de
+ * entregar el archivo, y durante esos segundos no avisan de nada. Si el selector se cierra (la ventana recupera el foco) y el
+ * archivo no llega enseguida, se avisa de que se está preparando.
+ */
+function watchPicker(onPreparing?: (on: boolean) => void) {
+  if (!onPreparing) return () => {}
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const onFocus = () => { timer = setTimeout(() => onPreparing(true), 500) }
+  window.addEventListener('focus', onFocus, { once: true })
+  return () => {
+    clearTimeout(timer)
+    window.removeEventListener('focus', onFocus)
+    onPreparing(false)
+  }
+}
+
+export async function pickFiles(onPreparing?: (on: boolean) => void): Promise<Picked[]> {
   if (pickerSupported()) {
     try {
       const handles: FsHandle[] = await (window as unknown as { showOpenFilePicker: (o: object) => Promise<FsHandle[]> }).showOpenFilePicker({ multiple: true })
@@ -79,21 +96,23 @@ export async function pickFiles(): Promise<Picked[]> {
     const input = document.createElement('input')
     input.type = 'file'
     input.multiple = true
-    input.onchange = () => resolve(Array.from(input.files ?? []).map((file) => ({ file })))
-    input.oncancel = () => resolve([])
+    const stop = watchPicker(onPreparing)
+    input.onchange = () => { stop(); resolve(Array.from(input.files ?? []).map((file) => ({ file }))) }
+    input.oncancel = () => { stop(); resolve([]) }
     input.click()
   })
 }
 
 /** Selector de carpeta (funciona en todos los navegadores de escritorio). Devuelve los archivos con su ruta relativa. */
-export function pickFolder(): Promise<File[]> {
+export function pickFolder(onPreparing?: (on: boolean) => void): Promise<File[]> {
   return new Promise((resolve) => {
     const input = document.createElement('input')
     input.type = 'file'
     input.multiple = true
     input.setAttribute('webkitdirectory', '')
-    input.onchange = () => resolve(Array.from(input.files ?? []))
-    input.oncancel = () => resolve([])
+    const stop = watchPicker(onPreparing)
+    input.onchange = () => { stop(); resolve(Array.from(input.files ?? [])) }
+    input.oncancel = () => { stop(); resolve([]) }
     input.click()
   })
 }

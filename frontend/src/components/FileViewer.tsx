@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, lazy, Suspense } from 'react'
 import { ChevronLeft, ChevronRight, Download, Maximize2, Minimize2, X } from 'lucide-react'
-import { fetchBlob, formatBytes } from '../api'
+import { formatBytes } from '../api'
+import { loadFile, prefetchFile } from '../fileCache'
 import { mimeFor, PREVIEW_LIMIT, previewKind } from '../preview'
 
 const PdfView = lazy(() => import('./PdfView'))
@@ -55,7 +56,7 @@ export default function FileViewer({ code, files, index, onIndex, onClose, onDow
     setProgress(null)
     if (!kind) return setError('Este tipo de archivo no se puede previsualizar.')
     if (file.sizeBytes > PREVIEW_LIMIT[kind]) return setError(`Es demasiado grande para previsualizarlo (${formatBytes(file.sizeBytes)}).`)
-    const h = fetchBlob(`/rooms/${code}/files/${file.id}`, (l, t) => setProgress({ loaded: l, total: t || file.sizeBytes }), mimeFor(file.name, kind))
+    const h = loadFile(code, file.id, (l, t) => setProgress({ loaded: l, total: t || file.sizeBytes }), mimeFor(file.name, kind))
     let url: string | null = null
     h.promise
       .then(async (blob) => {
@@ -69,6 +70,9 @@ export default function FileViewer({ code, files, index, onIndex, onClose, onDow
           setLoaded({ kind, text: text.slice(0, 500_000), truncated: text.length > 500_000 })
         }
         setProgress(null)
+        // con la actual ya en pantalla, se deja lista la siguiente de la carpeta para que pasar de una a otra sea instantáneo
+        const next = files[(index + 1) % files.length]
+        if (next && next.id !== file.id && previewKind(next.name) === 'image') prefetchFile(code, next.id, next.sizeBytes, mimeFor(next.name, 'image'))
       })
       .catch((e) => {
         if (e instanceof DOMException && e.name === 'AbortError') return

@@ -68,6 +68,16 @@ public class RoomController {
         return rooms.updateSettings(p.userId(), p.role(), code, req);
     }
 
+    @GetMapping("/{code}/status")
+    public RoomStatus status(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code) {
+        return rooms.status(p.userId(), code);
+    }
+
+    @PostMapping("/{code}/reactivate")
+    public RoomDto reactivate(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @Valid @RequestBody(required = false) ReactivateRequest req) {
+        return rooms.reactivate(p.userId(), p.role(), code, req);
+    }
+
     @GetMapping("/{code}")
     public RoomDto get(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code) {
         return rooms.get(p.userId(), code);
@@ -84,6 +94,13 @@ public class RoomController {
     public ParticipantDto setRole(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code,
                                   @PathVariable java.util.UUID userId, @Valid @RequestBody RoleRequest req) {
         return rooms.setMemberRole(p.userId(), p.role(), code, userId, req.role());
+    }
+
+    /** Expulsa a un participante de la sala. Solo el propietario (o un administrador). */
+    @DeleteMapping("/{code}/members/{userId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void expel(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable java.util.UUID userId) {
+        rooms.removeMember(p.userId(), p.role(), code, userId);
     }
 
     @DeleteMapping("/{code}")

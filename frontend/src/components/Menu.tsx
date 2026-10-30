@@ -20,8 +20,13 @@ export default function Menu({ items, label = 'Más acciones', trigger }: { item
       if (e instanceof KeyboardEvent ? e.key === 'Escape' : !wrap.current?.contains(e.target as Node) && !panel.current?.contains(e.target as Node)) setOpen(false)
     }
     const away = () => setOpen(false)
+    // El menú es fijo: si la lista de debajo se desplaza y el botón se mueve de verdad, se cierra. Safari lanza eventos
+    // de scroll al abrirse (enfoque, rebote) sin que nada se mueva, y eso no debe cerrarlo.
+    const start = wrap.current?.getBoundingClientRect()
     const onScroll = (e: Event) => {
-      if (!panel.current?.contains(e.target as Node)) setOpen(false) // el menú es fijo: si algo se desplaza debajo, se cierra
+      if (e.target instanceof Node && panel.current?.contains(e.target)) return
+      const now = wrap.current?.getBoundingClientRect()
+      if (!start || !now || Math.abs(now.top - start.top) > 4 || Math.abs(now.left - start.left) > 4) setOpen(false)
     }
     document.addEventListener('mousedown', close)
     document.addEventListener('keydown', close)
@@ -38,6 +43,7 @@ export default function Menu({ items, label = 'Más acciones', trigger }: { item
   return (
     <span className="menu-anchor" ref={wrap} onClick={(e) => e.stopPropagation()}>
       <button
+        type="button"
         className={trigger ? 'menu-trigger' : 'icon-btn sm'}
         aria-label={label}
         aria-haspopup="menu"
@@ -49,7 +55,7 @@ export default function Menu({ items, label = 'Más acciones', trigger }: { item
             const need = Math.max(280, items.length * 38 + 24)
             const up = r.bottom + need > window.innerHeight && r.top > window.innerHeight - r.bottom
             setPos(up
-              ? { position: 'fixed', right: Math.max(8, window.innerWidth - r.right), bottom: window.innerHeight - r.top + 4, maxHeight: r.top - 12, overflowY: 'auto' }
+              ? { position: 'fixed', right: Math.max(8, window.innerWidth - r.right), top: 'auto', bottom: window.innerHeight - r.top + 4, maxHeight: r.top - 12, overflowY: 'auto' }
               : { position: 'fixed', right: Math.max(8, window.innerWidth - r.right), top: r.bottom + 4, maxHeight: window.innerHeight - r.bottom - 12, overflowY: 'auto' })
           }
           setOpen((o) => !o)
@@ -65,7 +71,7 @@ export default function Menu({ items, label = 'Más acciones', trigger }: { item
             ) : 'heading' in it ? (
               <div key={i} className="menu-title">{it.heading}</div>
             ) : (
-              <button key={i} role="menuitem" className={it.danger ? 'danger' : ''}
+              <button key={i} type="button" role="menuitem" className={it.danger ? 'danger' : ''}
                 onClick={() => {
                   setOpen(false)
                   it.onClick()

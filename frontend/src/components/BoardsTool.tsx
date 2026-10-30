@@ -7,10 +7,13 @@ import { useAuth } from '../auth'
 import { useRealtime } from '../realtime'
 import { canWrite as canWriteIn, isStaff as isStaffIn } from '../roles'
 import { useToast } from '../toast'
+import { useDialogs } from '../dialogs'
 import type { DocInfo } from '../collab/DocEditor'
 import { renderSavedBoard } from '../collab/boardIO'
 import Menu, { type MenuItem } from './Menu'
 import Tabs from './Tabs'
+import { useMarquee } from '../marquee'
+import { fmtDateTime } from '../dates'
 
 interface BoardItem extends DocInfo {
   createdBy: string
@@ -31,7 +34,7 @@ type Sort = 'name' | 'date'
 const VIEW_KEY = 'nora-boards-view'
 const BOARDS_MIME = 'application/x-nora-boards'
 const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name)
-const when = (iso: string) => new Date(iso).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+const when = fmtDateTime
 
 /** Miniatura de la pizarra: se pide con el token (no hay cabecera en <img>) y se muestra como blob. */
 function Thumb({ code, board }: { code: string; board: BoardItem }) {
@@ -63,6 +66,7 @@ function Thumb({ code, board }: { code: string; board: BoardItem }) {
 export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: DocInfo) => void }) {
   const { user } = useAuth()
   const toast = useToast()
+  const dialogs = useDialogs()
   const [boards, setBoards] = useState<BoardItem[] | null>(null)
   const [folders, setFolders] = useState<FolderItem[]>([])
   const [current, setCurrent] = useState<string | null>(null)
@@ -82,6 +86,8 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
   const [anchor, setAnchor] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   const pick = useRef<HTMLInputElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const { box, justDragged } = useMarquee(bodyRef, true, (ids, additive) => setSel((s) => (additive ? new Set([...s, ...ids]) : new Set(ids))))
   const canWrite = canWriteIn(room, user)
   const staff = isStaffIn(room, user)
   const canTouch = (ownerId: string) => canWrite && (ownerId === user?.id || staff)
@@ -94,7 +100,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
   }
 
   const load = useCallback(() => api<BoardItem[]>(`/rooms/${room.code}/docs`).then((all) => setBoards(all.filter((d) => d.kind === 'BOARD'))).catch(() => setBoards([])), [room.code])
-  const loadFolders = useCallback(() => api<FolderItem[]>(`/rooms/${room.code}/folders?kind=BOARD`).then(setFolders).catch(() => {}), [room.code])
+  const loadFolders = useCallback(() => api<FolderItem[]>(`/rooms/${room.code}/folders?kind=FILE`).then(setFolders).catch(() => {}), [room.code])
   useEffect(() => void load(), [load])
   useEffect(() => void loadFolders(), [loadFolders])
   useRealtime('reconnected', () => { void load(); void loadFolders() })
@@ -102,14 +108,17 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
   useRealtime('doc.renamed', (d: BoardItem) => setBoards((all) => all?.map((x) => (x.id === d.id ? { ...x, name: d.name, updatedAt: d.updatedAt } : x)) ?? all))
   useRealtime('doc.thumb', (d: BoardItem) => setBoards((all) => all?.map((x) => (x.id === d.id ? { ...x, thumbAt: d.thumbAt, updatedAt: d.updatedAt } : x)) ?? all))
   useRealtime('doc.moved', (d: BoardItem) => setBoards((all) => all?.map((x) => (x.id === d.id ? { ...x, folderId: d.folderId } : x)) ?? all))
+  // mover o renombrar el archivo .excalidraw desde Archivos cambia también la pizarra
+  useRealtime('file.updated', (f: { id: string; name: string; folderId: string | null }) =>
+    setBoards((all) => all?.map((x) => (x.sourceFileId === f.id ? { ...x, folderId: f.folderId ?? null } : x)) ?? all))
   useRealtime('doc.deleted', (d: { id: string }) => {
     setBoards((all) => all?.filter((x) => x.id !== d.id) ?? all)
     setSel((s) => (s.has(d.id) ? new Set([...s].filter((x) => x !== d.id)) : s))
   })
-  useRealtime('folder.added', (f: FolderItem & { kind: string }) => f.kind === 'BOARD' && setFolders((all) => (all.some((x) => x.id === f.id) ? all : [...all, f])))
-  useRealtime('folder.updated', (f: FolderItem & { kind: string }) => f.kind === 'BOARD' && setFolders((all) => all.map((x) => (x.id === f.id ? f : x))))
+  useRealtime('folder.added', (f: FolderItem & { kind: string }) => f.kind === 'FILE' && setFolders((all) => (all.some((x) => x.id === f.id) ? all : [...all, f])))
+  useRealtime('folder.updated', (f: FolderItem & { kind: string }) => f.kind === 'FILE' && setFolders((all) => all.map((x) => (x.id === f.id ? f : x))))
   useRealtime('folder.deleted', (d: { kind: string; ids: string[] }) => {
-    if (d.kind !== 'BOARD') return
+    if (d.kind !== 'FILE') return
     setFolders((all) => all.filter((x) => !d.ids.includes(x.id)))
     setBoards((all) => all?.filter((b) => !b.folderId || !d.ids.includes(b.folderId)) ?? all)
     setCurrent((c) => (c && d.ids.includes(c) ? null : c))
@@ -145,7 +154,8 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
 
   // ---- selección ----
   const mineSel = useMemo(() => (boards ?? []).filter((b) => sel.has(b.id)), [boards, sel])
-  const movable = mineSel.filter((b) => canTouch(b.createdBy))
+  const movable = canWrite ? mineSel : []
+  const deletable = mineSel.filter((b) => canTouch(b.createdBy))
   const toggle = (id: string) => {
     setSel((s) => {
       const n = new Set(s)
@@ -182,8 +192,9 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
 
   // ---- acciones ----
   async function moveMany(list: BoardItem[], folderId: string | null) {
-    const todo = list.filter((b) => canTouch(b.createdBy) && (b.folderId ?? null) !== folderId)
-    if (!todo.length) return toast(list.length ? 'No hay nada que mover (ya están ahí o no son tuyas)' : 'Nada seleccionado', 'info')
+    if (!canWrite) return toast('Tu rol en esta sala es de solo lectura', 'warning')
+    const todo = list.filter((b) => (b.folderId ?? null) !== folderId) // cualquiera que pueda escribir puede mover
+    if (!todo.length) return toast(list.length ? `Ya ${list.length === 1 ? 'está' : 'están'} en ${folderId ? folderById.get(folderId)?.name : 'Pizarras'}` : 'Nada seleccionado', 'info')
     const results = await Promise.allSettled(todo.map((b) => api<BoardItem>(`/rooms/${room.code}/docs/${b.id}/folder`, 'PUT', { folderId })))
     setBoards((all) => all?.map((x) => (todo.some((t) => t.id === x.id) ? { ...x, folderId } : x)) ?? all)
     const bad = results.filter((r) => r.status === 'rejected').length
@@ -194,7 +205,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
 
   async function removeMany(list: BoardItem[]) {
     const todo = list.filter((b) => canTouch(b.createdBy))
-    if (!todo.length || !confirm(`¿Borrar ${todo.length === 1 ? `la pizarra «${todo[0]!.name}»` : `${todo.length} pizarras`}? También se borran sus archivos .excalidraw de la sala.`)) return
+    if (!todo.length || !await dialogs.confirm({ title: todo.length === 1 ? `¿Borrar la pizarra «${todo[0]!.name}»?` : `¿Borrar ${todo.length} pizarras?`, message: 'También se borran sus archivos .excalidraw de la sala. No se puede deshacer.', confirmLabel: todo.length === 1 ? 'Borrar pizarra' : 'Borrar pizarras', tone: 'danger' })) return
     await Promise.allSettled(todo.map((b) => api(`/rooms/${room.code}/docs/${b.id}`, 'DELETE')))
     setSel(new Set())
   }
@@ -202,7 +213,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
   async function createFolder(e: FormEvent) {
     e.preventDefault()
     try {
-      const f = await api<FolderItem>(`/rooms/${room.code}/folders?kind=BOARD`, 'POST', { name: folderName, parentId: current })
+      const f = await api<FolderItem>(`/rooms/${room.code}/folders?kind=FILE`, 'POST', { name: folderName, parentId: current })
       setFolders((all) => (all.some((x) => x.id === f.id) ? all : [...all, f]))
       setCreating(false)
       setFolderName('')
@@ -212,8 +223,8 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
   }
 
   async function renameFolder(f: FolderItem) {
-    const n = window.prompt('Nuevo nombre de la carpeta', f.name)
-    if (!n?.trim() || n.trim() === f.name) return
+    const n = await dialogs.prompt({ title: 'Cambiar nombre de la carpeta', label: 'Nombre', initial: f.name, maxLength: 60 })
+    if (!n || n === f.name) return
     try {
       const u = await api<FolderItem>(`/rooms/${room.code}/folders/${f.id}`, 'PATCH', { name: n.trim() })
       setFolders((all) => all.map((x) => (x.id === u.id ? u : x)))
@@ -229,7 +240,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
       for (const x of folders) if (x.parentId && ids.has(x.parentId) && !ids.has(x.id)) { ids.add(x.id); grew = true }
     }
     const n = (boards ?? []).filter((b) => b.folderId && ids.has(b.folderId)).length
-    if (!confirm(`¿Borrar la carpeta «${f.name}»${n ? ` y sus ${n} pizarra${n === 1 ? '' : 's'}` : ''}? No se puede deshacer.`)) return
+    if (!await dialogs.confirm({ title: `¿Borrar la carpeta «${f.name}»?`, message: n ? <>También se borrarán sus <b>{n} pizarra{n === 1 ? '' : 's'}</b>. No se puede deshacer.</> : 'No se puede deshacer.', confirmLabel: 'Borrar carpeta', tone: 'danger' })) return
     await api(`/rooms/${room.code}/folders/${f.id}`, 'DELETE').catch(fail)
   }
 
@@ -264,11 +275,12 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
         if (!Array.isArray(parsed.elements)) throw new Error('No es un archivo de pizarra válido (.excalidraw)')
       }
       const fd = new FormData()
+      if (current) fd.append('folderId', current)
       fd.append('file', new File([blob], `${name || 'Pizarra importada'}.excalidraw`, { type: 'application/json' }))
       const up = await fetch(`/api/rooms/${room.code}/files`, { method: 'POST', headers: { Authorization: `Bearer ${getAccessToken() ?? ''}` }, body: fd })
       if (!up.ok) throw new ApiError(up.status, (await up.json().catch(() => null))?.message ?? `Error ${up.status}`)
       const f = (await up.json()) as { id: string }
-      onOpen(await api<BoardItem>(`/rooms/${room.code}/docs/from-file/${f.id}${current ? `?folderId=${current}` : ''}`, 'POST'))
+      onOpen(await api<BoardItem>(`/rooms/${room.code}/docs/from-file/${f.id}`, 'POST'))
     } catch (e) {
       toast(e instanceof Error ? e.message : 'No se pudo importar', 'error')
     } finally {
@@ -316,16 +328,15 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
     const mine = canTouch(b.createdBy)
     const items: MenuItem[] = []
     if (mine) items.push({ label: 'Cambiar nombre', icon: <Pencil size={16} />, onClick: async () => {
-      const n = window.prompt('Nuevo nombre', b.name)
-      if (n?.trim()) await api(`/rooms/${room.code}/docs/${b.id}`, 'PATCH', { name: n.trim() }).catch(fail)
+      const n = await dialogs.prompt({ title: 'Cambiar nombre de la pizarra', label: 'Nombre', initial: b.name, maxLength: 120 })
+      if (n) await api(`/rooms/${room.code}/docs/${b.id}`, 'PATCH', { name: n }).catch(fail)
     } })
     items.push({ heading: 'Descargar como' })
     for (const [f, label] of [['excalidraw', 'Pizarra (.excalidraw)'], ['png', 'Imagen PNG'], ['svg', 'Imagen SVG'], ['pdf', 'PDF']] as const) {
       items.push({ label, icon: <Download size={16} />, onClick: () => void downloadBoard(b, f) })
     }
-    if (mine) {
-      items.push({ heading: 'Mover a' }, ...moveTargets([b]), 'separator', { label: 'Borrar', icon: <Trash2 size={16} />, danger: true, onClick: () => void removeMany([b]) })
-    }
+    if (canWrite) items.push({ heading: 'Mover a' }, ...moveTargets([b]))
+    if (mine) items.push('separator', { label: 'Borrar', icon: <Trash2 size={16} />, danger: true, onClick: () => void removeMany([b]) })
     return items
   }
 
@@ -385,7 +396,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
       {sel.has(b.id) ? <SquareCheck size={20} /> : <Square size={20} />}
     </button>
   )
-  const dragProps = (b: BoardItem) => canTouch(b.createdBy) ? {
+  const dragProps = (b: BoardItem) => canWrite ? {
     draggable: true,
     onDragStart: (e: DragEvent) => {
       e.dataTransfer.setData(BOARDS_MIME, JSON.stringify(dragIds(b)))
@@ -395,7 +406,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
   const meta = (b: BoardItem) => `${b.createdByName} · ${when(b.updatedAt)}${searching && b.folderId ? ` · ${where(b.folderId)}` : ''}`
 
   const boardCards = shownBoards.map((b) => view === 'grid' ? (
-    <div key={b.id} className={`board-card ${sel.has(b.id) ? 'selected' : ''}`} role="button" tabIndex={0} aria-label={`Abrir ${b.name}`} {...dragProps(b)}
+    <div key={b.id} data-sel-id={b.id} className={`board-card ${sel.has(b.id) ? 'selected' : ''}`} role="button" tabIndex={0} aria-label={`Abrir ${b.name}`} {...dragProps(b)}
       onClick={(e) => clickBoard(b, e)} onKeyDown={(e) => e.key === 'Enter' && clickBoard(b, e)}>
       <div className="board-thumb"><Thumb code={room.code} board={b} /></div>
       {check(b)}
@@ -405,7 +416,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
       </div>
     </div>
   ) : (
-    <div key={b.id} className={`fitem board-row ${sel.has(b.id) ? 'selected' : ''}`} role="button" tabIndex={0} aria-label={`Abrir ${b.name}`} {...dragProps(b)}
+    <div key={b.id} data-sel-id={b.id} className={`fitem board-row ${sel.has(b.id) ? 'selected' : ''}`} role="button" tabIndex={0} aria-label={`Abrir ${b.name}`} {...dragProps(b)}
       onClick={(e) => clickBoard(b, e)} onKeyDown={(e) => e.key === 'Enter' && clickBoard(b, e)}>
       {check(b)}
       <span className="ficon"><PenTool size={20} /></span>
@@ -473,13 +484,14 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
             <>
               <Menu label="Mover las seleccionadas a" items={[{ heading: `Mover ${movable.length} a` }, ...moveTargets(movable)]}
                 trigger={<span className="btn sm"><FolderInput size={15} /> Mover a… <ChevronDown size={14} /></span>} />
-              <button type="button" className="btn sm danger" onClick={() => void removeMany(movable)}><Trash2 size={15} /> Borrar</button>
             </>
           )}
+          {deletable.length > 0 && <button type="button" className="btn sm danger" onClick={() => void removeMany(deletable)}><Trash2 size={15} /> Borrar{deletable.length < mineSel.length ? ` (${deletable.length})` : ''}</button>}
         </div>
       )}
 
-      <div className="ex-body">
+      <div ref={bodyRef} className="ex-body" onClick={(e) => { if (!justDragged.current && sel.size > 0 && !(e.target as Element).closest('[data-sel-id], button, a, .fitem, .menu, input, select')) setSel(new Set()) }}>
+        {box && <div className="marquee" style={{ left: box.left, top: box.top, width: box.width, height: box.height }} />}
         {!canWrite && <p className="callout small" style={{ marginBottom: 10 }}>Tu rol en esta sala es de <strong>lector</strong>: puedes abrir las pizarras para verlas y descargarlas.</p>}
         {boards === null ? <p className="muted">Cargando…</p> : empty ? (
           <div className="empty">

@@ -1,6 +1,7 @@
 package com.nora.user;
 
 import com.nora.auth.AuthPrincipal;
+import com.nora.auth.AuthService;
 import com.nora.common.ApiException;
 import com.nora.file.FileService;
 import jakarta.validation.Valid;
@@ -30,14 +31,66 @@ public class AdminController {
 
     public record AdminUserView(UserDto user, long storageUsedBytes) {}
 
+    public record CreateUserRequest(
+            @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Email @jakarta.validation.constraints.Size(max = 254) String email,
+            @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(min = 2, max = 60) String displayName,
+            @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 72) String password,
+            Role role) {}
+
+    public record ProfileRequest(@jakarta.validation.constraints.Size(max = 60) String displayName, @jakarta.validation.constraints.Size(max = 254) String email) {}
+
+    public record ResetLinkView(String token, java.time.Instant expiresAt) {}
+
     private final UserRepository users;
     private final FileService files;
     private final ApplicationEventPublisher events;
+    private final AuthService auth;
+    private final AccountService accounts;
 
-    public AdminController(UserRepository users, FileService files, ApplicationEventPublisher events) {
+    public AdminController(UserRepository users, FileService files, ApplicationEventPublisher events, AuthService auth, AccountService accounts) {
         this.users = users;
         this.files = files;
         this.events = events;
+        this.auth = auth;
+        this.accounts = accounts;
+    }
+
+    /** Crea una cuenta con la contraseña que indique el administrador (la persona puede cambiarla luego en Ajustes). */
+    @PostMapping
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+    public AdminUserView create(@Valid @RequestBody CreateUserRequest req) {
+        AuthService.checkPassword(req.password());
+        User u = auth.createUser(req.email(), req.displayName(), req.password(), req.role() == null ? Role.USER : req.role());
+        return new AdminUserView(UserDto.of(u), 0);
+    }
+
+    /** Cambia el nombre y/o el correo de una cuenta. */
+    @PatchMapping("/{id}/profile")
+    public AdminUserView profile(@PathVariable UUID id, @Valid @RequestBody ProfileRequest req) {
+        User u = accounts.updateProfile(id, req.displayName(), req.email());
+        return new AdminUserView(UserDto.of(u), files.usedBytes(id));
+    }
+
+    /** Cierra todas las sesiones de la cuenta (la persona tiene que volver a entrar). */
+    @PostMapping("/{id}/revoke-sessions")
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
+    public void revoke(@PathVariable UUID id) {
+        auth.forceLogout(id, "Un administrador ha cerrado tus sesiones");
+    }
+
+    /** Enlace de un solo uso (24 h) para que la persona elija una contraseña nueva. */
+    @PostMapping("/{id}/reset-link")
+    public ResetLinkView resetLink(@PathVariable UUID id, @AuthenticationPrincipal AuthPrincipal me) {
+        var l = auth.createResetLink(me.userId(), id);
+        return new ResetLinkView(l.token(), l.expiresAt());
+    }
+
+    /** Borra la cuenta y todos sus datos. */
+    @DeleteMapping("/{id}")
+    @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable UUID id, @AuthenticationPrincipal AuthPrincipal me) {
+        if (id.equals(me.userId())) throw ApiException.badRequest("Para borrar tu propia cuenta usa Ajustes");
+        accounts.deleteAccount(id);
     }
 
     public record UserPage(List<AdminUserView> items, long total, int page, int size) {}
@@ -75,6 +128,7 @@ public class AdminController {
         u.setMaxParticipants(req.maxParticipants());
         User saved = users.save(u);
         if (!saved.isEnabled()) {
+            auth.forceLogout(saved.getId(), "Tu cuenta ha sido desactivada");
             events.publishEvent(new UserEvent(saved.getId(), "account.disabled", Map.of("message", "Tu cuenta ha sido desactivada")));
         } else if (!self) {
             events.publishEvent(new UserEvent(saved.getId(), "account.updated",

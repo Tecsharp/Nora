@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { api } from './api'
 import { useAuth } from './auth'
 import { useToast } from './toast'
+import { useDialogs } from './dialogs'
 
 export type RtStatus = 'offline' | 'connecting' | 'open'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -181,6 +182,7 @@ export const useConnection = () => useContext(Ctx)
 export function RealtimeProvider({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth()
   const toast = useToast()
+  const dialogs = useDialogs()
   const status = useRtStatus()
   const loggedIn = !!user
 
@@ -195,6 +197,13 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   })
   useRealtime('account.disabled', (d) => {
     toast(d.message, 'error')
+    logout().catch(() => {})
+  })
+  useRealtime('account.revoked', (d) => {
+    logout().catch(() => {})
+    void dialogs.notify({ title: 'Tu sesión se cerró', message: d.message, tone: 'warning', icon: 'info', confirmLabel: 'Volver a entrar' })
+  })
+  useRealtime('account.deleted', () => {
     logout().catch(() => {})
   })
 
