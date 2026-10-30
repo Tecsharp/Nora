@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { ArrowDown, Check, CornerUpLeft, Copy, Pencil, Send, Smile, Sparkles, Trash2, X } from 'lucide-react'
+import { ArrowDown, Check, CornerUpLeft, Copy, Pencil, Send, Smile, SmilePlus, Sparkles, Trash2, X } from 'lucide-react'
 import { useAuth } from '../auth'
 import Avatar from '../components/Avatar'
 import Menu from '../components/Menu'
@@ -68,6 +68,8 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
   const [editing, setEditing] = useState<Message | null>(null)
   const [emojis, setEmojis] = useState(false)
   const [sending, setSending] = useState(false)
+  const [pickFor, setPickFor] = useState<string | null>(null) // mensaje con el selector de reacciones abierto
+  const [activeMsg, setActiveMsg] = useState<string | null>(null) // mensaje tocado (en pantallas táctiles no hay «hover»)
   const [unseen, setUnseen] = useState(0)
   const [caret, setCaret] = useState(0)
   const [pick, setPick] = useState(0)
@@ -230,6 +232,15 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
     }
   }
 
+  useEffect(() => {
+    if (!pickFor) return
+    const away = (e: MouseEvent) => { if (!(e.target as Element).closest('.chat-picker, .chat-act-react')) setPickFor(null) }
+    const key = (e: globalThis.KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); setPickFor(null) } }
+    document.addEventListener('mousedown', away)
+    document.addEventListener('keydown', key, true)
+    return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', key, true) }
+  }, [pickFor])
+
   const react = (m: Message, emoji: string) => store.react(m.id, emoji).catch((e) => toast(e instanceof Error ? e.message : 'No se pudo reaccionar', 'error'))
   const startEdit = (m: Message) => {
     setEditing(m)
@@ -273,23 +284,26 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
         <div className="chat-col">
           {showName && <div className="chat-meta"><strong>{m.authorName}</strong><time title={at.toLocaleString('es')}>{clock(at)}</time></div>}
           {head && !showName && <div className="chat-meta"><time title={at.toLocaleString('es')}>{clock(at)}</time></div>}
-          <div className="chat-bubble-wrap">
+          <div className={`chat-bubble-wrap ${activeMsg === m.id || pickFor === m.id ? 'show' : ''}`} onClick={() => setActiveMsg((a) => (a === m.id ? null : m.id))}>
             <div className="chat-bubble">
               {m.replyTo && (quoted
                 ? <button type="button" className="chat-quote" onClick={() => jump(quoted.id)}><strong>{quoted.authorName}</strong><span>{quoted.text}</span></button>
                 : <div className="chat-quote gone"><span>Mensaje borrado</span></div>)}
               <p>{rich(m.text, names, user?.displayName ?? '')}{m.edited && <small className="chat-edited"> (editado)</small>}</p>
             </div>
-            <div className="chat-actions" role="toolbar" aria-label="Acciones del mensaje">
-              {QUICK.slice(0, variant === 'window' ? 2 : 3).map((e) => <button key={e} type="button" className="chat-act" onClick={() => void react(m, e)} aria-label={`Reaccionar ${e}`}>{e}</button>)}
-              <Menu label="Más reacciones" trigger={<span className="chat-act"><Smile size={15} /></span>}
-                items={[{ heading: 'Reaccionar' }, ...QUICK.map((e) => ({ label: e, onClick: () => void react(m, e) }))]} />
+            <div className="chat-actions" role="toolbar" aria-label="Acciones del mensaje" onClick={(e) => e.stopPropagation()}>
+              <button type="button" className="chat-act chat-act-react" aria-label="Reaccionar" aria-expanded={pickFor === m.id} title="Reaccionar" onClick={() => setPickFor((p) => (p === m.id ? null : m.id))}><SmilePlus size={15} /></button>
               {canWrite && <button type="button" className="chat-act" aria-label="Responder" title="Responder" onClick={() => { setReplyTo(m); setEditing(null); input.current?.focus() }}><CornerUpLeft size={15} /></button>}
               <Menu label="Más acciones" items={[
                 { label: 'Copiar texto', icon: <Copy size={16} />, onClick: () => void navigator.clipboard.writeText(m.text).then(() => toast('Copiado', 'success')) },
                 ...(mine && canWrite ? [{ label: 'Editar', icon: <Pencil size={16} />, onClick: () => startEdit(m) }] : []),
                 ...((mine || staff) && canWriteIn(room, user) ? [{ label: 'Borrar', icon: <Trash2 size={16} />, danger: true, onClick: () => void del(m) }] : []),
               ]} />
+              {pickFor === m.id && (
+                <div className="chat-picker" role="listbox" aria-label="Elegir reacción">
+                  {QUICK.map((e) => <button key={e} type="button" role="option" aria-selected="false" onClick={() => { setPickFor(null); setActiveMsg(null); void react(m, e) }}>{e}</button>)}
+                </div>
+              )}
             </div>
           </div>
           {reactions.length > 0 && (
