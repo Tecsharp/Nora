@@ -36,7 +36,7 @@ jobs:
         run: |
           cargo build --release
           cp "target/release/${{ matrix.bin }}" "${{ matrix.out }}"
-      - name: Compilar (macOS: universal Apple Silicon + Intel, empaquetado como «Nora Agent.app»)
+      - name: "Compilar en macOS (universal Apple Silicon + Intel, empaquetado como Nora Agent.app)"
         if: runner.os == 'macOS'
         shell: bash
         run: |
