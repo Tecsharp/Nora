@@ -1612,3 +1612,51 @@ body:has(.room-shell) .topbar-in { max-width: none; }
   .ws-page { padding: 20px 18px 48px; }
 }
 @media (prefers-reduced-motion: reduce) { .ws-nav { transition: none; } }
+
+/* ---------- Asistencia ---------- */
+.as-wrap { width: 100%; max-width: 760px; margin: 0 auto; padding: 36px 28px 64px; overflow-y: auto; display: flex; flex-direction: column; gap: 30px; }
+.as-warn { margin: 0; padding: 10px 14px; border-radius: 10px; background: var(--yellow-soft); color: var(--yellow); font-size: 0.9rem; text-align: center; }
+.as-hero { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.as-hero-ico { width: 54px; height: 54px; display: grid; place-items: center; border-radius: 16px; color: #fff; background: linear-gradient(160deg, #9a86ff, #6250e6); box-shadow: 0 10px 28px -10px var(--accent); }
+.as-hero h2 { margin: 6px 0 0; font-size: 1.45rem; letter-spacing: -0.02em; }
+.as-hero p { margin: 0; color: var(--muted); }
+.as-sec { display: flex; flex-direction: column; gap: 10px; }
+.as-h { margin: 0; display: flex; align-items: center; gap: 10px; font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--subtle); }
+.as-empty { margin: 0; text-align: center; color: var(--muted); padding: 18px 0; }
+.as-list { list-style: none; margin: 0; padding: 0; border-radius: 14px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--hairline); overflow: hidden; }
+.as-person { display: flex; align-items: center; gap: 14px; padding: 12px 16px; flex-wrap: wrap; }
+.as-person + .as-person { border-top: 1px solid var(--hairline); }
+.as-person.off { opacity: 0.5; }
+.as-who { flex: 1; min-width: 150px; display: flex; flex-direction: column; line-height: 1.25; }
+.as-who b { font-weight: 600; }
+.as-who small { color: var(--subtle); font-size: 0.8rem; }
+.as-who small.ok { color: var(--green); }
+.as-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.as-btn { display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px; border: 0; border-radius: 9px; background: var(--surface-3); color: var(--text); font: inherit; font-size: 0.86rem; font-weight: 500; cursor: pointer; text-decoration: none; transition: background 0.15s, transform 0.1s; }
+.as-btn:hover:not(:disabled) { background: var(--border-strong); text-decoration: none; }
+.as-btn:active:not(:disabled) { transform: scale(0.97); }
+.as-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.as-btn.ghost { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--border-strong); }
+.as-btn.ghost:hover:not(:disabled) { color: var(--text); background: var(--surface-3); }
+.as-note { margin: 0; display: flex; align-items: center; justify-content: center; gap: 7px; color: var(--subtle); font-size: 0.82rem; }
+.as-live { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; background: var(--accent-soft); color: var(--accent-text); }
+.as-state { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 0.8rem; color: var(--subtle); }
+.as-state i { width: 7px; height: 7px; border-radius: 50%; background: var(--subtle); }
+.as-state.on { color: var(--green); } .as-state.on i { background: var(--green); }
+.as-ready { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 14px 16px; border-radius: 14px; background: var(--green-soft); color: var(--green); }
+.as-ready span { color: var(--text); flex: 1; min-width: 200px; }
+.as-link { border: 0; background: none; color: var(--accent-text); font: inherit; font-size: 0.86rem; cursor: pointer; padding: 0; }
+.as-link:hover { text-decoration: underline; }
+.as-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.as-steps li { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 14px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--hairline); }
+.as-steps li > i { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: var(--accent-soft); color: var(--accent-text); font-style: normal; font-weight: 700; font-size: 0.82rem; }
+.as-steps li > div { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; min-width: 0; }
+.as-steps b { font-weight: 600; }
+.as-steps small { color: var(--muted); font-size: 0.82rem; line-height: 1.4; overflow-wrap: anywhere; }
+.as-steps code { font-family: var(--mono); font-size: 0.8rem; color: var(--text); }
+.as-dl { display: flex; flex-wrap: wrap; gap: 6px; }
+.as-code { display: flex; align-items: center; gap: 6px; }
+.as-code code { font: 700 1.15rem/1 var(--mono); letter-spacing: 0.1em; padding: 8px 12px; border-radius: 10px; background: var(--accent-soft); color: var(--accent-text); user-select: all; }
+.as-icon { width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 8px; background: var(--surface-3); color: var(--muted); cursor: pointer; }
+.as-icon:hover { color: var(--text); }
+@media (max-width: 720px) { .as-steps { grid-template-columns: 1fr; } .as-wrap { padding: 24px 16px 48px; } .as-acts { width: 100%; } }

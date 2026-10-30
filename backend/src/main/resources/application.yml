@@ -59,6 +59,7 @@ app:
     url: ${NORA_CONVERTER_URL:http://converter:3100}
     token: ${NORA_CONVERTER_TOKEN:}
   agent:
+    repo: ${NORA_AGENT_REPO:}
     url-windows: ${NORA_AGENT_URL_WINDOWS:}
     url-macos: ${NORA_AGENT_URL_MACOS:}
     url-linux: ${NORA_AGENT_URL_LINUX:}

@@ -2,7 +2,6 @@ package com.nora.assist;
 
 import com.nora.auth.AuthPrincipal;
 import com.nora.common.ApiException;
-import com.nora.config.AppProperties;
 import com.nora.room.RoomService;
 import java.util.List;
 import java.util.Map;
@@ -20,25 +19,18 @@ public class AssistController {
 
     private final AssistService assist;
     private final RoomService rooms;
-    private final AppProperties props;
+    private final AgentDownloads downloads;
 
-    public AssistController(AssistService assist, RoomService rooms, AppProperties props) {
+    public AssistController(AssistService assist, RoomService rooms, AgentDownloads downloads) {
         this.assist = assist;
         this.rooms = rooms;
-        this.props = props;
+        this.downloads = downloads;
     }
 
     /** Dónde descargar el agente en cada sistema (vacío = no configurado: la interfaz busca el archivo en /downloads/). */
     @GetMapping("/agent/downloads")
     public Map<String, String> downloads() {
-        var a = props.agent();
-        return Map.of("windows", clean(a == null ? null : a.urlWindows()), "macos", clean(a == null ? null : a.urlMacos()), "linux", clean(a == null ? null : a.urlLinux()));
-    }
-
-    /** Solo enlaces http(s): lo que venga del .env no puede ser un javascript: ni nada parecido. */
-    private static String clean(String url) {
-        String u = url == null ? "" : url.strip();
-        return u.startsWith("https://") || u.startsWith("http://") ? u : "";
+        return downloads.links();
     }
 
     /** Servidores STUN/TURN para la conexión directa entre los dos navegadores. */

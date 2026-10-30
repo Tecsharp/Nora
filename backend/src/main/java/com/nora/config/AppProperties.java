@@ -30,8 +30,8 @@ public record AppProperties(
         public boolean active() { return enabled && apiKey != null && !apiKey.isBlank(); }
     }
 
-    /** Enlaces de descarga del agente de escritorio (por ejemplo, de las Releases de GitHub). Vacío = se busca en /downloads/ del propio servidor. */
-    public record Agent(String urlWindows, String urlMacos, String urlLinux) {}
+    /** Descarga del agente de escritorio: {@code repo} («usuario/Nora») arma solos los enlaces a las Releases de GitHub; cada {@code url*} lo sustituye. Todo vacío = se busca en /downloads/ del propio servidor. */
+    public record Agent(String repo, String urlWindows, String urlMacos, String urlLinux) {}
 
     public record Storage(String endpoint, String adminEndpoint, String adminToken, String bucket, String region) {}
 }
