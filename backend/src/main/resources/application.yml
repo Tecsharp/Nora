@@ -58,6 +58,10 @@ app:
   converter:
     url: ${NORA_CONVERTER_URL:http://converter:3100}
     token: ${NORA_CONVERTER_TOKEN:}
+  agent:
+    url-windows: ${NORA_AGENT_URL_WINDOWS:}
+    url-macos: ${NORA_AGENT_URL_MACOS:}
+    url-linux: ${NORA_AGENT_URL_LINUX:}
   ai:
     enabled: ${NORA_AI_ENABLED:false}
     api-key: ${NORA_DEEPSEEK_API_KEY:}

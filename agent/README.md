@@ -34,6 +34,9 @@ si configuraste SignPath, ver `docs/ASISTENCIA.md`) y los publica en *Releases*.
 (el gateway los sirve en `/downloads/` y Nora los ofrece en Asistencia):
 `nora-agent-windows.exe`, `nora-agent-macos.zip`, `nora-agent-linux`.
 
+**Enlaces de descarga en Nora:** en `.env` pon `NORA_AGENT_URL_WINDOWS`, `NORA_AGENT_URL_MACOS` y `NORA_AGENT_URL_LINUX` con las direcciones de los archivos de tu Release de GitHub
+(clic derecho en cada archivo → copiar dirección del enlace) y reinicia con `docker compose up -d`. Si los dejas vacíos, Nora busca los archivos en `agent/dist/`.
+
 **B. Compilar a mano** (requiere [Rust](https://rustup.rs)); el resultado ya queda en `agent/dist/` con el nombre correcto:
 
 | Sistema | Comando | Resultado |

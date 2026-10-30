@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api } from '../api'
+import { useAuth } from '../auth'
 import { rt, useRealtime } from '../realtime'
 import { useToast } from '../toast'
 
@@ -71,6 +72,8 @@ export const screenSharingSupported = () => typeof navigator !== 'undefined' && 
 const FALLBACK_ICE: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }]
 
 export function AssistProvider({ code, children }: { code: string; children: ReactNode }) {
+  const { user } = useAuth()
+  const mine = (reason?: string) => !!user && !!reason && reason.startsWith(user.displayName) // lo que hice yo no hace falta avisármelo
   const toast = useToast()
   const [sessions, setSessions] = useState<AssistSession[]>([])
   const [incoming, setIncoming] = useState<Incoming[]>([])
@@ -229,13 +232,13 @@ export function AssistProvider({ code, children }: { code: string; children: Rea
       toast(`${s?.peer.name ?? 'La otra persona'} no permitió el control`, 'warning')
     } else if (d.action === 'revoked') {
       patch(d.session, { control: 'none', controller: '' })
-      toast(d.reason ?? 'Se terminó el control', 'info')
+      if (!mine(d.reason)) toast(d.reason ?? 'Se terminó el control', 'info')
     }
   })
   useRealtime('assist.ended', (d: { session: string; reason: string }) => {
     setIncoming((l) => l.filter((i) => i.id !== d.session))
     pendingInvites.current.delete(d.session)
-    if (sessionsRef.current.some((s) => s.id === d.session)) toast(d.reason || 'La asistencia terminó', 'info')
+    if (sessionsRef.current.some((s) => s.id === d.session) && !mine(d.reason)) toast(d.reason || 'La asistencia terminó', 'info')
     drop(d.session)
   })
 

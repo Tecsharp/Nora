@@ -7,9 +7,9 @@ import { useToast } from '../toast'
 import { screenSharingSupported, useAssist } from './AssistProvider'
 
 const DOWNLOADS = [
-  { os: 'Windows', file: 'nora-agent-windows.exe' },
-  { os: 'macOS', file: 'nora-agent-macos.zip' },
-  { os: 'Linux', file: 'nora-agent-linux' },
+  { os: 'Windows', key: 'windows', file: 'nora-agent-windows.exe' },
+  { os: 'macOS', key: 'macos', file: 'nora-agent-macos.zip' },
+  { os: 'Linux', key: 'linux', file: 'nora-agent-linux' },
 ]
 
 export default function AssistTool({ room, online }: { room: Room; online: Set<string> }) {
@@ -17,12 +17,19 @@ export default function AssistTool({ room, online }: { room: Room; online: Set<s
   const toast = useToast()
   const { sessions, agent, agents, ask, share } = useAssist()
   const [code, setCode] = useState<string | null>(null)
-  const [have, setHave] = useState<Record<string, boolean>>({})
+  const [links, setLinks] = useState<Record<string, string>>({})
   useEffect(() => {
-    // ¿Están los instaladores en el servidor? (se dejan en agent/dist/; ver agent/README.md)
-    DOWNLOADS.forEach((d) => fetch(`/downloads/${d.file}`, { method: 'HEAD' }).then((r) => setHave((h) => ({ ...h, [d.file]: r.ok && !(r.headers.get('content-type') ?? '').includes('text/html') }))).catch(() => setHave((h) => ({ ...h, [d.file]: false }))))
+    // El enlace sale del .env (p. ej. las Releases de GitHub); si no hay, se usa el archivo de agent/dist/ del propio servidor, si existe.
+    api<Record<string, string>>('/assist/agent/downloads').catch(() => ({} as Record<string, string>)).then((conf) => {
+      DOWNLOADS.forEach((d) => {
+        if (conf[d.key]) return setLinks((l) => ({ ...l, [d.key]: conf[d.key]! }))
+        fetch(`/downloads/${d.file}`, { method: 'HEAD' }).then((r) => {
+          if (r.ok && !(r.headers.get('content-type') ?? '').includes('text/html')) setLinks((l) => ({ ...l, [d.key]: `/downloads/${d.file}` }))
+        }).catch(() => undefined)
+      })
+    })
   }, [])
-  const anyMissing = DOWNLOADS.some((d) => have[d.file] === false)
+  const available = DOWNLOADS.filter((d) => links[d.key])
   const supported = screenSharingSupported()
   const others = room.participants.filter((p) => p.userId !== user?.id)
 
@@ -59,7 +66,7 @@ export default function AssistTool({ room, online }: { room: Room; online: Set<s
             )
           })}
         </div>
-        <p className="muted small"><ShieldCheck size={14} /> La otra persona siempre tiene que aceptar, elige qué pantalla enseña y puede cortarlo cuando quiera. La imagen va directa entre vuestros navegadores.</p>
+        <p className="muted small"><ShieldCheck size={14} /> La otra persona siempre tiene que aceptar y puede cortarlo cuando quiera.</p>
       </section>
 
       {sessions.length > 0 && (
@@ -76,24 +83,16 @@ export default function AssistTool({ room, online }: { room: Room; online: Set<s
 
       <section className="stack">
         <h4>Agente de escritorio <span className={`badge ${agent.online ? 'green' : ''}`}><i /> {agent.online ? `Conectado${agent.os ? ` (${agent.os})` : ''}` : 'No conectado'}</span></h4>
-        <p className="muted small">
-          Para <strong>ver</strong> pantallas no necesitas nada más. Para que otra persona pueda <strong>controlar tu equipo</strong> (ratón y teclado) instala este pequeño programa:
-          un navegador no puede hacerlo por sí solo. No hace nada hasta que aceptes cada petición de control.
-        </p>
-        <ol className="assist-steps small">
-          <li>Descárgalo: {DOWNLOADS.map((d, i) => <span key={d.os}>{i > 0 && ' · '}{have[d.file] === false
-            ? <span className="muted" title="Este instalador no está en el servidor todavía"><Download size={12} /> {d.os} (no disponible)</span>
-            : <a href={`/downloads/${d.file}`} download><Download size={12} /> {d.os}</a>}</span>)}
-          {anyMissing && <small className="muted"> — quien administra Nora debe dejarlos en <code>agent/dist/</code>: bájalos de las <a href="https://github.com/Tecsharp/Nora/releases" target="_blank" rel="noopener noreferrer">Releases de GitHub</a> o compílalos con <code>agent/build.sh</code> (ver <code>agent/README.md</code>).</small>}</li>
-          <li>Pulsa «Generar código», abre <strong>Nora Agent</strong> y escribe la dirección de esta Nora y el código en su ventana.</li>
-          <li>Déjalo abierto (puedes minimizarlo). Aquí arriba verás «Conectado»; la propia ventana te avisa y te deja detener el control.</li>
-        </ol>
+        <p className="muted">Solo hace falta si quieres que otra persona <strong>controle tu equipo</strong>. Para ver pantallas no.</p>
         <div className="row">
+          {available.length > 0
+            ? available.map((d) => <a key={d.key} className="btn sm" href={links[d.key]} download><Download size={14} /> {d.os}</a>)
+            : <span className="muted small">Descarga no disponible: pídele a quien administra Nora que la añada.</span>}
+          <span className="spacer" />
           <button className="btn sm" onClick={() => void newCode()}><Plug size={14} /> Generar código</button>
           {code && <code className="assist-code" aria-label="Código de vinculación">{code}</code>}
-          {code && <small className="muted">Vale 10 minutos y una sola vez. Dirección: <code>{window.location.origin}</code></small>}
         </div>
-        <p className="muted small">En Linux hace falta una sesión X11 (Wayland no permite controlar el equipo). En macOS descomprime el .zip, mueve «Nora Agent» a Aplicaciones, ábrelo con clic derecho → Abrir la primera vez y concede el permiso de Accesibilidad. Al compartir, elige la <strong>pantalla completa</strong> para que se pueda controlar.</p>
+        {code && <p className="muted small">Ábrelo en el agente junto con <code>{window.location.origin}</code>. Vale 10 minutos.</p>}
       </section>
     </div>
   )

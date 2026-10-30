@@ -75,6 +75,10 @@ services:
       NORA_AI_USER_LIMIT_PER_HOUR: ${NORA_AI_USER_LIMIT_PER_HOUR:-60}
       NORA_AI_MAX_INPUT_CHARS: ${NORA_AI_MAX_INPUT_CHARS:-30000}
       NORA_AI_MAX_OUTPUT_TOKENS: ${NORA_AI_MAX_OUTPUT_TOKENS:-2048}
+      # Descarga del agente de escritorio (enlaces de las Releases de GitHub; vacío = el archivo de agent/dist/)
+      NORA_AGENT_URL_WINDOWS: ${NORA_AGENT_URL_WINDOWS:-}
+      NORA_AGENT_URL_MACOS: ${NORA_AGENT_URL_MACOS:-}
+      NORA_AGENT_URL_LINUX: ${NORA_AGENT_URL_LINUX:-}
       NORA_STUN_URLS: ${NORA_STUN_URLS:-stun:stun.l.google.com:19302}
       NORA_TURN_URLS: ${NORA_TURN_URLS:-}
       NORA_TURN_SECRET: ${NORA_TURN_SECRET:-}

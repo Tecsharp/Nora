@@ -18,11 +18,16 @@ export const useToast = () => useContext(Ctx)
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
   const next = useRef(1)
+  const last = useRef({ message: '', at: 0 })
 
   const push = useCallback((message: string, level: ToastLevel = 'info') => {
     const id = next.current++
-    setToasts((t) => [...t.slice(-4), { id, level, message }])
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), level === 'error' || level === 'warning' ? 8000 : 4500)
+    // el mismo aviso seguido (p. ej. dos eventos que dicen lo mismo) se muestra una sola vez
+    const now = Date.now()
+    if (last.current.message === message && now - last.current.at < 3000) return
+    last.current = { message, at: now }
+    setToasts((t) => [...t.slice(-2), { id, level, message }])
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), level === 'error' || level === 'warning' ? 6000 : 3200)
   }, [])
 
   sink = push

@@ -13,7 +13,8 @@ public record AppProperties(
         Defaults defaults,
         Storage storage,
         Converter converter,
-        Ai ai) {
+        Ai ai,
+        Agent agent) {
 
     public record Jwt(String secret, long accessTtlMinutes, long refreshTtlDays) {}
 
@@ -28,6 +29,9 @@ public record AppProperties(
     public record Ai(boolean enabled, String apiKey, String baseUrl, String model, int maxInputChars, int maxOutputTokens, int perHourLimit) {
         public boolean active() { return enabled && apiKey != null && !apiKey.isBlank(); }
     }
+
+    /** Enlaces de descarga del agente de escritorio (por ejemplo, de las Releases de GitHub). Vacío = se busca en /downloads/ del propio servidor. */
+    public record Agent(String urlWindows, String urlMacos, String urlLinux) {}
 
     public record Storage(String endpoint, String adminEndpoint, String adminToken, String bucket, String region) {}
 }

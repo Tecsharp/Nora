@@ -92,13 +92,13 @@
 
 /* ───────── Base ───────── */
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; font-size: 106.25%; } /* 17 px: toda la tipografía en rem sube un poco */
 body {
   margin: 0;
   min-height: 100vh;
   background: var(--bg) var(--bg-grad) no-repeat;
   color: var(--text);
-  font: 400 16px/1.5 var(--font);
+  font: 400 1rem/1.5 var(--font);
   letter-spacing: -0.011em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -376,11 +376,13 @@ textarea { resize: vertical; min-height: 88px; }
 .dock-head { display: flex; justify-content: space-between; align-items: center; font-size: 0.92rem; }
 .dock-item { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid var(--border); }
 
-.toasts { position: fixed; right: 20px; bottom: calc(20px + env(safe-area-inset-bottom)); z-index: 80; display: flex; flex-direction: column; gap: 8px; max-width: min(360px, calc(100vw - 32px)); }
-.toast { background: var(--glass); -webkit-backdrop-filter: saturate(180%) blur(22px); backdrop-filter: saturate(180%) blur(22px); box-shadow: 0 0 0 1px var(--hairline), var(--shadow); border-left: 4px solid var(--accent); border-radius: 14px; padding: 11px 16px; font-size: 0.9rem; cursor: pointer; animation: pop 0.25s var(--ease); }
-.toast.success { border-left-color: var(--green); }
-.toast.warning { border-left-color: var(--yellow); }
-.toast.error { border-left-color: var(--red); }
+.toasts { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 80; display: flex; flex-direction: column; align-items: center; gap: 6px; max-width: min(420px, calc(100vw - 32px)); pointer-events: none; }
+.toast { pointer-events: auto; background: var(--elevated); box-shadow: 0 0 0 1px var(--hairline), var(--shadow-sm); border-radius: 999px; padding: 7px 16px 7px 12px; font-size: 0.82rem; color: var(--muted); cursor: pointer; animation: pop 0.2s var(--ease); display: flex; align-items: center; gap: 8px; }
+.toast::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+.toast.success::before { background: var(--green); }
+.toast.warning::before { background: var(--yellow); }
+.toast.error::before { background: var(--red); }
+.toast.error, .toast.warning { color: var(--text); }
 
 /* ───────── Admin ───────── */
 .table-wrap { overflow-x: auto; border-radius: var(--radius); background: var(--elevated); box-shadow: 0 0 0 1px var(--hairline), var(--shadow-sm); }
@@ -1475,7 +1477,6 @@ input.rng:disabled { opacity: 0.5; cursor: default; }
 .pp-empty { display: flex; align-items: center; gap: 8px; padding: 12px 8px; }
 
 /* con el dock en pantalla los avisos pasan al centro para no taparlo */
-body.has-cdock .toasts { right: auto; left: 50%; transform: translateX(-50%); align-items: center; }
 @media (max-width: 760px) { .cdock { right: 8px; } .cpanel { width: 200px; } }
 .switch-row input[type=checkbox] { -webkit-appearance: none; appearance: none; width: 40px; height: 24px; min-height: 0; padding: 0; border: 0; border-radius: 999px; background: var(--surface-3); box-shadow: none; position: relative; flex: none; cursor: pointer; transition: background 0.18s; }
 .switch-row input[type=checkbox]::after { content: ''; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); transition: transform 0.18s var(--ease); }
