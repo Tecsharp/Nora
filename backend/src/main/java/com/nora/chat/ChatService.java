@@ -51,9 +51,11 @@ public class ChatService {
     private final UserRepository users;
     private final NotificationService notifications;
     private final ApplicationEventPublisher events;
+    private final com.nora.config.AppProperties props;
 
     public ChatService(ChatConversationRepository convs, ChatMemberRepository members, ChatMessageRepository messages, RoomService rooms,
-                       RoomMemberRepository roomMembers, UserRepository users, NotificationService notifications, ApplicationEventPublisher events) {
+                       RoomMemberRepository roomMembers, UserRepository users, NotificationService notifications, ApplicationEventPublisher events, com.nora.config.AppProperties props) {
+        this.props = props;
         this.convs = convs;
         this.members = members;
         this.messages = messages;
@@ -352,7 +354,6 @@ public class ChatService {
         if (c.isRoom()) ensureRoomMembers(c, x.room(), m.getCreatedAt().minusMillis(1));
         MessageDto dto = dto(m);
         deliver(x.room(), c, "chat.message", dto);
-        notifyMessage(x.room(), c, m, p.userId());
         return dto;
     }
 
@@ -474,30 +475,39 @@ public class ChatService {
         deliver(room, c, "chat.message", dto(m));
     }
 
-    /** Avisos persistentes (la campana): mensajes directos y de grupo, y en la general solo cuando te mencionan. */
-    private void notifyMessage(Room room, ChatConversation c, ChatMessage m, UUID author) {
-        String name = m.getAuthorName();
-        Map<String, Object> link = new LinkedHashMap<>();
-        link.put("tool", "chat");
-        link.put("conv", c.getId().toString());
-        link.put("msg", m.getId().toString());
-        if (c.isRoom()) {
-            // las menciones son la única razón de avisar en la general: sin «@» en el texto no hay nada que mirar
-            if (m.getText().indexOf('@') < 0) return;
-            String lower = m.getText().toLowerCase(Locale.ROOT);
-            List<RoomMember> rms = roomMembers.findByRoomId(room.getId());
-            Map<UUID, User> byId = users.findAllById(rms.stream().map(RoomMember::getUserId).toList()).stream().collect(Collectors.toMap(User::getId, u -> u));
-            List<UUID> mentioned = new ArrayList<>();
-            for (RoomMember rm : rms) {
-                User u = byId.get(rm.getUserId());
-                if (u != null && !rm.getUserId().equals(author) && lower.contains("@" + u.getDisplayName().toLowerCase(Locale.ROOT))) mentioned.add(rm.getUserId());
-            }
-            notifications.notifyMany(mentioned, room, "chat", name + " te mencionó en el chat general", m.getText(), link, "chat:" + c.getId() + ":mention");
-            return;
+    /**
+     * Avisos en la campana por mensajes de chat: no al instante, sino cuando llevan más de N minutos (por defecto 2 horas) sin leerse. Así el chat en
+     * vivo no llena la campana, y a quien no entró a verlo le llega un solo aviso por conversación con lo que se perdió.
+     */
+    @org.springframework.scheduling.annotation.Scheduled(fixedDelayString = "#{${app.chat.check-seconds:300} * 1000}", initialDelayString = "#{${app.chat.check-seconds:300} * 1000}")
+    @Transactional
+    public void notifyUnanswered() {
+        int mins = Math.max(1, props.chat() == null ? 120 : props.chat().notifyAfterMinutes());
+        Map<UUID, Room> roomCache = new HashMap<>();
+        Map<UUID, String> dmNames = new HashMap<>();
+        for (Object[] r : members.unansweredFor(mins)) {
+            UUID conv = (UUID) r[0];
+            UUID user = (UUID) r[1];
+            UUID roomId = (UUID) r[2];
+            String kind = (String) r[3];
+            String groupName = (String) r[4];
+            long n = ((Number) r[5]).longValue();
+            UUID lastId = (UUID) r[6];
+            String lastAuthor = (String) r[7];
+            String lastText = (String) r[8];
+            Instant lastAt = r[9] instanceof java.sql.Timestamp ts ? ts.toInstant() : (Instant) r[9];
+            Room room = roomCache.computeIfAbsent(roomId, rooms::roomById);
+            if (room == null || !roomMembers.existsById(new RoomMember.Key(roomId, user))) { members.markNotified(conv, user, lastAt); continue; }
+            String where = ChatConversation.ROOM.equals(kind) ? "el chat general" : ChatConversation.GROUP.equals(kind) ? "«" + groupName + "»" : lastAuthor;
+            String title = n == 1 ? (ChatConversation.DM.equals(kind) ? lastAuthor + " te escribió" : "Mensaje sin leer en " + where)
+                    : n + " mensajes sin leer " + (ChatConversation.DM.equals(kind) ? "de " + lastAuthor : "en " + where);
+            Map<String, Object> link = new LinkedHashMap<>();
+            link.put("tool", "chat");
+            link.put("conv", conv.toString());
+            link.put("msg", lastId.toString());
+            notifications.notify(user, room, "chat", title, (ChatConversation.DM.equals(kind) ? "" : lastAuthor + ": ") + lastText, link, "chat:" + conv);
+            members.markNotified(conv, user, lastAt);
         }
-        String title = c.isGroup() ? name + " en " + c.getName() : name;
-        List<UUID> to = members.findByConversationId(c.getId()).stream().filter(cm -> !cm.getUserId().equals(author) && !cm.isMuted()).map(ChatMember::getUserId).toList();
-        notifications.notifyMany(to, room, "chat", title, m.getText(), link, "chat:" + c.getId());
     }
 
     private ConvDto dto(ChatConversation c, UUID viewer, Room room) {

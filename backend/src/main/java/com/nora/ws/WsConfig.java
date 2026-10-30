@@ -52,6 +52,8 @@ public class WsConfig implements WebSocketConfigurer {
                             return false;
                         }
                         attributes.put("userId", user.getId());
+                        attributes.put("displayName", user.getDisplayName());
+                        attributes.put("email", user.getEmail());
                         return true;
                     }
 

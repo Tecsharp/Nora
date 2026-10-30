@@ -58,6 +58,9 @@ app:
   converter:
     url: ${NORA_CONVERTER_URL:http://converter:3100}
     token: ${NORA_CONVERTER_TOKEN:}
+  chat:
+    notify-after-minutes: ${NORA_CHAT_NOTIFY_AFTER_MINUTES:120}
+    check-seconds: ${NORA_CHAT_CHECK_SECONDS:300}
   agent:
     repo: ${NORA_AGENT_REPO:}
     url-windows: ${NORA_AGENT_URL_WINDOWS:}
