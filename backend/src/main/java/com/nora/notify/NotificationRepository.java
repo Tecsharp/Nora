@@ -17,6 +17,8 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
 
     Optional<Notification> findFirstByUserIdAndGroupKeyAndReadAtIsNull(UUID userId, String groupKey);
 
+    List<Notification> findByGroupKeyAndReadAtIsNullAndUserIdIn(String groupKey, java.util.Collection<UUID> userIds);
+
     Optional<Notification> findByIdAndUserId(UUID id, UUID userId);
 
     @Modifying

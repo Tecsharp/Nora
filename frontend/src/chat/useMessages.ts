@@ -5,21 +5,30 @@ import { chatApi, type Message } from './chatApi'
 const PAGE = 50
 
 /**
- * Mensajes de una conversación en vivo: carga los últimos, aplica lo que llega por el WebSocket (nuevo, editado, borrado) y pagina hacia atrás.
- * Lo que llega mientras se carga se guarda y se aplica al terminar, para no perderlo ni pisarlo con una respuesta vieja.
+ * Mensajes de una conversación en vivo. Trabaja con una ventana de la historia: normalmente los últimos mensajes (hasta el final), pero
+ * también puede ser una ventana centrada en un mensaje antiguo (ir a un resultado de búsqueda o a una cita) sin cargar todo lo de en medio.
+ * Se pagina hacia atrás (`older`) y hacia delante (`newer`); `latest` vuelve al final.
+ * Lo que llega por el WebSocket mientras se carga se guarda y se aplica al terminar, y si la ventana no llega al final no se añade nada
+ * nuevo (se dejaría un hueco): avisa con `atLatest = false`.
  */
 export function useMessages(code: string, conv: string) {
   const [items, setItems] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [hasMore, setHasMore] = useState(false)
+  const [hasMore, setHasMore] = useState(false) // hay más antiguos
+  const [hasNewer, setHasNewer] = useState(false) // la ventana no llega al final
   const alive = useRef(true)
   const loadingRef = useRef(true)
+  const newerRef = useRef(false)
+  const itemsRef = useRef<Message[]>([])
+  itemsRef.current = items
+  newerRef.current = hasNewer
   const buffer = useRef<{ type: 'upsert' | 'delete'; m: Message | string }[]>([])
 
   const upsert = useCallback((m: Message) => setItems((l) => {
     const i = l.findIndex((x) => x.id === m.id)
     if (i >= 0) { const n = [...l]; n[i] = m; return n }
+    if (newerRef.current) return l // la ventana no llega al final: un mensaje nuevo dejaría un hueco
     return [...l, m].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   }), [])
   const drop = useCallback((id: string) => setItems((l) => l.filter((x) => x.id !== id)), [])
@@ -30,11 +39,9 @@ export function useMessages(code: string, conv: string) {
     try {
       const l = await chatApi.messages(code, conv, undefined, PAGE)
       if (!alive.current) return
-      setItems((old) => {
-        const map = new Map(l.map((m) => [m.id, m]))
-        for (const m of old) if (!map.has(m.id) && m.createdAt < (l[0]?.createdAt ?? '')) map.set(m.id, m) // lo anterior que ya se había paginado
-        return [...map.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-      })
+      newerRef.current = false
+      setHasNewer(false)
+      setItems(l) // se parte de los últimos: lo que hubiera de una ventana antigua ya no es contiguo
       setHasMore(l.length >= PAGE)
       setError('')
     } catch (e) {
@@ -52,12 +59,13 @@ export function useMessages(code: string, conv: string) {
   useEffect(() => {
     alive.current = true
     setItems([])
+    setHasNewer(false)
     setLoading(true)
     void load()
     return () => { alive.current = false }
   }, [load])
 
-  useRealtime('reconnected', () => { void load() })
+  useRealtime('reconnected', () => { if (!newerRef.current) void load() })
   const mine = (d: { room: string; conv: string }) => d.room === code && d.conv === conv
   useRealtime('chat.message', (d: { room: string; conv: string; message: Message }) => {
     if (!mine(d)) return
@@ -76,7 +84,7 @@ export function useMessages(code: string, conv: string) {
   })
 
   const older = useCallback(async () => {
-    const first = items[0]
+    const first = itemsRef.current[0]
     if (!first) return
     const l = await chatApi.messages(code, conv, first.createdAt, PAGE)
     setItems((cur) => {
@@ -84,14 +92,49 @@ export function useMessages(code: string, conv: string) {
       return [...l.filter((m) => !have.has(m.id)), ...cur]
     })
     setHasMore(l.length >= PAGE)
-  }, [code, conv, items])
+  }, [code, conv])
 
-  const send = useCallback(async (text: string, replyTo?: string) => { const m = await chatApi.send(code, conv, text, replyTo); upsert(m); return m }, [code, conv, upsert])
+  const newer = useCallback(async () => {
+    const last = itemsRef.current[itemsRef.current.length - 1]
+    if (!last || !newerRef.current) return
+    const l = await chatApi.after(code, conv, last.createdAt, PAGE)
+    setItems((cur) => {
+      const have = new Set(cur.map((m) => m.id))
+      return [...cur, ...l.filter((m) => !have.has(m.id))]
+    })
+    if (l.length < PAGE) { newerRef.current = false; setHasNewer(false) }
+  }, [code, conv])
+
+  /** Deja el mensaje cargado en pantalla: si ya está no hace nada; si no, pide una ventana centrada en él (no todo lo anterior). */
+  const jump = useCallback(async (id: string): Promise<boolean> => {
+    if (itemsRef.current.some((m) => m.id === id)) return true
+    try {
+      const w = await chatApi.window(code, conv, id, PAGE)
+      if (!alive.current) return false
+      newerRef.current = w.hasNewer
+      setHasNewer(w.hasNewer)
+      setItems(w.items)
+      setHasMore(w.hasOlder)
+      return true
+    } catch {
+      return false // el mensaje ya no existe
+    }
+  }, [code, conv])
+
+  /** Vuelve a los mensajes más recientes. */
+  const latest = useCallback(async () => { setLoading(true); await load() }, [load])
+
+  const send = useCallback(async (text: string, replyTo?: string) => {
+    const m = await chatApi.send(code, conv, text, replyTo)
+    if (newerRef.current) await latest() // se escribe desde una ventana antigua: se vuelve al final para ver lo enviado
+    else upsert(m)
+    return m
+  }, [code, conv, upsert, latest])
   const edit = useCallback(async (id: string, text: string) => { upsert(await chatApi.edit(code, conv, id, text)) }, [code, conv, upsert])
   const remove = useCallback(async (id: string) => { await chatApi.remove(code, conv, id); drop(id) }, [code, conv, drop])
   const react = useCallback(async (id: string, emoji: string) => { upsert(await chatApi.react(code, conv, id, emoji)) }, [code, conv, upsert])
 
-  return { items, loading, error, hasMore, older, send, edit, remove, react }
+  return { items, loading, error, hasMore, hasNewer, older, newer, jump, latest, send, edit, remove, react }
 }
 
 export type MessagesStore = ReturnType<typeof useMessages>

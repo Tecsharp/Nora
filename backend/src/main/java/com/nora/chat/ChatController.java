@@ -73,10 +73,26 @@ public class ChatController {
         chat.markRead(p, code, id);
     }
 
+    /** Una página de mensajes: hacia atrás desde `before` (por defecto, los últimos) o hacia delante desde `after`. */
     @GetMapping("/conversations/{id}/messages")
     public List<MessageDto> messages(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable UUID id,
-                                     @RequestParam(required = false) Instant before, @RequestParam(defaultValue = "50") int limit) {
-        return chat.messages(p, code, id, before, limit);
+                                     @RequestParam(required = false) Instant before, @RequestParam(required = false) Instant after,
+                                     @RequestParam(defaultValue = "50") int limit) {
+        return after != null ? chat.messagesAfter(p, code, id, after, limit) : chat.messages(p, code, id, before, limit);
+    }
+
+    /** Ventana de mensajes centrada en uno (para ir a un mensaje antiguo sin cargar todo lo anterior). */
+    @GetMapping("/conversations/{id}/window")
+    public WindowDto window(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable UUID id,
+                            @RequestParam UUID around, @RequestParam(defaultValue = "50") int limit) {
+        return chat.window(p, code, id, around, limit);
+    }
+
+    /** Búsqueda en el historial: de una conversación (`conv`) o de todas las que ve esta persona. */
+    @GetMapping("/search")
+    public SearchDto search(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @RequestParam String q,
+                            @RequestParam(required = false) UUID conv, @RequestParam(required = false) Instant before, @RequestParam(defaultValue = "30") int limit) {
+        return chat.search(p, code, conv, q, before, limit);
     }
 
     @PostMapping("/conversations/{id}/messages")

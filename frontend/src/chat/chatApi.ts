@@ -35,11 +35,16 @@ export interface Message {
   kind: 'TEXT' | 'SYSTEM'
   text: string
   replyTo: string | null
+  /** Lo citado (autor y texto), resuelto por el servidor aunque el original no esté cargado. */
+  reply: { id: string; authorName: string; text: string } | null
   reactions: Record<string, string[]>
   edited: boolean
   createdAt: string
   updatedAt: string
 }
+
+export interface MessageWindow { items: Message[]; hasOlder: boolean; hasNewer: boolean }
+export interface SearchResult { items: Message[]; more: boolean }
 
 export const GROUP_COLORS = ['#7c6af7', '#4cc38a', '#e7b35e', '#ee8fae', '#5cc4b4', '#f09d72', '#74a9f5', '#f2837b']
 
@@ -49,6 +54,12 @@ export const chatApi = {
   list: (code: string) => api<Conv[]>(`${base(code)}/conversations`),
   messages: (code: string, conv: string, before?: string, limit = 50) =>
     api<Message[]>(`${base(code)}/conversations/${conv}/messages?limit=${limit}${before ? `&before=${encodeURIComponent(before)}` : ''}`),
+  after: (code: string, conv: string, after: string, limit = 50) =>
+    api<Message[]>(`${base(code)}/conversations/${conv}/messages?limit=${limit}&after=${encodeURIComponent(after)}`),
+  window: (code: string, conv: string, around: string, limit = 50) =>
+    api<MessageWindow>(`${base(code)}/conversations/${conv}/window?around=${around}&limit=${limit}`),
+  search: (code: string, q: string, conv?: string, before?: string, limit = 30) =>
+    api<SearchResult>(`${base(code)}/search?q=${encodeURIComponent(q)}&limit=${limit}${conv ? `&conv=${conv}` : ''}${before ? `&before=${encodeURIComponent(before)}` : ''}`),
   send: (code: string, conv: string, text: string, replyTo?: string) => api<Message>(`${base(code)}/conversations/${conv}/messages`, 'POST', { text, replyTo }),
   edit: (code: string, conv: string, id: string, text: string) => api<Message>(`${base(code)}/conversations/${conv}/messages/${id}`, 'PATCH', { text }),
   remove: (code: string, conv: string, id: string) => api(`${base(code)}/conversations/${conv}/messages/${id}`, 'DELETE'),

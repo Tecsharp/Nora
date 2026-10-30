@@ -18,7 +18,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 /**
  * Canal del agente de escritorio (/ws/agent). Se autentica con el token que recibió al emparejarse (cabecera Authorization).
- * Servidor → agente: control.start {session, controller}, control.stop, input {t, x, y, …}. Agente → servidor: hello {os, screen, version}, ping, control.revoke (la persona detuvo el control desde el agente).
+ * Servidor → agente: welcome {name, email}, control.start {session, controller}, control.stop, input {t, x, y, …}. Agente → servidor: hello {os, screen, version}, ping, control.revoke (la persona detuvo el control desde el agente).
  */
 @Component
 public class AgentWebSocketHandler extends TextWebSocketHandler {
@@ -52,6 +52,8 @@ public class AgentWebSocketHandler extends TextWebSocketHandler {
         };
         entries.put(raw.getId(), new Entry(userId, link));
         raw.getAttributes().put("info", info);
+        // el agente muestra con qué cuenta está conectado
+        link.send(json.writeValueAsString(Map.of("type", "welcome", "name", String.valueOf(raw.getAttributes().getOrDefault("displayName", "")), "email", String.valueOf(raw.getAttributes().getOrDefault("email", "")))));
         assist.agentConnected(userId, link);
     }
 

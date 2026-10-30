@@ -65,6 +65,8 @@ public class NoraWebSocketHandler extends TextWebSocketHandler implements Assist
     }
 
     private final Map<String, Conn> conns = new ConcurrentHashMap<>();
+    /** Las conexiones de cada persona: repartir un aviso a N personas cuesta N, no N × todas las conexiones del servidor. */
+    private final Map<UUID, java.util.Set<Conn>> byUser = new ConcurrentHashMap<>();
     private final ObjectMapper json;
     private final RoomService rooms;
     private final PresenceService presence;
@@ -99,6 +101,7 @@ public class NoraWebSocketHandler extends TextWebSocketHandler implements Assist
         Conn conn = new Conn(safe, userId, name);
         conn.owner = this;
         conns.put(raw.getId(), conn);
+        byUser.computeIfAbsent(userId, k -> ConcurrentHashMap.newKeySet()).add(conn);
     }
 
     @Override
@@ -264,6 +267,7 @@ public class NoraWebSocketHandler extends TextWebSocketHandler implements Assist
     public void afterConnectionClosed(WebSocketSession raw, CloseStatus status) {
         Conn conn = conns.remove(raw.getId());
         if (conn != null) {
+            byUser.computeIfPresent(conn.userId, (k, set) -> { set.remove(conn); return set.isEmpty() ? null : set; });
             collab.leaveAll(conn);
             leaveRoom(conn);
         }
@@ -283,9 +287,9 @@ public class NoraWebSocketHandler extends TextWebSocketHandler implements Assist
     }
 
     void sendToUser(UUID userId, String type, Object data) {
-        for (Conn c : List.copyOf(conns.values())) {
-            if (c.userId.equals(userId)) send(c, type, data);
-        }
+        java.util.Set<Conn> mine = byUser.get(userId);
+        if (mine == null) return;
+        for (Conn c : List.copyOf(mine)) send(c, type, data);
     }
 
     /** La sala ya no existe: los clientes dejan de estar "dentro" de ella. */
