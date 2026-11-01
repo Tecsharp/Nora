@@ -10,11 +10,14 @@ Salas colaborativas **temporales** para trabajar en equipo: archivos, pizarra, d
 **llamadas y videollamadas** y asistencia remota. Todo en tu propio servidor, con un solo comando.
 
 <p>
-  <a href="https://github.com/Tecsharp/Nora/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Tecsharp/Nora/actions/workflows/ci.yml/badge.svg" /></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=Tecsharp_Nora"><img alt="Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=Tecsharp_Nora&metric=alert_status" /></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=Tecsharp_Nora"><img alt="Seguridad" src="https://sonarcloud.io/api/project_badges/measure?project=Tecsharp_Nora&metric=security_rating" /></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=Tecsharp_Nora"><img alt="Mantenibilidad" src="https://sonarcloud.io/api/project_badges/measure?project=Tecsharp_Nora&metric=sqale_rating" /></a>
-  <!-- Cuando registres el proyecto en Coverity Scan (docs/CALIDAD.md), quita estos comentarios y pon tu número de proyecto:
+  <a href="https://github.com/Tecsharp/Nora/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Tecsharp/Nora/actions/workflows/ci.yml/badge.svg?branch=develop" /></a>
+  <!-- ── Insignias de calidad: se activan cuando exista el análisis (ver docs/CALIDAD.md, «Las insignias») ──
+  SonarQube propio: en tu proyecto → «Project Information» → «Get project badges» → copia las URL (incluyen un token).
+  SonarCloud (repositorio público): cambia KEY por tu clave de proyecto.
+  <a href="https://sonarcloud.io/summary/new_code?id=KEY"><img alt="Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=KEY&metric=alert_status" /></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=KEY"><img alt="Seguridad" src="https://sonarcloud.io/api/project_badges/measure?project=KEY&metric=security_rating" /></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=KEY"><img alt="Mantenibilidad" src="https://sonarcloud.io/api/project_badges/measure?project=KEY&metric=sqale_rating" /></a>
+  Coverity Scan (cuando registres el proyecto): cambia PROJECT_ID.
   <a href="https://scan.coverity.com/projects/PROJECT_ID"><img alt="Coverity Scan" src="https://scan.coverity.com/projects/PROJECT_ID/badge.svg" /></a>
   -->
   <a href="LICENSE"><img alt="Licencia MIT" src="https://img.shields.io/badge/licencia-MIT-green" /></a>
@@ -98,12 +101,16 @@ Salas que **se borran solas** al expirar (o se conservan si tú quieres), roles 
 <td width="50%"><img src="docs/assets/chat.jpg" alt="Chat de la sala" /><br/><sub><b>Chat</b> · general, grupos y mensajes directos</sub></td>
 </tr>
 <tr>
-<td><img src="docs/assets/llamada-presentacion.jpg" alt="Llamada con una pantalla presentada" /><br/><sub><b>Llamadas</b> · pantalla presentada y personas a un lado</sub></td>
-<td><img src="docs/assets/llamada-mosaico.jpg" alt="Llamada en mosaico" /><br/><sub><b>Llamadas</b> · mosaico, reacciones y mano levantada</sub></td>
+<td><img src="docs/assets/calendario.jpg" alt="Calendario" /><br/><sub><b>Calendario</b> · eventos y recordatorios</sub></td>
+<td><img src="docs/assets/llamadas.jpg" alt="Herramienta Llamadas" /><br/><sub><b>Llamadas</b> · iniciar, unirse con código y ver las últimas</sub></td>
 </tr>
 <tr>
-<td><img src="docs/assets/calendario.jpg" alt="Calendario" /><br/><sub><b>Calendario</b> · eventos y recordatorios</sub></td>
-<td><img src="docs/assets/llamadas.jpg" alt="Herramienta Llamadas" /><br/><sub><b>Herramienta Llamadas</b> · iniciar, unirse con código y ver las últimas</sub></td>
+<td><img src="docs/assets/llamada-antes.jpg" alt="Antes de entrar a una llamada" /><br/><sub><b>Antes de entrar</b> · cámara, micrófono y modo complementario</sub></td>
+<td><img src="docs/assets/llamada-mosaico.jpg" alt="Llamada en mosaico" /><br/><sub><b>En la llamada</b> · mosaico, reacciones y mano levantada</sub></td>
+</tr>
+<tr>
+<td><img src="docs/assets/llamada-presentacion.jpg" alt="Llamada con una pantalla presentada" /><br/><sub><b>Presentar pantalla</b> · la presentación arriba y las personas a un lado</sub></td>
+<td><img src="docs/assets/llamada-chat.jpg" alt="Chat de la llamada" /><br/><sub><b>Chat de la llamada</b> · queda como grupo en Mensajes</sub></td>
 </tr>
 </table>
 
@@ -235,7 +242,7 @@ cd backend && mvn spring-boot:run
 cd frontend && npm install && npm run dev
 ```
 
-Cada cambio pasa por **GitHub Actions** (`CI`: backend, frontend, agente y `docker-compose.yml`) y se analiza con **SonarQube/SonarCloud**. Cómo enlazarlo sin Jenkins, y cómo añadir **Coverity**, en [docs/CALIDAD.md](docs/CALIDAD.md).
+Cada `push` ejecuta **GitHub Actions** (`CI`: backend, frontend, agente y `docker-compose.yml`) y los cambios de `develop`/`main` se analizan con **SonarQube/SonarCloud**. Cómo enlazarlo sin Jenkins, y cómo añadir **Coverity**, en [docs/CALIDAD.md](docs/CALIDAD.md).
 
 Los mensajes de commit siguen el formato `[TICKET] Descripción`, y las funciones nuevas se desarrollan en ramas `feature/*` que se integran en `develop` con *pull request*.
 

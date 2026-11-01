@@ -1,9 +1,9 @@
 name: CI
 
-# Comprueba en cada cambio que todo compila: backend (Maven), frontend (TypeScript + Vite) y agente (Rust).
+# Comprueba que todo compila: backend (Maven), frontend (TypeScript + Vite) y agente (Rust).
+# Se ejecuta en CADA push (a cualquier rama), en los pull requests y a mano desde la pestaña Actions.
 on:
   push:
-    branches: [main, develop]
   pull_request:
   workflow_dispatch:
 

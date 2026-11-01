@@ -10,7 +10,16 @@ Esta guía explica cómo pasar Nora por **SonarQube** y **Coverity** y cómo mos
 | `.github/workflows/sonar.yml` | Análisis de **SonarQube / SonarCloud**. Se salta solo (sin fallar) hasta que añadas el secreto `SONAR_TOKEN`. |
 | `sonar-project.properties` | Qué carpetas analiza Sonar (backend, frontend y agente) y qué excluye. |
 
-Cómo se ve el estado: pestaña **Actions** del repositorio. Las insignias del README se actualizan solas.
+## Cuándo se ejecuta
+
+| Flujo | Cuándo |
+|---|---|
+| **CI** | En **cada `git push`** (cualquier rama), en cada pull request y a mano. No hay que configurar nada: GitHub lo ejecuta al subir el archivo `.github/workflows/ci.yml`. |
+| **Calidad (SonarQube)** | En cada push a **`develop` o `main`**, en pull requests (solo SonarCloud) y a mano. En ramas `feature/*` no se lanza a propósito: SonarQube Community solo analiza la rama principal y una rama de trabajo la pisaría. |
+
+Dónde verlo: pestaña **Actions** del repositorio en GitHub (verde = bien, rojo = falló; pulsa la ejecución para ver el registro). Para lanzarlo sin hacer push: **Actions → elige el flujo → Run workflow**.
+
+> Los flujos solo se ejecutan si el archivo existe en la rama que subes. La insignia de CI del README apunta a `develop`: se pone verde cuando `develop` ya tiene `ci.yml` (al hacer merge de la rama) y se ha ejecutado una vez.
 
 ## SonarQube sin Jenkins
 
@@ -67,8 +76,8 @@ docker run -d --name sonarqube --restart unless-stopped -p 9000:9000 \
 | Insignia | De dónde sale | Estado |
 |---|---|---|
 | **CI** | `https://github.com/Tecsharp/Nora/actions/workflows/ci.yml/badge.svg` | Funciona en cuanto hay una ejecución del flujo `ci.yml`. |
-| **Quality Gate / Seguridad / Mantenibilidad** | `https://sonarcloud.io/api/project_badges/measure?project=Tecsharp_Nora&metric=alert_status` (otras métricas: `security_rating`, `sqale_rating`, `reliability_rating`, `bugs`) | Aparecen cuando existe el proyecto y se ha ejecutado el primer análisis (opción A). Con SonarQube propio, la insignia sale de **Project Information → Get project badges** de tu servidor. |
-| **Coverity** | `https://scan.coverity.com/projects/PROJECT_ID/badge.svg` | Desactivada hasta que registres el proyecto. |
+| **Quality Gate / Seguridad / Mantenibilidad** | SonarCloud: `https://sonarcloud.io/api/project_badges/measure?project=TU_CLAVE&metric=alert_status` (otras métricas: `security_rating`, `sqale_rating`, `reliability_rating`, `bugs`). SonarQube propio: **Project Information → Get project badges** (la URL lleva un token). | **Están comentadas en el README** (si no, mostrarían «Project not found»). Cuando exista el primer análisis, descomenta esas líneas del README y pon tu clave o tus URL. |
+| **Coverity** | `https://scan.coverity.com/projects/PROJECT_ID/badge.svg` | Comentada en el README hasta que registres el proyecto. |
 | Tecnologías y licencia | `shields.io` | Siempre. |
 
 Si el repositorio es **privado**, las insignias de `shields.io` y de SonarCloud no se ven fuera de GitHub; la de CI de GitHub sí se ve a quien tenga acceso.

@@ -3,6 +3,8 @@ name: Calidad (SonarQube)
 # Analiza el código con SonarCloud (gratis para repositorios públicos) o con tu propio SonarQube. No necesita Jenkins:
 # el análisis lo hace este flujo de GitHub Actions. Mientras no existan el secreto SONAR_TOKEN, se salta sin fallar.
 # Cómo configurarlo, paso a paso: docs/CALIDAD.md
+# Se ejecuta en cada push a main o develop (SonarQube Community solo analiza la rama principal: otras ramas la pisarían), en los
+# pull requests solo con SonarCloud y a mano desde Actions.
 on:
   push:
     branches: [main, develop]
@@ -17,6 +19,8 @@ permissions:
 jobs:
   sonar:
     name: Análisis
+    # con un SonarQube propio (variable SONAR_HOST_URL) no se analizan los pull requests: la edición Community no los admite
+    if: github.event_name != 'pull_request' || vars.SONAR_HOST_URL == ''
     runs-on: ubuntu-latest
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
