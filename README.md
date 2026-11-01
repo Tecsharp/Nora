@@ -58,7 +58,7 @@ Salas colaborativas **temporales** para trabajar en equipo: archivos, pizarra, d
 ### 📅 Planificación
 - **Tablero** de tareas con arrastrar y soltar.
 - **Votaciones** anónimas con cierre automático.
-- **Calendario** con mes, semana y día, **invitaciones**, **llamada en el evento** y vista de **disponibilidad** de cada persona (sus eventos personales solo salen como «Ocupado»).
+- **Calendario** con mes, semana y día, **invitaciones**, **llamada en la cita** y vista de **disponibilidad** de cada persona (sus eventos personales solo salen como «Ocupado»).
 
 </td>
 <td width="50%" valign="top">

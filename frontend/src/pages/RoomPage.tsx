@@ -300,7 +300,7 @@ export default function RoomPage() {
     calls: roomCalls.active.length > 0 ? <span className="ws-badge hot" title="Llamada en curso" aria-label={`${roomCalls.active.length} llamadas en curso`}>{roomCalls.active.length}</span> : null,
     player: playing ? <span className="ws-badge info" title="Sonando"><span className="pl-eq"><i /><i /><i /></span></span> : null,
     focus: focus.state.status === 'running' ? <span className="ws-badge info mono" title="Temporizador en marcha">{fmtFocus(focus.remaining)}</span> : null,
-    calendar: calendar.today > 0 ? <span className="ws-badge info" aria-label={`${calendar.today} eventos hoy`} title="Eventos de hoy">{calendar.today}</span> : null,
+    calendar: calendar.today > 0 ? <span className="ws-badge info" aria-label={`${calendar.today} citas hoy`} title="Citas de hoy">{calendar.today}</span> : null,
   }
   const title = active === OVERVIEW ? 'Resumen' : active === PEOPLE.id ? 'Personas' : tool?.label ?? ''
 
