@@ -42,7 +42,7 @@ export default function ChatApp({ focus }: { focus?: FocusTarget | null }) {
   }, [focus, convs])
   // por defecto, la general (o la que se estaba mirando en el dock)
   useEffect(() => {
-    if (sel || !loaded || chat.narrow || (focus?.conv && done.current !== focus.nonce)) return // en el móvil se empieza por la lista
+    if (sel || !loaded || chat.narrow || (focus?.conv && convs.some((c) => c.id === focus.conv))) return // en el móvil se empieza por la lista; con una conversación pedida (barra lateral, aviso) manda esa
     const dockFirst = chat.dock.wins.find((w) => !w.min && convs.some((c) => c.id === w.id))?.id
     setSel(dockFirst ?? convs.find((c) => c.kind === 'ROOM')?.id ?? convs[0]?.id ?? null)
   }, [sel, loaded, convs, chat.dock.wins, chat.narrow, focus])

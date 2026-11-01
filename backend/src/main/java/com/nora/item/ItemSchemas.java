@@ -24,7 +24,7 @@ final class ItemSchemas {
     static final Set<String> TOOLS = Set.of("task", "poll", "review", "event", "link", "player");
 
     /** Campos que solo cambia el servidor mediante acciones (votar, reaccionar…). */
-    static final Map<String, Set<String>> SERVER_FIELDS = Map.of("poll", Set.of("votes"), "event", Set.of("rsvp"));
+    static final Map<String, Set<String>> SERVER_FIELDS = Map.of("poll", Set.of("votes"), "event", Set.of("rsvp", "call"));
 
     private static final Pattern DATETIME = Pattern.compile("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$");
     private static final Pattern COLOR = Pattern.compile("^#[0-9a-fA-F]{6}$");
@@ -78,6 +78,16 @@ final class ItemSchemas {
                 out.put("end", end);
                 String color = opt(d, "color", 7);
                 out.put("color", color != null && COLOR.matcher(color).matches() ? color : null);
+                // invitados (personas de la sala), evento personal (solo lo ven quien lo crea y sus invitados) y los instantes exactos
+                // para los recordatorios y la llamada programada
+                List<String> invited = new ArrayList<>();
+                for (String u : strings(d, "invitees", 50, 40)) if (!invited.contains(uuid(u))) invited.add(uuid(u));
+                out.put("invitees", invited);
+                out.put("private", bool(d, "private"));
+                Double sm = num(d, "startMs", 0, 4_102_444_800_000.0);
+                Double em = num(d, "endMs", 0, 4_102_444_800_000.0);
+                out.put("startMs", sm == null ? null : sm.longValue());
+                out.put("endMs", em == null ? null : em.longValue());
             }
             case "link" -> {
                 out.put("url", url(str(d, "url", 2000, true)));

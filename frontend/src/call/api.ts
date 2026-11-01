@@ -43,6 +43,9 @@ export interface CallInfo {
   people: string[]
   count: number
   max: number
+  /** Llamada programada desde un evento del calendario. */
+  scheduledAt: string | null
+  scheduledEnd: string | null
 }
 
 export const callApi = {

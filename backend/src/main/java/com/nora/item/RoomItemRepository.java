@@ -27,4 +27,8 @@ public interface RoomItemRepository extends JpaRepository<RoomItem, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select i from RoomItem i where i.id = :id and i.roomId = :roomId and i.tool = :tool")
     Optional<RoomItem> lockById(UUID id, UUID roomId, String tool);
+
+    /** Eventos que empiezan entre dos instantes (ms) y aún no han avisado (recordatorios). */
+    @Query(value = "select * from room_items where tool = 'event' and (data ->> 'startMs') ~ '^[0-9]+$' and (data ->> 'startMs')::bigint between :from and :to and coalesce(data ->> 'reminded', '') = ''", nativeQuery = true)
+    List<RoomItem> dueEvents(long from, long to);
 }

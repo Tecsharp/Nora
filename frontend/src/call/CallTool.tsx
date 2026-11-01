@@ -13,7 +13,7 @@ export default function CallTool({ room }: { room: Room }) {
   const { user } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
-  const { active, recent, loaded, refresh } = useRoomCalls(room.code)
+  const { active, upcoming, recent, loaded, refresh } = useRoomCalls(room.code)
   const [title, setTitle] = useState('')
   const [access, setAccess] = useState<'HOST' | 'OPEN'>('HOST')
   const [busy, setBusy] = useState(false)
@@ -86,6 +86,23 @@ export default function CallTool({ room }: { room: Room }) {
           </article>
         ))}
       </section>
+
+      {upcoming.length > 0 && (
+        <section className="calls-list">
+          <h3>Programadas desde el calendario</h3>
+          {upcoming.map((c) => (
+            <article key={c.code} className="calls-item">
+              <Clock size={14} className="calls-ico" />
+              <div className="calls-info">
+                <strong>{c.title || 'Llamada'}</strong>
+                <small>{new Date(c.scheduledAt!).toLocaleString('es', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · <Link2 size={12} /> <code>{c.code}</code></small>
+              </div>
+              <button className="btn sm" onClick={() => navigator.clipboard?.writeText(callUrl(c.code)).then(() => toast('Enlace copiado', 'success'))}>Copiar enlace</button>
+              <a className="btn sm" href={`/call/${c.code}`} target="_blank" rel="noreferrer">Unirse</a>
+            </article>
+          ))}
+        </section>
+      )}
 
       {recent.length > 0 && (
         <section className="calls-list">

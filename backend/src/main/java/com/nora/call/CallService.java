@@ -96,7 +96,7 @@ public class CallService {
     }
 
     public record CallDto(String code, String title, String access, UUID hostId, String hostName, String roomCode, String roomName, UUID conversationId,
-                          Instant createdAt, Instant endedAt, List<String> people, int count, int max) {}
+                          Instant createdAt, Instant endedAt, List<String> people, int count, int max, Instant scheduledAt, Instant scheduledEnd) {}
 
     private final CallRepository calls;
     private final RoomService rooms;
@@ -127,7 +127,7 @@ public class CallService {
     @Transactional
     public CallDto create(UUID userId, String userName, String roomCode, String title, String access) {
         Room room = rooms.requireMember(userId, roomCode);
-        if (calls.countByRoomIdAndEndedAtIsNull(room.getId()) >= MAX_OPEN_PER_ROOM) throw ApiException.conflict("Ya hay varias llamadas abiertas en esta sala; termina alguna antes de abrir otra");
+        if (calls.countByRoomIdAndEndedAtIsNullAndScheduledAtIsNull(room.getId()) >= MAX_OPEN_PER_ROOM) throw ApiException.conflict("Ya hay varias llamadas abiertas en esta sala; termina alguna antes de abrir otra");
         String t = title == null ? "" : title.strip();
         if (t.length() > 80) t = t.substring(0, 80);
         String acc = Call.ACCESS_OPEN.equalsIgnoreCase(access) ? Call.ACCESS_OPEN : Call.ACCESS_HOST;
@@ -142,6 +142,41 @@ public class CallService {
         events.publishEvent(new RoomEvent(room.getId(), "call.started", Map.of("code", c.getCode(), "title", t, "hostName", userName)));
         notifications.notifyRoom(room, userId, "call", userName + " inició una llamada", t.isEmpty() ? "Toca para unirte" : t, Map.of("call", c.getCode()), null);
         return dto(c, room);
+    }
+
+    /** Llamada programada desde un evento del calendario: sin avisos de «llamada iniciada» (el evento ya invita) y sin terminar sola antes de su hora. */
+    @Transactional
+    public String createScheduled(Room room, UUID hostId, String hostName, String title, boolean open, Long startMs, Long endMs, UUID eventId) {
+        Call c = null;
+        for (int i = 0; i < 8 && c == null; i++) {
+            String code = newCode();
+            if (calls.findByCode(code).isEmpty()) c = new Call(code, room.getId(), hostId, hostName, clip(title), open ? Call.ACCESS_OPEN : Call.ACCESS_HOST);
+        }
+        if (c == null) throw ApiException.conflict("No se pudo crear la llamada, inténtalo otra vez");
+        c.schedule(startMs == null ? null : Instant.ofEpochMilli(startMs), endMs == null ? null : Instant.ofEpochMilli(endMs), eventId);
+        calls.save(c);
+        return c.getCode();
+    }
+
+    /** El evento cambió de título u hora. */
+    @Transactional
+    public void reschedule(String code, String title, Long startMs, Long endMs) {
+        calls.findByCode(code).filter(c -> !c.isEnded()).ifPresent(c -> {
+            c.setTitle(clip(title));
+            c.schedule(startMs == null ? null : Instant.ofEpochMilli(startMs), endMs == null ? null : Instant.ofEpochMilli(endMs), c.getEventId());
+            calls.save(c);
+        });
+    }
+
+    /** Se quitó la llamada del evento (o se borró el evento): termina, y si había gente dentro, también para ellos. */
+    @Transactional
+    public void cancelScheduled(String code) {
+        calls.findByCode(code).filter(c -> !c.isEnded()).ifPresent(c -> finish(c, rooms.roomById(c.getRoomId())));
+    }
+
+    private static String clip(String t) {
+        String s = t == null ? "" : t.strip();
+        return s.length() > 80 ? s.substring(0, 80) : s;
     }
 
     @Transactional(readOnly = true)
@@ -418,6 +453,8 @@ public class CallService {
         Instant limit = Instant.now().minus(Duration.ofMinutes(emptyMinutes));
         for (Call c : calls.findByEndedAtIsNull()) {
             Live l = live.get(c.getCode());
+            // una llamada programada espera hasta media hora después de su hora de fin prevista
+            if (c.getScheduledEnd() != null && c.getScheduledEnd().plus(Duration.ofMinutes(30)).isAfter(Instant.now())) continue;
             boolean empty = l == null ? c.getCreatedAt().isBefore(limit) : l.parts.isEmpty() && (l.emptySince == null ? c.getCreatedAt().isBefore(limit) : l.emptySince.isBefore(limit));
             if (empty) finish(c, rooms.roomById(c.getRoomId()));
         }
@@ -492,7 +529,7 @@ public class CallService {
         Live l = live.get(c.getCode());
         List<String> people = l == null ? List.of() : l.parts.stream().map(p -> p.name).distinct().toList();
         return new CallDto(c.getCode(), c.getTitle(), c.getAccess(), c.getHostId(), c.getHostName(), room == null ? null : room.getCode(), room == null ? null : room.getName(),
-                c.getConversationId(), c.getCreatedAt(), c.getEndedAt(), people, l == null ? 0 : l.parts.size(), maxParticipants);
+                c.getConversationId(), c.getCreatedAt(), c.getEndedAt(), people, l == null ? 0 : l.parts.size(), maxParticipants, c.getScheduledAt(), c.getScheduledEnd());
     }
 
     private void error(Peer p, String code, String message) {

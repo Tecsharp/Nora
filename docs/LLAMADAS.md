@@ -19,6 +19,10 @@ La herramienta **Llamadas** de cada sala abre llamadas de voz y vídeo con el mi
 | **Control del anfitrión** | Silenciar a una persona o a todas, bajar manos, sacar a alguien, cambiar el acceso y **terminar para todos**. Las personas con rol de moderador de la sala también son anfitrionas. |
 | **Avisos** | Al iniciar una llamada llega una notificación a la sala con enlace directo, y la herramienta muestra una insignia mientras haya una abierta. |
 
+## Llamadas desde el calendario
+
+Al crear un evento del Calendario se puede marcar **Añadir llamada** e **invitar** a personas de la sala. La llamada tiene su código desde el principio, se ve en la ficha del evento, y quienes tienen ese hueco reciben un aviso 10 minutos antes con el enlace directo. Mientras no llega su hora aparece en *Programadas desde el calendario* y no termina sola por estar vacía (hasta 30 minutos después de la hora de fin prevista). Ver [HERRAMIENTAS.md](HERRAMIENTAS.md#calendario).
+
 ## Subtítulos
 
 Los subtítulos usan la API `SpeechRecognition` del navegador:

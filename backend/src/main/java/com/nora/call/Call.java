@@ -44,6 +44,16 @@ public class Call {
     @Column(name = "ended_at")
     private Instant endedAt;
 
+    /** Llamada programada desde un evento del calendario: hora de inicio y fin previstas y el evento al que pertenece. */
+    @Column(name = "scheduled_at")
+    private Instant scheduledAt;
+
+    @Column(name = "scheduled_end")
+    private Instant scheduledEnd;
+
+    @Column(name = "event_id")
+    private UUID eventId;
+
     protected Call() {}
 
     public Call(String code, UUID roomId, UUID hostId, String hostName, String title, String access) {
@@ -69,4 +79,9 @@ public class Call {
     public Instant getEndedAt() { return endedAt; }
     public void end() { this.endedAt = Instant.now(); }
     public boolean isEnded() { return endedAt != null; }
+    public Instant getScheduledAt() { return scheduledAt; }
+    public Instant getScheduledEnd() { return scheduledEnd; }
+    public UUID getEventId() { return eventId; }
+    public void schedule(Instant at, Instant end, UUID eventId) { this.scheduledAt = at; this.scheduledEnd = end; this.eventId = eventId; }
+    public void setTitle(String title) { this.title = title; }
 }
