@@ -10,6 +10,7 @@ import Register from './pages/Register'
 import ResetPassword from './pages/ResetPassword'
 import Settings from './pages/Settings'
 import RoomPage from './pages/RoomPage'
+import CallPage from './call/CallPage'
 
 function Protected({ children, admin }: { children: ReactNode; admin?: boolean }) {
   const { user, loading } = useAuth()
@@ -29,6 +30,7 @@ export default function App() {
       <Route path="/terms" element={<Legal />} />
       <Route path="/privacy" element={<Legal />} />
       <Route path="/data" element={<Legal />} />
+      <Route path="/call/:code" element={<Protected><CallPage /></Protected>} />
       <Route element={<Layout />}>
         <Route path="/" element={<Protected><Home /></Protected>} />
         <Route path="/room/:code" element={<Protected><RoomPage /></Protected>} />

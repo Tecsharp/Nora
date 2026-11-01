@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import { CalendarDays, Clapperboard, ClipboardList, FolderOpen, KanbanSquare, Link2, Monitor, MessageSquare, PenTool, SquareCheckBig, Timer, Tv, Users, type LucideProps } from 'lucide-react'
+import { CalendarDays, Clapperboard, ClipboardList, FolderOpen, KanbanSquare, Link2, Monitor, MessageSquare, PenTool, SquareCheckBig, Timer, Tv, Users, Video, type LucideProps } from 'lucide-react'
 
 export interface ToolDef {
   id: string
@@ -27,6 +27,7 @@ export const TOOLS: ToolDef[] = [
   { id: 'player', label: 'Reproductor', icon: Tv, group: 'media', hint: 'Música y vídeo sincronizados' },
   { id: 'links', label: 'Enlaces', icon: Link2, group: 'media', hint: 'Enlaces útiles con etiquetas' },
   { id: 'chat', label: 'Chat', icon: MessageSquare, group: 'live', hint: 'Conversaciones, grupos y mensajes directos' },
+  { id: 'calls', label: 'Llamadas', icon: Video, group: 'live', hint: 'Llamadas y videollamadas con código' },
   { id: 'focus', label: 'Foco', icon: Timer, group: 'live', hint: 'Pomodoro compartido' },
   { id: 'attendance', label: 'Asistencia', icon: Monitor, group: 'live', hint: 'Ver y controlar pantallas con permiso' },
 ]
