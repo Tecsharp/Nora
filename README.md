@@ -58,7 +58,7 @@ Salas colaborativas **temporales** para trabajar en equipo: archivos, pizarra, d
 ### 📅 Planificación
 - **Tablero** de tareas con arrastrar y soltar.
 - **Votaciones** anónimas con cierre automático.
-- **Calendario** con vistas de mes, semana y día.
+- **Calendario** con mes, semana y día, **invitaciones**, **llamada en el evento** y vista de **disponibilidad** de cada persona (sus eventos personales solo salen como «Ocupado»).
 
 </td>
 <td width="50%" valign="top">
@@ -69,7 +69,7 @@ Salas colaborativas **temporales** para trabajar en equipo: archivos, pizarra, d
 - Chat de la llamada que **queda en Mensajes**.
 
 ### 💬 Comunicación
-- **Chat** con grupos, mensajes directos y búsqueda en historiales enormes.
+- **Chat** con grupos, mensajes directos y búsqueda en historiales enormes, siempre a mano en la barra lateral.
 - **Notificaciones** con enlace al lugar exacto.
 - **Foco** (Pomodoro compartido) y **Reproductor** sincronizado.
 

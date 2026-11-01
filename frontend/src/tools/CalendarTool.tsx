@@ -1,6 +1,6 @@
 import { useFocusTarget, type FocusTarget } from './focus'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CalendarDays, CalendarPlus, Check, ChevronLeft, ChevronRight, Download, HelpCircle, ListTodo, MapPin, Pencil, Plus, Sparkles, Trash2, Users, X } from 'lucide-react'
+import { CalendarDays, CalendarPlus, Check, ChevronLeft, ChevronRight, Copy, Download, HelpCircle, ListTodo, Lock, MapPin, Pencil, Plus, ShieldCheck, Sparkles, Trash2, UserPlus, Users, Video, Wand2, X } from 'lucide-react'
 import type { Room } from '../api'
 import { useAuth } from '../auth'
 import Avatar from '../components/Avatar'
@@ -10,6 +10,8 @@ import { useToast } from '../toast'
 import { canWrite as canWriteIn, isStaff as isStaffIn } from '../roles'
 import { aiNow, useAi } from '../ai/AiProvider'
 import { useItems, type Item } from './useItems'
+import { AvailabilityGrid, findSlots, isoAt, useAvailability } from './Availability'
+import { callUrl } from '../call/api'
 
 type Rsvp = 'yes' | 'no' | 'maybe'
 interface EventData {
@@ -21,8 +23,20 @@ interface EventData {
   end: string
   color: string | null
   rsvp?: Record<string, Rsvp>
+  /** Personas de la sala invitadas. */
+  invitees?: string[]
+  /** Evento personal: solo quien lo crea y sus invitados ven los detalles; el resto ve «Ocupado». */
+  private?: boolean
+  /** Código de la llamada del evento (lo pone el servidor). */
+  call?: string
+  startMs?: number | null
+  endMs?: number | null
+  /** Solo del formulario: pedir (o quitar) la llamada y quién entra directamente. */
+  withCall?: boolean
+  callAccess?: 'OPEN' | 'HOST'
 }
 type Ev = Item<EventData>
+type View = 'month' | 'week' | 'day' | 'agenda' | 'avail'
 
 const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 const WEEKDAYS = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom']
@@ -87,8 +101,8 @@ export default function CalendarTool({ room, focus }: { room: Room; focus?: Focu
   const canWrite = canWriteIn(room, user)
   const staff = isStaffIn(room, user)
   const [cursor, setCursor] = useState(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }) // cualquier día del periodo que se mira
-  const [view, setView] = useState<'month' | 'week' | 'day' | 'agenda'>(() => { try { return (localStorage.getItem('nora-cal-view') as 'month' | 'week' | 'day' | 'agenda') || 'week' } catch { return 'week' } })
-  const changeView = (v: 'month' | 'week' | 'day' | 'agenda') => { setView(v); try { localStorage.setItem('nora-cal-view', v) } catch { /* sin almacenamiento */ } }
+    const [view, setView] = useState<View>(() => { try { return (localStorage.getItem('nora-cal-view') as View) || 'week' } catch { return 'week' } })
+  const changeView = (v: View) => { setView(v); try { localStorage.setItem('nora-cal-view', v) } catch { /* sin almacenamiento */ } }
   const [openState, setOpen] = useState<{ id?: string; draft?: Partial<EventData>; edit: boolean } | null>(null)
   // el evento abierto se lee siempre de la lista en vivo: así las respuestas que llegan se ven al instante
   const open = openState ? { ...openState, ev: openState.id ? items.find((x) => x.id === openState.id) : undefined } : null
@@ -113,7 +127,7 @@ export default function CalendarTool({ room, focus }: { room: Room; focus?: Focu
   const shiftBy = (dir: number) => setCursor((c) => view === 'month' || view === 'agenda' ? new Date(c.getFullYear(), c.getMonth() + dir, 1) : addDays(c, (view === 'week' ? 7 : 1) * dir))
   const title = view === 'week'
     ? (() => { const a = weekDays[0]!; const z = weekDays[6]!; return a.getMonth() === z.getMonth() ? `${a.getDate()} – ${z.getDate()} de ${MONTHS[z.getMonth()]}` : `${a.getDate()} ${MONTHS[a.getMonth()].slice(0, 3)} – ${z.getDate()} ${MONTHS[z.getMonth()].slice(0, 3)}` })()
-    : view === 'day' ? `${cursor.getDate()} de ${MONTHS[cursor.getMonth()]}` : MONTHS[cursor.getMonth()]
+    : view === 'day' || view === 'avail' ? `${cursor.getDate()} de ${MONTHS[cursor.getMonth()]}` : MONTHS[cursor.getMonth()]
   const byDay = useMemo(() => {
     const m = new Map<string, Ev[]>()
     for (const e of items) for (const k of spans(e.data)) m.set(k, [...(m.get(k) ?? []), e])
@@ -144,6 +158,7 @@ export default function CalendarTool({ room, focus }: { room: Room; focus?: Focu
           <button role="tab" aria-selected={view === 'week'} className={view === 'week' ? 'on' : ''} onClick={() => changeView('week')}>Semana</button>
           <button role="tab" aria-selected={view === 'month'} className={view === 'month' ? 'on' : ''} onClick={() => changeView('month')}><CalendarDays size={13} /> Mes</button>
           <button role="tab" aria-selected={view === 'agenda'} className={view === 'agenda' ? 'on' : ''} onClick={() => changeView('agenda')}><ListTodo size={13} /> Agenda</button>
+          <button role="tab" aria-selected={view === 'avail'} className={view === 'avail' ? 'on' : ''} onClick={() => changeView('avail')} title="Cuándo está libre cada persona"><Users size={13} /> Disponibilidad</button>
         </div>
         <button className="btn sm ghost" disabled={!items.length} title="Descargar todos los eventos (.ics) para tu calendario" onClick={() => download(`${room.name}.ics`, ics(items, room.name))}><Download size={14} /> .ics</button>
         {canWrite && ai.enabled && <button className="btn ai sm" onClick={() => setAiOpen(true)}><Sparkles size={14} /> Crear desde texto</button>}
@@ -155,6 +170,9 @@ export default function CalendarTool({ room, focus }: { room: Room; focus?: Focu
         <TimeGrid days={view === 'week' ? weekDays : [cursor]} byDay={byDay} todayKey={todayKey} canWrite={canWrite}
           onOpen={(e) => setOpen({ id: e.id, edit: false })}
           onCreate={(start, end, allDay) => setOpen({ edit: true, draft: { title: '', description: '', location: '', allDay, start, end, color: COLORS[0]! } })} />
+      ) : view === 'avail' ? (
+        <AvailView room={room} cursor={cursor} meId={user?.id} canWrite={canWrite} onOpen={(id) => setOpen({ id, edit: false })}
+          onCreate={(draft) => setOpen({ edit: true, draft: { title: '', description: '', location: '', allDay: false, color: COLORS[0]!, ...draft } })} />
       ) : view === 'month' ? (
         <div className="cal-month">
           <div className="cal-week head">{WEEKDAYS.map((w) => <span key={w}>{w}</span>)}</div>
@@ -167,7 +185,7 @@ export default function CalendarTool({ room, focus }: { room: Room; focus?: Focu
                   <span className="cal-num">{d.getDate()}</span>
                   {evs.slice(0, 3).map((e) => (
                     <button key={e.id} className={`cal-chip ${e.data.allDay ? 'allday' : ''}`} style={{ ['--c' as string]: e.data.color ?? COLORS[0] }} onClick={(ev) => { ev.stopPropagation(); setOpen({ id: e.id, edit: false }) }} title={`${e.data.title} · ${when(e.data)}`}>
-                      {!e.data.allDay && day(e.data.start) === k && <b>{hhmm(e.data.start)}</b>} <span>{e.data.title}</span>
+                      {!e.data.allDay && day(e.data.start) === k && <b>{hhmm(e.data.start)}</b>} <span>{e.data.private && <Lock size={10} />}{e.data.call && <Video size={10} />} {e.data.title}</span>
                     </button>
                   ))}
                   {evs.length > 3 && <button className="cal-more" onClick={(ev) => { ev.stopPropagation(); setCursor(d); changeView('day') }}>+{evs.length - 3} más</button>}
@@ -191,7 +209,7 @@ export default function CalendarTool({ room, focus }: { room: Room; focus?: Focu
                 return (
                   <article key={e.id} className="cal-item" style={{ ['--c' as string]: e.data.color ?? COLORS[0] }} onClick={() => setOpen({ id: e.id, edit: false })}>
                     <span className="cal-time">{e.data.allDay ? 'Todo el día' : `${hhmm(e.data.start)}`}<small>{e.data.allDay ? '' : hhmm(e.data.end)}</small></span>
-                    <div className="cal-item-main"><strong>{e.data.title}</strong>
+                    <div className="cal-item-main"><strong>{e.data.private && <Lock size={12} className="cal-ico" />}{e.data.call && <Video size={12} className="cal-ico" />}{e.data.title}</strong>
                       {e.data.location && <span className="muted small"><MapPin size={12} /> {e.data.location}</span>}</div>
                     <span className="cal-going"><Users size={13} /> {Object.values(e.data.rsvp ?? {}).filter((v) => v === 'yes').length}</span>
                     <span className={`cal-rsvp ${mine ?? ''}`}>{mine === 'yes' ? 'Voy' : mine === 'maybe' ? 'Quizás' : mine === 'no' ? 'No voy' : 'Sin responder'}</span>
@@ -205,7 +223,10 @@ export default function CalendarTool({ room, focus }: { room: Room; focus?: Focu
 
       {open && <EventDialog key={open.ev?.id ?? 'new'} ev={open.ev} draft={open.draft} startEditing={open.edit} room={room} people={people} meId={user?.id}
         canEdit={canWrite && (!open.ev || open.ev.authorId === user?.id || staff)} onClose={() => setOpen(null)}
-        onSave={async (d) => { if (open.ev) await update(open.ev.id, { ...open.ev.data, ...d }); else await create(d) }}
+        onSave={async (d) => {
+          const withTimes = { ...d, startMs: parse(d.start).getTime(), endMs: parse(d.end).getTime() }
+          if (open.ev) await update(open.ev.id, { ...open.ev.data, ...withTimes }); else await create(withTimes)
+        }}
         onRsvp={(s) => open.ev && act(open.ev.id, 'rsvp', { status: s }).catch((e) => fail(e, 'No se pudo responder'))}
         onDelete={async () => {
           if (!open.ev) return
@@ -318,7 +339,7 @@ function TimeGrid({ days, byDay, todayKey, canWrite, onOpen, onCreate }: {
                 {segs.map((sg) => (
                   <button key={sg.ev.id} className="tg-ev" style={{ ['--c' as string]: sg.ev.data.color ?? COLORS[0], top: (sg.from / 60) * HOUR, height: Math.max(20, ((sg.to - sg.from) / 60) * HOUR - 2), left: `${(sg.lane / sg.lanes) * 100}%`, width: `calc(${100 / sg.lanes}% - 3px)` }}
                     title={`${sg.ev.data.title} · ${when(sg.ev.data)}`} onClick={(e) => { e.stopPropagation(); onOpen(sg.ev) }}>
-                    <b>{sg.ev.data.title}</b>
+                    <b>{sg.ev.data.private && <Lock size={10} />}{sg.ev.data.call && <Video size={10} />} {sg.ev.data.title}</b>
                     {sg.to - sg.from >= 45 && <span>{hhmm(sg.ev.data.start)}–{hhmm(sg.ev.data.end)}</span>}
                   </button>
                 ))}
@@ -333,19 +354,69 @@ function TimeGrid({ days, byDay, todayKey, canWrite, onOpen, onCreate }: {
   )
 }
 
+/** Vista «Disponibilidad»: cuándo está libre cada persona de la sala (sin ver qué hace) y huecos comunes para proponer una reunión. */
+function AvailView({ room, cursor, meId, canWrite, onCreate, onOpen }: { room: Room; cursor: Date; meId?: string; canWrite: boolean; onCreate: (d: Partial<EventData>) => void; onOpen: (id: string) => void }) {
+  const day = ymd(cursor)
+  const [picked, setPicked] = useState<string[] | null>(null)
+  const [dur, setDur] = useState(60)
+  const { users, loading } = useAvailability(room.code, day, ymd(addDays(cursor, 6)))
+  const all = room.participants.map((p) => p.userId)
+  const ids = picked ?? all
+  const toggle = (u: string) => setPicked((cur) => { const l = cur ?? all; return l.includes(u) ? l.filter((x) => x !== u) : [...l, u] })
+  const others = (l: string[]) => l.filter((u) => u !== meId)
+  const create = (d: string, start: number, end: number) => onCreate({ start: isoAt(d, start), end: isoAt(d, end), invitees: others(ids) })
+  const slots = useMemo(() => findSlots(users, ids, day, 7, dur), [users, ids, day, dur])
+  return (
+    <div className="av-view">
+      <div className="av-tools">
+        <div className="av-people">
+          {room.participants.map((p) => (
+            <button key={p.userId} type="button" className={`av-chip ${ids.includes(p.userId) ? 'on' : ''}`} onClick={() => toggle(p.userId)} aria-pressed={ids.includes(p.userId)}>
+              <Avatar name={p.displayName} userId={p.userId} version={p.avatarVersion} size={18} />{p.userId === meId ? 'Tú' : p.displayName.split(' ')[0]}
+            </button>
+          ))}
+        </div>
+        <label className="av-dur small muted">Duración
+          <select value={dur} onChange={(e) => setDur(Number(e.target.value))}>{[30, 45, 60, 90, 120].map((m) => <option key={m} value={m}>{m} min</option>)}</select>
+        </label>
+      </div>
+      <p className="av-note small muted"><Lock size={12} /> Solo ves cuándo está ocupada cada persona. Sus eventos personales aparecen como «Ocupado», sin detalles.</p>
+      {loading ? <p className="muted small">Cargando…</p> : (
+        <AvailabilityGrid users={users} ids={ids} meId={meId} day={day} onPick={canWrite ? (d, m) => create(d, m, m + dur) : undefined} onOpenEvent={onOpen} />
+      )}
+      {canWrite && <p className="av-hint small muted">Pulsa un hueco libre para proponer una reunión a esa hora con las personas elegidas.</p>}
+      <section className="av-best">
+        <h4><Wand2 size={14} /> Mejores momentos para {ids.length === all.length ? 'todas las personas' : 'las personas elegidas'}</h4>
+        {!slots.length && !loading && <p className="muted small">No hay un hueco de {dur} min libre para todas en los próximos 7 días laborables (de 8:00 a 19:00).</p>}
+        <div className="av-slots">
+          {slots.map((sl) => (
+            <button key={sl.day + sl.start} type="button" className="av-slot" disabled={!canWrite} onClick={() => create(sl.day, sl.start, sl.end)}>
+              <b>{dayLabel(sl.day)}</b><span>{isoAt(sl.day, sl.start).slice(11)}–{isoAt(sl.day, sl.end).slice(11)}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+    </div>
+  )
+}
+
 function EventDialog({ ev, draft, startEditing, room, people, meId, canEdit, onClose, onSave, onRsvp, onDelete }: {
   ev?: Ev; draft?: Partial<EventData>; startEditing: boolean; room: Room; people: Map<string, Room['participants'][number]>; meId?: string; canEdit: boolean
   onClose: () => void; onSave: (d: EventData) => Promise<void>; onRsvp: (s: Rsvp | 'none') => void; onDelete: () => void
 }) {
   const toast = useToast()
+  const blank = (): EventData => ({ title: '', description: '', location: '', allDay: false, start: '', end: '', color: COLORS[0]!, invitees: [], private: false, ...(ev?.data ?? {}), ...(draft ?? {}) })
   const [edit, setEdit] = useState(startEditing)
-  const [d, setD] = useState<EventData>({ title: '', description: '', location: '', allDay: false, start: '', end: '', color: COLORS[0]!, ...(ev?.data ?? {}), ...(draft ?? {}) })
+  const [d, setD] = useState<EventData>(() => { const x = blank(); return { ...x, withCall: x.withCall ?? !!x.call, callAccess: x.callAccess ?? 'OPEN' } })
   const [saving, setSaving] = useState(false)
   const set = <K extends keyof EventData>(k: K, v: EventData[K]) => setD((x) => ({ ...x, [k]: v }))
   const rsvp = ev?.data.rsvp ?? {}
   const mine = rsvp[meId ?? '']
   const lists: [Rsvp, string][] = [['yes', 'Van'], ['maybe', 'Quizás'], ['no', 'No van']]
-  useEffect(() => { if (!edit) setD({ title: '', description: '', location: '', allDay: false, start: '', end: '', color: COLORS[0]!, ...(ev?.data ?? {}), ...(draft ?? {}) }) }, [ev?.updatedAt]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!edit) setD((x) => ({ ...blank(), withCall: !!ev?.data.call, callAccess: x.callAccess })) }, [ev?.updatedAt]) // eslint-disable-line react-hooks/exhaustive-deps
+  const invitees = d.invitees ?? []
+  const others = room.participants.filter((p) => p.userId !== meId)
+  const toggleInvite = (u: string) => set('invitees', invitees.includes(u) ? invitees.filter((x) => x !== u) : [...invitees, u])
 
   const save = async () => {
     if (!d.title.trim()) return toast('El evento necesita un título', 'warning')
@@ -360,10 +431,21 @@ function EventDialog({ ev, draft, startEditing, room, people, meId, canEdit, onC
     }
   }
   const link = /https?:\/\/\S+/.exec(d.location)?.[0]
+  // disponibilidad de quien organiza y de las personas invitadas el día del evento
+  const startDay = day(d.start || ymd(new Date()))
+  const avail = useAvailability(room.code, startDay, ymd(addDays(new Date(`${startDay}T00:00:00`), 6)))
+  const group = [...(meId ? [meId] : []), ...invitees]
+  const dur = Math.max(30, Math.round((parse(d.end).getTime() - parse(d.start).getTime()) / 60000) || 60)
+  const clashes = !d.allDay && d.start && d.end ? avail.users.filter((u) => group.includes(u.userId) && u.busy.some((b) => b.eventId !== (ev?.id ?? null) && b.start < d.end && b.end > d.start)) : []
+  const suggest = () => {
+    const s = findSlots(avail.users, group, startDay, 7, dur, 1)[0]
+    if (!s) return toast('No hay un hueco libre para todas las personas en los próximos días laborables', 'info')
+    setD((x) => ({ ...x, start: isoAt(s.day, s.start), end: isoAt(s.day, s.end) }))
+  }
 
   if (edit) {
     return (
-      <Modal title={ev ? 'Editar evento' : 'Nuevo evento'} icon={<CalendarPlus size={20} />} onClose={onClose}
+      <Modal title={ev ? 'Editar evento' : 'Nuevo evento'} icon={<CalendarPlus size={20} />} onClose={onClose} wide
         footer={<>{ev && <button className="btn danger" onClick={onDelete}><Trash2 size={15} /> Borrar</button>}<span className="grow" /><button className="btn ghost" onClick={onClose}>Cancelar</button><button className="btn primary" disabled={saving || !d.title.trim()} onClick={() => void save()}>{saving ? 'Guardando…' : 'Guardar'}</button></>}>
         <div className="stack">
           <input autoFocus className="kb-title-input" value={d.title} maxLength={150} placeholder="Título del evento" aria-label="Título" onChange={(e) => set('title', e.target.value)} />
@@ -374,22 +456,72 @@ function EventDialog({ ev, draft, startEditing, room, people, meId, canEdit, onC
             <label className="stack tight"><span className="small muted">Termina</span>
               <input type={d.allDay ? 'date' : 'datetime-local'} min={d.allDay ? day(d.start) : d.start} value={d.allDay ? day(d.end) : d.end} onChange={(e) => set('end', d.allDay ? `${e.target.value}T00:00` : e.target.value)} /></label>
           </div>
+
+          <div className="stack tight">
+            <span className="small muted"><UserPlus size={13} /> Invitar a personas de la sala</span>
+            <div className="av-people">
+              {others.map((p) => (
+                <button key={p.userId} type="button" className={`av-chip ${invitees.includes(p.userId) ? 'on' : ''}`} aria-pressed={invitees.includes(p.userId)} onClick={() => toggleInvite(p.userId)}>
+                  <Avatar name={p.displayName} userId={p.userId} version={p.avatarVersion} size={18} />{p.displayName.split(' ')[0]}
+                </button>
+              ))}
+              {others.length > 1 && <button type="button" className="av-chip all" onClick={() => set('invitees', invitees.length === others.length ? [] : others.map((p) => p.userId))}>{invitees.length === others.length ? 'Quitar a todas' : 'Invitar a todas'}</button>}
+              {!others.length && <span className="muted small">Todavía no hay más personas en la sala.</span>}
+            </div>
+          </div>
+
+          {!d.allDay && d.start && (
+            <div className="stack tight">
+              <div className="row between"><span className="small muted">Disponibilidad ese día</span>
+                <button type="button" className="btn sm ghost" onClick={suggest}><Wand2 size={13} /> Sugerir hora libre</button></div>
+              {avail.loading ? <span className="muted small">Cargando…</span> : <AvailabilityGrid users={avail.users} ids={group} meId={meId} day={startDay} proposal={{ start: d.start, end: d.end }} from={7 * 60} to={21 * 60}
+                onPick={(dd, m) => setD((x) => ({ ...x, start: isoAt(dd, m), end: isoAt(dd, m + dur) }))} />}
+              {clashes.length > 0 && <span className="av-warn small"><X size={13} /> {clashes.map((u) => (u.userId === meId ? 'Tú' : u.displayName.split(' ')[0])).join(', ')} {clashes.length > 1 ? 'tienen' : 'tiene'} algo a esa hora.</span>}
+              {group.length > 0 && clashes.length === 0 && !avail.loading && <span className="av-fine small"><Check size={13} /> Todas las personas elegidas están libres a esa hora.</span>}
+            </div>
+          )}
+
+          <div className="cal-opts">
+            <label className="check"><input type="checkbox" checked={!!d.withCall} onChange={(e) => set('withCall', e.target.checked)} /> <Video size={15} /> <span><b>Añadir llamada</b><small>Se crea un código de llamada y las personas invitadas reciben el enlace y un aviso 10 minutos antes.</small></span></label>
+            {d.withCall && (
+              <div className="seg" role="radiogroup" aria-label="Quién entra a la llamada">
+                <button type="button" role="radio" aria-checked={d.callAccess !== 'HOST'} className={d.callAccess !== 'HOST' ? 'on' : ''} onClick={() => set('callAccess', 'OPEN')}><ShieldCheck size={13} /> Entran directamente</button>
+                <button type="button" role="radio" aria-checked={d.callAccess === 'HOST'} className={d.callAccess === 'HOST' ? 'on' : ''} onClick={() => set('callAccess', 'HOST')}><Lock size={13} /> Yo admito a cada persona</button>
+              </div>
+            )}
+            <label className="check"><input type="checkbox" checked={!!d.private} onChange={(e) => set('private', e.target.checked)} /> <Lock size={15} /> <span><b>Evento personal</b><small>Solo tú y quien invites veréis los detalles. El resto de la sala solo verá que estás «Ocupado».</small></span></label>
+          </div>
+
           <label className="stack tight"><span className="small muted">Lugar o enlace de la reunión</span><input value={d.location} maxLength={200} placeholder="Sala 2, o https://…" onChange={(e) => set('location', e.target.value)} /></label>
-          <label className="stack tight"><span className="small muted">Descripción</span><textarea rows={4} value={d.description} maxLength={2000} onChange={(e) => set('description', e.target.value)} /></label>
+          <label className="stack tight"><span className="small muted">Descripción</span><textarea rows={3} value={d.description} maxLength={2000} onChange={(e) => set('description', e.target.value)} /></label>
           <div className="stack tight"><span className="small muted">Color</span>
             <div className="cal-colors">{COLORS.map((c) => <button key={c} type="button" className={d.color === c ? 'on' : ''} style={{ background: c }} aria-label={`Color ${c}`} onClick={() => set('color', c)}>{d.color === c && <Check size={13} />}</button>)}</div></div>
         </div>
       </Modal>
     )
   }
+  const invited = (d.invitees ?? []).map((u) => ({ u, p: people.get(u) }))
   return (
     <Modal title="Evento" icon={<CalendarDays size={20} />} onClose={onClose}
       footer={<>{ev && <button className="btn ghost" onClick={() => download(`${d.title}.ics`, ics([ev], room.name))}><Download size={15} /> Añadir a mi calendario</button>}<span className="grow" />{canEdit && <button className="btn" onClick={() => setEdit(true)}><Pencil size={15} /> Editar</button>}<button className="btn ghost" onClick={onClose}>Cerrar</button></>}>
       <div className="cal-view" style={{ ['--c' as string]: d.color ?? COLORS[0] }}>
         <h3><i />{d.title}</h3>
+        {d.private && <p className="cal-private small"><Lock size={13} /> Evento personal: solo lo ven quien lo creó y sus invitados.</p>}
         <p className="cal-when"><CalendarDays size={15} /> {when(d)}</p>
+        {d.call && (
+          <div className="cal-callbox">
+            <Video size={18} />
+            <div><b>Llamada de la reunión</b><small>{d.call}</small></div>
+            <button className="btn sm" onClick={() => navigator.clipboard?.writeText(callUrl(d.call!)).then(() => toast('Enlace copiado', 'success'))}><Copy size={13} /> Copiar enlace</button>
+            <a className="btn sm primary" href={`/call/${d.call}`} target="_blank" rel="noreferrer">Unirse a la llamada</a>
+          </div>
+        )}
         {d.location && <p className="cal-when"><MapPin size={15} /> {link ? <a href={link} target="_blank" rel="noopener noreferrer">{d.location}</a> : d.location}</p>}
         {d.description && <p className="cal-desc">{d.description}</p>}
+        {invited.length > 0 && (
+          <div className="cal-people"><span className="small muted">Invitadas · {invited.length}</span>
+            <div className="cal-avatars">{invited.map(({ u, p }) => <span key={u} className="cal-who" title={p?.displayName}><Avatar name={p?.displayName ?? '?'} userId={u} version={p?.avatarVersion} size={26} /><span className="small">{u === meId ? 'Tú' : p?.displayName.split(' ')[0]}{rsvp[u] ? ` · ${rsvp[u] === 'yes' ? 'va' : rsvp[u] === 'no' ? 'no va' : 'quizás'}` : ''}</span></span>)}</div></div>
+        )}
         <div className="cal-rsvp-box">
             <span className="small muted">¿Vas?</span>
             <div className="seg">
@@ -453,7 +585,7 @@ export function useCalendarWatch(code: string, meId: string | undefined) {
   const today = items.filter((e) => spans(e.data).includes(todayKey) && e.data.rsvp?.[meId ?? ''] !== 'no').length
   useEffect(() => {
     for (const e of items) {
-      if (e.data.allDay || e.data.rsvp?.[meId ?? ''] === 'no') continue
+      if (e.data.allDay || e.data.rsvp?.[meId ?? ''] === 'no' || e.data.startMs) continue // con instante exacto avisa el servidor (también con la pestaña cerrada)
       const ms = parse(e.data.start).getTime() - now
       if (ms > 0 && ms <= 10 * 60_000) {
         const key = `nora-cal-notified:${e.id}:${e.data.start}`
