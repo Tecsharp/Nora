@@ -83,6 +83,7 @@ services:
       # Chat: pasado este tiempo sin leer un mensaje se avisa en la campana (no al instante)
       NORA_CHAT_NOTIFY_AFTER_MINUTES: ${NORA_CHAT_NOTIFY_AFTER_MINUTES:-120}
       NORA_CALL_MAX_PARTICIPANTS: ${NORA_CALL_MAX_PARTICIPANTS:-8}
+      NORA_CALL_EMPTY_MINUTES: ${NORA_CALL_EMPTY_MINUTES:-5}
       NORA_STUN_URLS: ${NORA_STUN_URLS:-stun:stun.l.google.com:19302}
       NORA_TURN_URLS: ${NORA_TURN_URLS:-}
       NORA_TURN_SECRET: ${NORA_TURN_SECRET:-}
