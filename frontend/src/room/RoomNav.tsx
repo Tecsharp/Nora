@@ -1,18 +1,25 @@
-import { type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Check, Clock, Copy, LayoutDashboard, Pin, PinOff, Settings, ShieldCheck, Trash2 } from 'lucide-react'
+import { ArrowLeft, BellOff, Check, Clock, Copy, Hash, LayoutDashboard, LayoutGrid, MessageSquare, Plus, Settings, ShieldCheck, Trash2, Users } from 'lucide-react'
 import type { Room } from '../api'
+import { useChat } from '../chat/ChatProvider'
+import type { Conv } from '../chat/chatApi'
 import Avatar from '../components/Avatar'
 import { remaining } from '../time'
-import { GROUPS, OVERVIEW, PEOPLE, TOOLS, type ToolDef } from './tools'
+import { OVERVIEW, PEOPLE, TOOLS, type ToolDef } from './tools'
+
+/** Herramientas que se ven por defecto en la barra lateral; el resto está en «Todas las herramientas». */
+export const DEFAULT_PINNED = ['files', 'actions', 'calendar', 'calls']
+export const MAX_PINNED = 4
 
 interface Props {
   room: Room
   active: string
   online: Set<string>
   pinned: string[]
-  onTogglePin: (id: string) => void
   onSelect: (id: string) => void
+  /** Abre el panel con todas las herramientas. */
+  onLauncher: () => void
   badges: Record<string, ReactNode>
   owner: boolean
   copied: boolean
@@ -26,24 +33,68 @@ interface Props {
   expired: boolean
 }
 
-/** Barra lateral de la sala: datos de la sala, herramientas agrupadas (con fijadas arriba) y las personas conectadas. */
+const SHOWN = 5 // conversaciones que se ven por sección antes de «Ver todas»
+
+/**
+ * Barra lateral de la sala. Arriba, lo que más se usa: las conversaciones (general, grupos y mensajes directos, con lo que no has leído);
+ * abajo, siempre a la vista, el Resumen, las Personas y solo cuatro herramientas. Las demás están en «Todas las herramientas».
+ */
 export default function RoomNav(p: Props) {
-  const { room, active, online, pinned } = p
+  const { room, active, online } = p
+  const chat = useChat()
+  const [more, setMore] = useState<Record<string, boolean>>({})
   const onlineList = room.participants.filter((x) => online.has(x.userId))
-  const item = (t: ToolDef) => (
+  const people = new Map(room.participants.map((x) => [x.userId, x]))
+
+  const general = chat.convs.find((c) => c.kind === 'ROOM')
+  const groups = chat.convs.filter((c) => c.kind === 'GROUP')
+  const dms = chat.convs.filter((c) => c.kind === 'DM')
+
+  const unreadBadge = (c: Conv) => (c.unread > 0 && !c.muted ? <span className="ws-badge hot" aria-label={`${c.unread} sin leer`}>{c.unread > 99 ? '99+' : c.unread}</span> : c.muted ? <BellOff size={12} className="ws-muted-ico" aria-label="Silenciada" /> : null)
+
+  const conv = (c: Conv) => {
+    const other = c.kind === 'DM' && c.otherUserId ? people.get(c.otherUserId) : undefined
+    return (
+      <li key={c.id}>
+        <button className={`ws-item ws-conv ${c.unread > 0 && !c.muted ? 'unread' : ''}`} onClick={() => chat.openFull(c.id)} title={chat.title(c)}>
+          {c.kind === 'DM' && other
+            ? <span className="ws-av"><Avatar name={other.displayName} userId={other.userId} version={other.avatarVersion} size={22} />{online.has(other.userId) && <i className="ws-on" aria-label="En línea" />}</span>
+            : c.kind === 'ROOM' ? <span className="ws-cdot general"><Hash size={13} /></span>
+              : <span className="ws-cdot" style={{ background: c.color ?? 'var(--accent)' }}>{chat.title(c).slice(0, 1).toUpperCase()}</span>}
+          <span className="ws-item-label">{c.kind === 'ROOM' ? 'General' : chat.title(c)}</span>
+          {unreadBadge(c)}
+        </button>
+      </li>
+    )
+  }
+  const section = (key: string, label: string, list: Conv[]) => {
+    if (!list.length) return null
+    const open = more[key]
+    const shown = open ? list : list.slice(0, SHOWN)
+    const hidden = list.length - shown.length
+    const hiddenUnread = list.slice(SHOWN).reduce((n, c) => n + (c.muted ? 0 : c.unread), 0)
+    return (
+      <div key={key}>
+        <h6 className="ws-h">{label}</h6>
+        <ul className="ws-list">{shown.map(conv)}</ul>
+        {hidden > 0 && <button className="ws-more" onClick={() => setMore((m) => ({ ...m, [key]: true }))}>Ver {hidden} más{hiddenUnread > 0 && <span className="ws-badge hot">{hiddenUnread}</span>}</button>}
+        {open && list.length > SHOWN && <button className="ws-more" onClick={() => setMore((m) => ({ ...m, [key]: false }))}>Ver menos</button>}
+      </div>
+    )
+  }
+
+  const tool = (t: ToolDef) => (
     <li key={t.id}>
       <button className={`ws-item ${active === t.id ? 'on' : ''}`} onClick={() => p.onSelect(t.id)} aria-current={active === t.id ? 'page' : undefined}>
         <t.icon size={17} />
         <span className="ws-item-label">{t.label}</span>
         {p.badges[t.id]}
-        <span className="ws-pin" role="button" tabIndex={0} aria-pressed={pinned.includes(t.id)} aria-label={pinned.includes(t.id) ? `Desfijar ${t.label}` : `Fijar ${t.label}`} title={pinned.includes(t.id) ? 'Quitar de fijadas' : 'Fijar arriba'}
-          onClick={(e) => { e.stopPropagation(); p.onTogglePin(t.id) }} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); p.onTogglePin(t.id) } }}>
-          {pinned.includes(t.id) ? <PinOff size={13} /> : <Pin size={13} />}
-        </span>
       </button>
     </li>
   )
-  const pinnedTools = pinned.map((id) => TOOLS.find((t) => t.id === id)).filter((t): t is ToolDef => !!t)
+  const pinnedTools = p.pinned.slice(0, MAX_PINNED).map((id) => TOOLS.find((t) => t.id === id)).filter((t): t is ToolDef => !!t)
+  // la herramienta abierta que no está fijada se ve igualmente mientras se usa, para saber dónde estás
+  const current = TOOLS.find((t) => t.id === active && !pinnedTools.some((x) => x.id === t.id) && t.id !== 'chat')
 
   return (
     <aside className="ws-nav" aria-label="Navegación de la sala">
@@ -60,36 +111,34 @@ export default function RoomNav(p: Props) {
         </div>
       </div>
 
-      <nav className="ws-scroll">
-        <ul className="ws-list">
-          <li>
-            <button className={`ws-item ${active === OVERVIEW ? 'on' : ''}`} onClick={() => p.onSelect(OVERVIEW)} aria-current={active === OVERVIEW ? 'page' : undefined}>
-              <LayoutDashboard size={17} /><span className="ws-item-label">Resumen</span>
-            </button>
-          </li>
-          <li>
-            <button className={`ws-item ${active === PEOPLE.id ? 'on' : ''}`} onClick={() => p.onSelect(PEOPLE.id)} aria-current={active === PEOPLE.id ? 'page' : undefined}>
-              <PEOPLE.icon size={17} /><span className="ws-item-label">Personas</span>
-              {p.requests > 0 ? <span className="ws-badge hot" title="Solicitudes de entrada">{p.requests}</span> : <span className="ws-count">{room.participants.length}</span>}
-            </button>
-          </li>
-        </ul>
-        {pinnedTools.length > 0 && (
-          <>
-            <h6 className="ws-h">Fijadas</h6>
-            <ul className="ws-list">{pinnedTools.map(item)}</ul>
-          </>
+      <nav className="ws-scroll ws-chats" aria-label="Conversaciones">
+        <div className="ws-chats-head">
+          <button className={`ws-chats-title ${active === 'chat' ? 'on' : ''}`} onClick={() => chat.openFull()} title="Abrir todas las conversaciones">
+            <MessageSquare size={15} /> Mensajes {chat.unread > 0 && <span className="ws-badge hot">{chat.unread > 99 ? '99+' : chat.unread}</span>}
+          </button>
+          <button className="icon-btn sm" onClick={() => chat.openFull()} aria-label="Nueva conversación" title="Nuevo grupo o mensaje directo"><Plus size={16} /></button>
+        </div>
+        {general && <ul className="ws-list">{conv(general)}</ul>}
+        {section('groups', 'Grupos', groups)}
+        {section('dms', 'Mensajes directos', dms)}
+        {chat.loaded && !groups.length && !dms.length && (
+          <p className="ws-empty">Crea un grupo o escribe a alguien desde <button onClick={() => chat.openFull()}>Mensajes</button>.</p>
         )}
-        {GROUPS.map((g) => {
-          const list = TOOLS.filter((t) => t.group === g.id && !pinned.includes(t.id))
-          return list.length ? (
-            <div key={g.id}>
-              <h6 className="ws-h">{g.label}</h6>
-              <ul className="ws-list">{list.map(item)}</ul>
-            </div>
-          ) : null
-        })}
       </nav>
+
+      <div className="ws-tools" aria-label="Sala y herramientas">
+        <div className="ws-pair">
+          <button className={`ws-mini ${active === OVERVIEW ? 'on' : ''}`} onClick={() => p.onSelect(OVERVIEW)} aria-current={active === OVERVIEW ? 'page' : undefined}><LayoutDashboard size={15} /> Resumen</button>
+          <button className={`ws-mini ${active === PEOPLE.id ? 'on' : ''}`} onClick={() => p.onSelect(PEOPLE.id)} aria-current={active === PEOPLE.id ? 'page' : undefined}>
+            <Users size={15} /> Personas {p.requests > 0 ? <span className="ws-badge hot" title="Solicitudes de entrada">{p.requests}</span> : <span className="ws-count">{room.participants.length}</span>}
+          </button>
+        </div>
+        <ul className="ws-list">
+          {pinnedTools.map(tool)}
+          {current && tool(current)}
+        </ul>
+        <button className="ws-launch" onClick={p.onLauncher}><LayoutGrid size={16} /> Todas las herramientas</button>
+      </div>
 
       <div className="ws-foot">
         <button className="ws-online" onClick={() => p.onSelect(PEOPLE.id)} aria-label={`${onlineList.length} personas en línea. Ver personas`}>

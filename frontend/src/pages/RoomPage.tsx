@@ -1,7 +1,7 @@
 import type { FocusTarget } from '../tools/focus'
 import { Suspense, lazy, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Menu as MenuIcon } from 'lucide-react'
+import { LayoutGrid, Menu as MenuIcon } from 'lucide-react'
 import { api, ApiError, type JoinRequest, type Room, type RoomStatus } from '../api'
 import ReactivateDialog from '../components/ReactivateDialog'
 import { useAuth } from '../auth'
@@ -14,7 +14,8 @@ import FilesTool from '../components/FilesTool'
 import BoardsTool from '../components/BoardsTool'
 import type { DocInfo } from '../collab/DocEditor'
 import { canWrite as canWriteIn, ROLE_HINT, ROLE_LABEL, type RoomRole } from '../roles'
-import RoomNav from '../room/RoomNav'
+import RoomNav, { DEFAULT_PINNED, MAX_PINNED } from '../room/RoomNav'
+import ToolsLauncher from '../room/ToolsLauncher'
 import RoomOverview from '../room/RoomOverview'
 import PeopleView from '../room/PeopleView'
 import { OVERVIEW, PEOPLE, TOOLS } from '../room/tools'
@@ -59,12 +60,17 @@ export default function RoomPage() {
   const [inactive, setInactive] = useState<RoomStatus | null>(null)
   const [reactivating, setReactivating] = useState(false)
   const pinKey = `nora-pinned-tools:${user?.id ?? ''}`
-  const [pinned, setPinned] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem(`nora-pinned-tools:${user?.id ?? ''}`) ?? '[]') as string[] } catch { return [] } })
-  const togglePin = (id: string) => setPinned((l) => {
-    const next = l.includes(id) ? l.filter((x) => x !== id) : [...l, id]
-    try { localStorage.setItem(pinKey, JSON.stringify(next)) } catch { /* sin almacenamiento */ }
-    return next
+  const [pinned, setPinned] = useState<string[]>(() => {
+    try { const raw = localStorage.getItem(`nora-pinned-tools:${user?.id ?? ''}`); return raw === null ? DEFAULT_PINNED : (JSON.parse(raw) as string[]) } catch { return DEFAULT_PINNED }
   })
+  const [launcher, setLauncher] = useState(false)
+  const togglePin = (id: string) => {
+    const shown = pinned.slice(0, MAX_PINNED)
+    if (!shown.includes(id) && shown.length >= MAX_PINNED) return toast(`La barra lateral admite ${MAX_PINNED} herramientas: quita alguna antes de fijar otra`, 'info')
+    const next = shown.includes(id) ? shown.filter((x) => x !== id) : [...shown, id]
+    setPinned(next)
+    try { localStorage.setItem(pinKey, JSON.stringify(next)) } catch { /* sin almacenamiento */ }
+  }
   const [playerOn, setPlayerOn] = useState(false) // el Reproductor, una vez abierto, sigue montado para que no se corte el sonido
   const [playing, setPlaying] = useState(false)
   useEffect(() => { if (active === 'player') setPlayerOn(true) }, [active])
@@ -302,7 +308,7 @@ export default function RoomPage() {
     <AssistProvider code={room.code}>
     <ChatProvider room={room} online={online} fullOpen={active === 'chat'} onOpenFull={openChat}>
     <div className={`ws ${navOpen ? 'nav-open' : ''}`}>
-      <RoomNav room={room} active={active} online={online} pinned={pinned} onTogglePin={togglePin} onSelect={openAt} badges={badges}
+      <RoomNav room={room} active={active} online={online} pinned={pinned} onSelect={openAt} onLauncher={() => setLauncher(true)} badges={badges}
         owner={canAssign} copied={copied} onCopy={copy} onExtend={() => setAdjusting(true)} onSettings={() => setSettingsOpen(true)} onClose={closeRoom}
         connection={status} secure={secure} requests={requests.length} expired={expired} />
       <div className="ws-scrim" onClick={() => setNavOpen(false)} />
@@ -314,6 +320,7 @@ export default function RoomPage() {
           <h1 className="ws-bar-title">{title}</h1>
           {tool && <span className="ws-bar-hint">{tool.hint}</span>}
           <span className="spacer" />
+          <button className="btn sm ghost ws-tools-btn" onClick={() => setLauncher(true)} title="Todas las herramientas de la sala"><LayoutGrid size={15} /> <span className="hide-sm">Herramientas</span></button>
           {expired && <span className="badge red"><i /> Sala expirada</span>}
         </header>
 
@@ -348,6 +355,8 @@ export default function RoomPage() {
           <DocEditor code={room.code} doc={editingDoc} canWrite={canWriteIn(room, user)} onClose={closeDoc} />
         </Suspense>
       )}
+
+      {launcher && <ToolsLauncher active={active} pinned={pinned} badges={badges} onSelect={openAt} onTogglePin={togglePin} onClose={() => setLauncher(false)} />}
 
       {settingsOpen && <RoomSettingsDialog room={room} onClose={() => setSettingsOpen(false)} onSaved={(r) => setRoom(r)} />}
 
