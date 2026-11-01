@@ -1,6 +1,7 @@
 //! El motor del agente: vinculación con tu Nora, el canal en vivo y la aplicación de clics y teclas.
 //! No sabe nada de ventanas: la interfaz (o la consola) solo lee su estado y le manda órdenes.
 
+use crate::applog;
 use crate::input::Controller;
 use crate::platform;
 use serde_json::{json, Value};
@@ -224,8 +225,17 @@ impl Worker {
             }
 
             let started = Instant::now();
+            // un fallo inesperado dentro de la sesión no debe cerrar el programa: se anota, se suelta el control y se reconecta
             let outcome = match (cfg.as_ref(), ctl.as_mut()) {
-                (Some(c), Some(k)) => self.session(c, k, &rx),
+                (Some(c), Some(k)) => match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.session(c, k, &rx))) {
+                    Ok(o) => o,
+                    Err(_) => {
+                        applog::log("La sesión falló y se reinicia");
+                        ctl = None;
+                        self.set(|s| s.controlled_by = None);
+                        Outcome::Retry
+                    }
+                },
                 _ => Outcome::Retry,
             };
             match outcome {
@@ -287,12 +297,13 @@ impl Worker {
         let Ok(stream) = std::net::TcpStream::connect((host.as_str(), port)) else { return Outcome::Retry };
         let _ = stream.set_nodelay(true);
         let _ = stream.set_read_timeout(Some(Duration::from_millis(300)));
-        let mut req = ws_url.as_str().into_client_request().expect("url");
-        req.headers_mut().insert("Authorization", HeaderValue::from_str(&format!("Bearer {}", cfg.token)).expect("token"));
+        let Ok(mut req) = ws_url.as_str().into_client_request() else { return Outcome::Retry };
+        let Ok(auth) = HeaderValue::from_str(&format!("Bearer {}", cfg.token)) else { return Outcome::Unauthorized };
+        req.headers_mut().insert("Authorization", auth);
         let (mut ws, _) = match tungstenite::client_tls(req, stream) {
             Ok(x) => x,
             Err(tungstenite::HandshakeError::Failure(tungstenite::Error::Http(r))) if r.status().as_u16() == 401 => return Outcome::Unauthorized,
-            Err(_) => return Outcome::Retry,
+            Err(e) => { applog::log(&format!("No se pudo abrir el canal con Nora: {e}")); return Outcome::Retry }
         };
         let (w, h) = ctl.screen();
         let _ = ws.send(Message::text(json!({ "type": "hello", "os": std::env::consts::OS, "version": VERSION, "screen": format!("{w}x{h}") }).to_string()));
@@ -323,10 +334,10 @@ impl Worker {
             }
             match ws.read() {
                 Ok(Message::Text(t)) => self.handle(ctl, &t),
-                Ok(Message::Close(_)) => break Outcome::Retry,
+                Ok(Message::Close(_)) => { applog::log("Nora cerró el canal"); break Outcome::Retry }
                 Ok(_) => {}
                 Err(tungstenite::Error::Io(e)) if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) => {}
-                Err(_) => break Outcome::Retry,
+                Err(e) => { applog::log(&format!("Se perdió el canal con Nora: {e}")); break Outcome::Retry }
             }
         };
         ctl.stop(); // sin canal no se obedece nada

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, CalendarDays, CheckCheck, Clapperboard, Clock, FolderOpen, KanbanSquare, MessageSquare, SquareCheckBig, UserPlus } from 'lucide-react'
+import { Bell, CalendarDays, Video, CheckCheck, Clapperboard, Clock, FolderOpen, KanbanSquare, MessageSquare, SquareCheckBig, UserPlus } from 'lucide-react'
 import { api } from './api'
 import { useAuth } from './auth'
 import { useRealtime } from './realtime'
@@ -13,7 +13,7 @@ export interface AppNotification {
   kind: string
   title: string
   body: string
-  link: { tool?: string; item?: string; file?: string; conv?: string; msg?: string }
+  link: { tool?: string; item?: string; file?: string; conv?: string; msg?: string; call?: string }
   count: number
   createdAt: string
   readAt: string | null
@@ -32,6 +32,7 @@ export const useNotifications = () => useContext(Ctx)
 
 /** Dirección exacta dentro de la app a la que lleva una notificación. */
 export function notificationPath(n: Pick<AppNotification, 'roomCode' | 'link'>): string | null {
+  if (n.link?.call) return `/call/${n.link.call}`
   if (!n.roomCode) return null
   const q = new URLSearchParams()
   for (const [k, v] of Object.entries(n.link ?? {})) if (v) q.set(k, String(v))
@@ -97,7 +98,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
 const ICONS: Record<string, typeof Bell> = {
   task: KanbanSquare, poll: SquareCheckBig, event: CalendarDays, review: Clapperboard, file: FolderOpen,
-  join: UserPlus, member: UserPlus, room: Clock, chat: MessageSquare,
+  join: UserPlus, member: UserPlus, room: Clock, chat: MessageSquare, call: Video,
 }
 
 export function ago(iso: string): string {

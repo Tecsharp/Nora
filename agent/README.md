@@ -56,4 +56,5 @@ hay que abrirla con clic derecho → Abrir (o `xattr -dr com.apple.quarantine "N
 | --- | --- |
 | Windows | Funciona. No puede controlar ventanas que se ejecutan como administrador salvo que el agente también lo haga. |
 | macOS | Concede **Accesibilidad** (Ajustes del Sistema → Privacidad y seguridad) a *Nora Agent* la primera vez; la ventana lo avisa y tiene un botón para abrir esos ajustes. Para compartir la pantalla, el navegador necesita el permiso de **Grabación de pantalla**. |
+| Todos | Si algo falla, el motivo queda en `nora-agent/agent.log` dentro de la carpeta de configuración (macOS: `~/Library/Application Support`, Linux: `~/.config`, Windows: `%APPDATA%`). |
 | Linux | Sesión **X11**. En Wayland el sistema no permite controlar el equipo desde un programa. |

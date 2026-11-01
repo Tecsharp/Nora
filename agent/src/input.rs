@@ -40,6 +40,26 @@ impl Controller {
         was
     }
 
+    /// Escribe un carácter. En macOS `Key::Unicode` consulta el teclado con las funciones TIS, que el sistema solo permite en el hilo principal
+    /// (desde otro hilo cierran el programa en el acto); por eso allí se escribe el texto directamente y, con un atajo en marcha (⌘, ⌃, ⌥),
+    /// se usa la tecla física por su código.
+    fn type_char(&mut self, c: char) {
+        #[cfg(target_os = "macos")]
+        {
+            if self.held.iter().any(|k| k != "Shift") {
+                if let Some(code) = mac_keycode(c) {
+                    let _ = self.enigo.key(Key::Other(code), Direction::Click);
+                }
+            } else {
+                let _ = self.enigo.text(&c.to_string());
+            }
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = self.enigo.key(Key::Unicode(c), Direction::Click);
+        }
+    }
+
     pub fn apply(&mut self, e: &Value) {
         if !self.active {
             return;
@@ -87,7 +107,7 @@ impl Controller {
                 } else if down {
                     let mut chars = k.chars();
                     if let (Some(c), None) = (chars.next(), chars.next()) {
-                        let _ = self.enigo.key(Key::Unicode(c), Direction::Click);
+                        self.type_char(c);
                     }
                 }
             }
@@ -147,6 +167,20 @@ fn special(k: &str) -> Option<Key> {
         "F10" => Key::F10,
         "F11" => Key::F11,
         "F12" => Key::F12,
+        _ => return None,
+    })
+}
+
+/// Código de tecla físico (disposición ANSI/US) de un carácter, para los atajos de macOS sin consultar el teclado.
+#[cfg(target_os = "macos")]
+fn mac_keycode(c: char) -> Option<u32> {
+    Some(match c.to_ascii_lowercase() {
+        'a' => 0, 's' => 1, 'd' => 2, 'f' => 3, 'h' => 4, 'g' => 5, 'z' => 6, 'x' => 7, 'c' => 8, 'v' => 9, 'b' => 11,
+        'q' => 12, 'w' => 13, 'e' => 14, 'r' => 15, 'y' => 16, 't' => 17, 'o' => 31, 'u' => 32, 'i' => 34, 'p' => 35,
+        'l' => 37, 'j' => 38, 'k' => 40, 'n' => 45, 'm' => 46,
+        '1' | '!' => 18, '2' | '@' => 19, '3' | '#' => 20, '4' | '$' => 21, '6' | '^' => 22, '5' | '%' => 23, '=' | '+' => 24,
+        '9' | '(' => 25, '7' | '&' => 26, '-' | '_' => 27, '8' | '*' => 28, '0' | ')' => 29, ']' | '}' => 30, '[' | '{' => 33,
+        '\'' | '"' => 39, ';' | ':' => 41, '\\' | '|' => 42, ',' | '<' => 43, '/' | '?' => 44, '.' | '>' => 47, '`' | '~' => 50,
         _ => return None,
     })
 }

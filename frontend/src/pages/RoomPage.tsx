@@ -22,6 +22,8 @@ import NotesTool from '../components/NotesTool'
 import { AssistProvider } from '../assist/AssistProvider'
 import AssistOverlay from '../assist/AssistOverlay'
 import AssistTool from '../assist/AssistTool'
+import CallTool from '../call/CallTool'
+import { useRoomCalls } from '../call/useRoomCalls'
 import ChatTool from '../tools/ChatTool'
 import { ChatProvider, useChat } from '../chat/ChatProvider'
 import ChatDock from '../chat/ChatDock'
@@ -67,6 +69,7 @@ export default function RoomPage() {
   const [playing, setPlaying] = useState(false)
   useEffect(() => { if (active === 'player') setPlayerOn(true) }, [active])
   const calendar = useCalendarWatch(code, user?.id)
+  const roomCalls = useRoomCalls(code)
   const focus = useFocus(code)
   const toast = useToast()
   const dialogs = useDialogs()
@@ -288,6 +291,7 @@ export default function RoomPage() {
 
   const badges: Record<string, ReactNode> = {
     chat: <ChatBadge />,
+    calls: roomCalls.active.length > 0 ? <span className="ws-badge hot" title="Llamada en curso" aria-label={`${roomCalls.active.length} llamadas en curso`}>{roomCalls.active.length}</span> : null,
     player: playing ? <span className="ws-badge info" title="Sonando"><span className="pl-eq"><i /><i /><i /></span></span> : null,
     focus: focus.state.status === 'running' ? <span className="ws-badge info mono" title="Temporizador en marcha">{fmtFocus(focus.remaining)}</span> : null,
     calendar: calendar.today > 0 ? <span className="ws-badge info" aria-label={`${calendar.today} eventos hoy`} title="Eventos de hoy">{calendar.today}</span> : null,
@@ -325,6 +329,7 @@ export default function RoomPage() {
               {tool.id === 'files' && <FilesTool room={room} onEditDoc={openDoc} focus={target} />}
               {tool.id === 'board' && <BoardsTool room={room} onOpen={openDoc} />}
               {tool.id === 'attendance' && <AssistTool room={room} online={online} />}
+              {tool.id === 'calls' && <CallTool room={room} />}
               {tool.id === 'focus' && <FocusTool room={room} focus={focus} />}
               {tool.id === 'links' && <LinksTool room={room} focus={target} />}
               {tool.id === 'calendar' && <CalendarTool room={room} focus={target} />}

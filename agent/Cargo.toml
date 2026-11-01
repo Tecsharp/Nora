@@ -1,6 +1,6 @@
 [package]
 name = "nora-agent"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 description = "Agente de escritorio de Nora: permite que alguien de tu sala controle tu equipo mientras lo permites"
 license = "MIT"
@@ -20,4 +20,4 @@ opt-level = "s"
 lto = true
 strip = true
 codegen-units = 1
-panic = "abort"
+panic = "unwind"
