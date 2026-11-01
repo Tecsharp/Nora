@@ -139,6 +139,43 @@ public class ChatService {
         return dto(c, p.userId(), room);
     }
 
+    // ---- chat de una llamada (lo usa CallService; aparece en Mensajes como un grupo más) ----
+
+    /** Crea el grupo del chat de una llamada con las personas que están ahora en ella (las demás se añaden al entrar). */
+    @Transactional
+    public UUID createCallChat(Room room, UUID creator, String creatorName, String title, java.util.Collection<UUID> people) {
+        ChatConversation c = new ChatConversation(room.getId(), ChatConversation.GROUP, name(title), creator);
+        c.setColor(color(null));
+        convs.save(c);
+        members.save(new ChatMember(c.getId(), creator, "ADMIN"));
+        for (UUID u : distinct(new ArrayList<>(people))) {
+            if (u.equals(creator) || !roomMembers.existsById(new RoomMember.Key(room.getId(), u))) continue;
+            members.save(new ChatMember(c.getId(), u, "MEMBER"));
+        }
+        system(c, null, creatorName + " creó el chat de la llamada", room);
+        notifyConv(room, c, "created");
+        return c.getId();
+    }
+
+    /** Alguien entra a la llamada: pasa a formar parte de su chat. */
+    @Transactional
+    public void joinCallChat(UUID convId, UUID userId) {
+        ChatConversation c = convs.findById(convId).orElse(null);
+        if (c == null || !c.isGroup() || members.existsById(new ChatMember.Key(convId, userId))) return;
+        members.save(new ChatMember(convId, userId, "MEMBER"));
+        Room room = rooms.roomById(c.getRoomId());
+        if (room != null) events.publishEvent(new UserEvent(userId, "chat.conv", Map.of("room", room.getCode(), "conv", convId, "op", "created")));
+    }
+
+    /** Una línea de sistema en el chat de la llamada («Llamada terminada · 12 min»). */
+    @Transactional
+    public void postCallSystem(UUID convId, String text) {
+        ChatConversation c = convs.findById(convId).orElse(null);
+        if (c == null) return;
+        Room room = rooms.roomById(c.getRoomId());
+        if (room != null) system(c, null, text, room);
+    }
+
     @Transactional
     public ConvDto openDm(AuthPrincipal p, String code, UUID otherId) {
         Room room = rooms.requireWriter(p.userId(), p.role(), code);

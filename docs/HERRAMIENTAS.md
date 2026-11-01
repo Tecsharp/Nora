@@ -100,3 +100,7 @@ Qué avisa: te asignan una tarea, alguien crea una votación o agenda un evento,
 **Cada aviso lleva el lugar exacto** (`link`: `tool`, `item`, `file`, `conv`, `msg`). Al pulsarlo se abre `/room/{código}?tool=…&item=…` y la herramienta se coloca justo ahí: la tarea se abre, el evento se abre en su día, la votación y el enlace se resaltan, el comentario de Media Review se resalta con su archivo elegido y el archivo nuevo se selecciona en su carpeta.
 Las notificaciones se guardan en la tabla `notifications` (V18), se purgan las leídas con más de 30 días y se borran con la sala.
 Para añadir un aviso nuevo basta llamar a `NotificationService.notify(...)` con el `link` al lugar; la herramienta recibe el destino en su prop `focus` y usa `useFocusTarget` y `flash` (`tools/focus.ts`).
+
+## Llamadas
+
+Llamadas y videollamadas de la sala con un **código** (`abc-defg-hij`), sala de espera con admisión del anfitrión, vistas Mosaico/Destacado/Barra lateral, pantalla compartida, reacciones, mano levantada, subtítulos, modo complementario y un chat de la llamada que queda en Mensajes. Al iniciar una llamada llega un aviso a la sala y la herramienta muestra una insignia mientras haya una abierta. Funcionamiento, límites (malla de hasta 8 personas) y protocolo en [LLAMADAS.md](LLAMADAS.md).

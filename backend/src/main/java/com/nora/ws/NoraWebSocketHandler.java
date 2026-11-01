@@ -3,6 +3,7 @@ package com.nora.ws;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nora.assist.AssistService;
+import com.nora.call.CallService;
 import com.nora.chat.ChatService;
 import com.nora.collab.CollabWs;
 import com.nora.live.LiveService;
@@ -27,7 +28,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 /**
  * Canal en tiempo real. Protocolo JSON {"type": "...", "data": {...}}.
- * Cliente → servidor: join {code}, leave, ping, chat.typing {conv}.
+ * Cliente → servidor: join {code}, leave, ping, chat.typing {conv}, doc.*, assist.* y call.* (llamadas, ver {@link CallService}).
  * Servidor → cliente: joined, presence, pong, error y los eventos de sala/usuario (ver {@link RealtimeBroadcaster}).
  */
 @Component
@@ -75,9 +76,12 @@ public class NoraWebSocketHandler extends TextWebSocketHandler implements Assist
     private final AssistService assist;
     private final LiveService live;
     private final ChatService chat;
+    private final CallService calls;
 
-    public NoraWebSocketHandler(ObjectMapper json, @Lazy RoomService rooms, PresenceService presence, @Lazy UploadService uploads, @Lazy CollabWs collab, @Lazy AssistService assist, @Lazy LiveService live, @Lazy ChatService chat) {
+    public NoraWebSocketHandler(ObjectMapper json, @Lazy RoomService rooms, PresenceService presence, @Lazy UploadService uploads, @Lazy CollabWs collab, @Lazy AssistService assist, @Lazy LiveService live, @Lazy ChatService chat, @Lazy CallService calls) {
         this.chat = chat;
+        this.calls = calls;
+        calls.setHub(this);
         this.collab = collab;
         this.live = live;
         this.assist = assist;
@@ -112,7 +116,7 @@ public class NoraWebSocketHandler extends TextWebSocketHandler implements Assist
         String payload = message.getPayload();
         // Los mensajes de edición (una pulsación de tecla puede generar varios) tienen su propio presupuesto
         boolean docMsg = payload.startsWith("{\"type\":\"doc.");
-        boolean assistMsg = payload.startsWith("{\"type\":\"assist.");
+        boolean assistMsg = payload.startsWith("{\"type\":\"assist.") || payload.startsWith("{\"type\":\"call."); // la señalización de las llamadas (ICE) también va a ráfagas
         if (assistMsg) {
             if (now - conn.assistWindowStart > 10_000) {
                 conn.assistWindowStart = now;
@@ -165,6 +169,14 @@ public class NoraWebSocketHandler extends TextWebSocketHandler implements Assist
             case "assist.control" -> assist.control(conn, msg);
             case "assist.input" -> assist.input(conn, msg);
             case "assist.end" -> assist.end(conn, msg);
+            case "call.join" -> calls.join(conn, msg);
+            case "call.leave" -> calls.leave(conn, msg);
+            case "call.me" -> calls.me(conn, msg);
+            case "call.signal" -> calls.signal(conn, msg);
+            case "call.reaction" -> calls.reaction(conn, msg);
+            case "call.caption" -> calls.caption(conn, msg);
+            case "call.admit" -> calls.admit(conn, msg);
+            case "call.host" -> calls.host(conn, msg);
             default -> send(conn, "error", Map.of("message", "Tipo de mensaje desconocido"));
         }
     }
@@ -269,6 +281,7 @@ public class NoraWebSocketHandler extends TextWebSocketHandler implements Assist
         if (conn != null) {
             byUser.computeIfPresent(conn.userId, (k, set) -> { set.remove(conn); return set.isEmpty() ? null : set; });
             collab.leaveAll(conn);
+            calls.peerGone(conn);
             leaveRoom(conn);
         }
     }
