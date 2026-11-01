@@ -1,4 +1,6 @@
-# Nora
+# Nora · Referencia técnica
+
+> Esta es la referencia completa (arquitectura, seguridad, protocolo, límites…). La presentación del proyecto está en el [README](../README.md).
 
 Aplicación web para compartir documentos y archivos de forma colaborativa en **salas temporales**: cada sala tiene un código, un tiempo de expiración, participantes conectados y un conjunto de herramientas (archivos, notas, pizarra… y más por venir).
 
@@ -54,11 +56,11 @@ Eventos de sala: quién está conectado (`presence`, `joined`), nuevos miembros 
 
 Todo documento es un **archivo de la sala**. En **Archivos** el botón **Nuevo** crea un documento, una hoja o una presentación (nace como `.docx`, `.xlsx` o `.pptx` en la carpeta actual) y un clic sobre cualquier DOCX/ODT/XLSX/ODS/CSV/PPTX/ODP lo abre para editarlo entre todos, con cursores, selección de cada persona, historial de versiones y control de permisos (el lector ve pero no edita). **Guardar** (o Ctrl+S) escribe el contenido compartido en ese archivo y todos ven si está al día; **Descargar** y «guardar una copia» son botones aparte.
 
-Cada editor tiene una cinta de opciones al estilo Office: **texto** (fuentes, tamaños, colores, listas, tablas, gráficos, buscar y reemplazar), **hojas** (formato, bordes, fórmulas con nombres en español, insertar/eliminar filas y columnas, ordenar, gráficos, estadísticas) y **diapositivas** (texto enriquecido, formas, tablas, gráficos, notas, modo presentación). Usa **Yjs (CRDT)** sobre el WebSocket de Nora; el servidor solo ordena, guarda y reparte los cambios. La conversión la hace el servicio interno `converter` (LibreOffice headless, sin acceso a Internet). Diseño, protocolo, fidelidad de conversión, fases y **limitaciones conocidas** en [docs/COLABORACION.md](docs/COLABORACION.md).
+Cada editor tiene una cinta de opciones al estilo Office: **texto** (fuentes, tamaños, colores, listas, tablas, gráficos, buscar y reemplazar), **hojas** (formato, bordes, fórmulas con nombres en español, insertar/eliminar filas y columnas, ordenar, gráficos, estadísticas) y **diapositivas** (texto enriquecido, formas, tablas, gráficos, notas, modo presentación). Usa **Yjs (CRDT)** sobre el WebSocket de Nora; el servidor solo ordena, guarda y reparte los cambios. La conversión la hace el servicio interno `converter` (LibreOffice headless, sin acceso a Internet). Diseño, protocolo, fidelidad de conversión, fases y **limitaciones conocidas** en [docs/COLABORACION.md](COLABORACION.md).
 
 ### Pizarra colaborativa
 
-La herramienta **Pizarra** de cada sala es un lienzo infinito con el editor de **Excalidraw** (todas sus herramientas: formas, flechas ligadas, texto, dibujo libre, imágenes, marcos, láser, biblioteca…) sincronizado en tiempo real por el WebSocket de Nora, con cursores con nombre, selecciones, seguimiento de otra persona y permisos de la sala. Las figuras y textos se **alinean y centran** con el imán (guías al mover), con la barra «Alinear» y con las opciones de Excalidraw, y el editor tiene **pantalla completa**. Se guarda sola; **Guardar** escribe el archivo `.excalidraw` en Archivos; se puede **descargar** (`.excalidraw`, PNG y SVG con la escena incrustada, PDF), guardar copias en la sala e **importar** `.excalidraw`, PNG/SVG con escena e imágenes. Funciona sin Internet. Detalles en [docs/PIZARRA.md](docs/PIZARRA.md).
+La herramienta **Pizarra** de cada sala es un lienzo infinito con el editor de **Excalidraw** (todas sus herramientas: formas, flechas ligadas, texto, dibujo libre, imágenes, marcos, láser, biblioteca…) sincronizado en tiempo real por el WebSocket de Nora, con cursores con nombre, selecciones, seguimiento de otra persona y permisos de la sala. Las figuras y textos se **alinean y centran** con el imán (guías al mover), con la barra «Alinear» y con las opciones de Excalidraw, y el editor tiene **pantalla completa**. Se guarda sola; **Guardar** escribe el archivo `.excalidraw` en Archivos; se puede **descargar** (`.excalidraw`, PNG y SVG con la escena incrustada, PDF), guardar copias en la sala e **importar** `.excalidraw`, PNG/SVG con escena e imágenes. Funciona sin Internet. Detalles en [docs/PIZARRA.md](PIZARRA.md).
 
 ### Asistencia (ver y controlar la pantalla de otra persona)
 
@@ -74,13 +76,13 @@ puede cortar la sesión o el control cuando quiera; mientras alguien controla se
 - **Redes:** por defecto usa un STUN público (`NORA_STUN_URLS`); para redes estrictas (empresas, 4G) activa el servidor TURN incluido:
   define `NORA_TURN_SECRET` y `NORA_TURN_URLS=turn:TU-IP:3478` en `.env` y arranca con `docker compose --profile turn up -d` (abre 3478 y 49160-49200 UDP).
 
-Detalles técnicos, protocolo y límites en [docs/ASISTENCIA.md](docs/ASISTENCIA.md).
+Detalles técnicos, protocolo y límites en [docs/ASISTENCIA.md](ASISTENCIA.md).
 
 ### IA con DeepSeek (opcional)
 
 Nora puede ayudar con IA (mejorar y traducir textos, resumir, extraer tareas, crear eventos desde una frase…) usando **DeepSeek**. Viene **desactivada** y sin rastro en la
 interfaz: se activa a mano en el `.env` (`NORA_AI_ENABLED=true` y `NORA_DEEPSEEK_API_KEY=…`, ya vienen ahí apagadas) y `docker compose up -d`. La clave solo vive en el servidor y
-solo se envía a DeepSeek el texto que cada persona decide procesar. Detalles en [docs/IA.md](docs/IA.md).
+solo se envía a DeepSeek el texto que cada persona decide procesar. Detalles en [docs/IA.md](IA.md).
 
 ### Mantener sala (inactiva en lugar de borrarse)
 
@@ -94,8 +96,8 @@ La sala es un **espacio de trabajo**: una barra lateral con los datos de la sala
 **Archivos y Pizarra comparten carpetas:** una pizarra es un archivo `.excalidraw`, así que vive en la misma carpeta en las dos herramientas; moverla, renombrarla o crear carpetas en una se ve al instante en la otra. Las imágenes, PDF y textos que ya se han visto se guardan en una caché en memoria (se vacía al cerrar sesión), por lo que volver a abrirlos desde Archivos o Media Review no los descarga otra vez.
 
 Además de Archivos, Pizarra y Notas, cada sala tiene: **Chat** (General, grupos con ajustes y mensajes directos en tiempo real, con un dock abajo a la derecha y una vista completa tipo Telegram Web), **Tablero** (tareas con arrastrar y soltar), **Votaciones** (anónimas, cierre automático, resultados en vivo), **Media Review** (comentarios en el momento exacto de un vídeo/audio o en un punto de una imagen),
-**Calendario** (mes y agenda, respuestas «Voy», `.ics`, recordatorios), **Enlaces** (marcadores compartidos con etiquetas), **Foco** (Pomodoro compartido con grupo de enfocados), **Reproductor** (cola sincronizada de YouTube, enlaces directos y archivos de la sala, sin cortar el sonido al cerrar la ventana) y **Asistencia** (ver/controlar pantallas).
-Con la IA activa (opcional) casi todas incorporan ayuda: resumir el chat, crear tareas o eventos desde un texto, sugerir opciones de votación, resumir comentarios de revisión… Detalles y permisos en [docs/HERRAMIENTAS.md](docs/HERRAMIENTAS.md).
+**Calendario** (mes y agenda, respuestas «Voy», `.ics`, recordatorios), **Enlaces** (marcadores compartidos con etiquetas), **Foco** (Pomodoro compartido con grupo de enfocados), **Reproductor** (cola sincronizada de YouTube, enlaces directos y archivos de la sala, sin cortar el sonido al cerrar la ventana) **Llamadas** (voz y videollamadas con código, ver [LLAMADAS.md](LLAMADAS.md)) y **Asistencia** (ver/controlar pantallas).
+Con la IA activa (opcional) casi todas incorporan ayuda: resumir el chat, crear tareas o eventos desde un texto, sugerir opciones de votación, resumir comentarios de revisión… Detalles y permisos en [docs/HERRAMIENTAS.md](HERRAMIENTAS.md).
 
 ### Subidas reanudables
 
