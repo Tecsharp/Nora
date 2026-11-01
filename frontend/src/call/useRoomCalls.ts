@@ -16,5 +16,9 @@ export function useRoomCalls(code: string) {
   useRealtime('call.started', () => void refresh())
   useRealtime('call.ended', () => void refresh())
   useRealtime('reconnected', () => void refresh())
-  return { ...data, loaded, refresh }
+  // las programadas desde el calendario cuentan como «en curso» solo desde 10 minutos antes de su hora (o si ya hay gente dentro)
+  const soon = Date.now() + 10 * 60_000
+  const upcoming = data.active.filter((c) => c.scheduledAt && new Date(c.scheduledAt).getTime() > soon && c.count === 0)
+  const active = data.active.filter((c) => !upcoming.includes(c))
+  return { active, upcoming, recent: data.recent, max: data.max, loaded, refresh }
 }
