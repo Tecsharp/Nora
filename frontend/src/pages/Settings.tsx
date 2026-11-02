@@ -9,7 +9,7 @@ import Tabs from '../components/Tabs'
 import { useDialogs } from '../dialogs'
 import { useToast } from '../toast'
 import { uploads } from '../uploadManager'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { fmtDate, fmtDateTime } from '../dates'
 
 interface SessionInfo {
@@ -268,7 +268,11 @@ function Account({ user, storageUsed }: { user: User; storageUsed: number }) {
 
 export default function Settings() {
   const { user } = useAuth()
-  const [tab, setTab] = useState('profile')
+  // la sección vive en la dirección (/settings/security): al recargar se vuelve a ella
+  const { tab: tabParam } = useParams()
+  const go = useNavigate()
+  const tab = ['profile', 'security', 'account'].includes(tabParam ?? '') ? tabParam! : 'profile'
+  const setTab = (t: string) => go(`/settings/${t}`)
   const [used, setUsed] = useState(0)
   useEffect(() => {
     api<{ storageUsedBytes: number }>('/me').then((m) => setUsed(m.storageUsedBytes)).catch(() => undefined)

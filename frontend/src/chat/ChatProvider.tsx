@@ -186,9 +186,9 @@ export function ChatProvider({ room, online, fullOpen, onOpenFull, children }: {
   const unread = useMemo(() => convs.reduce((n, c) => n + (c.muted ? 0 : c.unread), 0), [convs])
   const people = useMemo(() => new Map(room.participants.map((p) => [p.userId, p])), [room.participants])
   const title = useCallback((c: Conv) => {
-    if (c.kind === 'ROOM') return 'General'
+    if (c.kind === 'ROOM') return c.name ?? 'General'
     if (c.kind === 'GROUP') return c.name ?? 'Grupo'
-    return (c.otherUserId && people.get(c.otherUserId)?.displayName) || 'Mensaje directo'
+    return c.name ?? ((c.otherUserId && people.get(c.otherUserId)?.displayName) || 'Mensaje directo')
   }, [people])
   const conv = useCallback((id: string) => convs.find((c) => c.id === id), [convs])
 

@@ -32,6 +32,8 @@ public final class ChatDtos {
 
     public record UpdateGroup(String name, String description, String color, String postPolicy, String addPolicy) {}
 
+    public record Rename(String name) {}
+
     public record AddMembers(List<UUID> userIds) {}
 
     public record SetRole(String role) {}

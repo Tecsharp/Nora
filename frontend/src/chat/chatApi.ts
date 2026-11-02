@@ -72,6 +72,7 @@ export const chatApi = {
   dm: (code: string, userId: string) => api<Conv>(`${base(code)}/dm`, 'POST', { userId }),
   createGroup: (code: string, body: { name: string; description?: string; color?: string; members: string[] }) => api<Conv>(`${base(code)}/conversations`, 'POST', body),
   updateGroup: (code: string, conv: string, body: Partial<Pick<Conv, 'name' | 'description' | 'color' | 'postPolicy' | 'addPolicy'>>) => api<Conv>(`${base(code)}/conversations/${conv}`, 'PATCH', body),
+  rename: (code: string, conv: string, name: string) => api<Conv>(`${base(code)}/conversations/${conv}/name`, 'PUT', { name }),
   deleteGroup: (code: string, conv: string) => api(`${base(code)}/conversations/${conv}`, 'DELETE'),
   addMembers: (code: string, conv: string, userIds: string[]) => api<ChatMember[]>(`${base(code)}/conversations/${conv}/members`, 'POST', { userIds }),
   removeMember: (code: string, conv: string, userId: string) => api(`${base(code)}/conversations/${conv}/members/${userId}`, 'DELETE'),

@@ -234,12 +234,27 @@ public class CallService {
         if (c.getConversationId() != null) return c.getConversationId();
         Set<UUID> people = new LinkedHashSet<>();
         if (l != null) for (Part p : l.parts) people.add(p.userId);
-        String title = "Llamada" + (c.getTitle().isBlank() ? "" : " · " + c.getTitle());
-        UUID conv = chat.createCallChat(room, userId, userName, title, people);
+        UUID conv = chat.createCallChat(room, userId, userName, callChatName(c, l, userName), people);
         c.setConversationId(conv);
         calls.save(c);
         if (l != null) broadcast(c, l);
         return conv;
+    }
+
+    /** Nombre del chat de una llamada: su código y las personas (las que están dentro y las invitadas), p. ej. «abc-defg-hij, Abisai Vázquez, Josué Zala». */
+    private String callChatName(Call c, Live l, String creatorName) {
+        List<String> names = new ArrayList<>();
+        names.add(creatorName);
+        if (l != null) {
+            for (Part p : l.parts) if (!names.contains(p.name)) names.add(p.name);
+            for (Map<String, Object> m : invited(c, l)) { String n = String.valueOf(m.get("name")); if (!names.contains(n)) names.add(n); }
+        }
+        StringBuilder sb = new StringBuilder(c.getCode());
+        for (String n : names) {
+            if (sb.length() + 2 + n.length() > 79) { sb.append('…'); break; }
+            sb.append(", ").append(n);
+        }
+        return sb.toString();
     }
 
     // ---------------------------------------------------------------- WebSocket

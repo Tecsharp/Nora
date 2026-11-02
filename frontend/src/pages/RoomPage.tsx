@@ -45,13 +45,30 @@ import { useBusy } from '../useBusy'
 
 const DocEditor = lazy(() => import('../collab/DocEditor'))
 
+/** Direcciones de las herramientas, en inglés y legibles. */
+const SLUG_OF: Record<string, string> = { actions: 'tasks', attendance: 'assistance', [PEOPLE.id]: 'people' }
+const slugOfId = (id: string) => (id === OVERVIEW ? '' : SLUG_OF[id] ?? id)
+const idOfSlug = (slug?: string): string => {
+  if (!slug) return OVERVIEW
+  const hit = Object.entries(SLUG_OF).find(([, s]) => s === slug)?.[0]
+  const id = hit ?? slug
+  return id === PEOPLE.id || TOOLS.some((t) => t.id === id) ? id : OVERVIEW
+}
+
 export default function RoomPage() {
-  const { code = '' } = useParams()
+  const { code = '', tool: toolSlug, sub: subPath } = useParams()
   const { user } = useAuth()
   const navigate = useNavigate()
   const [room, setRoom] = useState<Room | null>(null)
   const [error, setError] = useState('')
-  const [active, setActive] = useState<string>(OVERVIEW)
+  // Dónde se está (resumen, personas o una herramienta) vive en la dirección: /room/ABC/files, /room/ABC/tasks…, así al recargar se vuelve al mismo sitio
+  const active = idOfSlug(toolSlug)
+  const setActive = useCallback((id: string) => {
+    const sp = new URLSearchParams(window.location.search)
+    for (const k of ['tool', 'item', 'file', 'conv', 'msg', 'folder']) sp.delete(k) // lo propio de otra herramienta no viaja
+    const qs = sp.toString()
+    navigate(`/room/${code}${slugOfId(id) ? `/${slugOfId(id)}` : ''}${qs ? `?${qs}` : ''}`)
+  }, [code, navigate])
   const [navOpen, setNavOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [adjusting, setAdjusting] = useState(false)
@@ -350,7 +367,7 @@ export default function RoomPage() {
               {tool.id === 'media' && <MediaReviewTool room={room} focus={target} />}
               {tool.id === 'polls' && <PollsTool room={room} focus={target} />}
               {tool.id === 'actions' && <TasksTool room={room} focus={target} />}
-              {tool.id === 'chat' && <ChatTool focus={target} />}
+              {tool.id === 'chat' && <ChatTool focus={target} urlConv={subPath} onUrlConv={(id) => navigate(`/room/${code}/chat${id ? `/${id}` : ''}${window.location.search}`, { replace: true })} />}
               {tool.id === 'notes' && <NotesTool room={room} kind="NOTE" placeholder="Escribe una nota para la sala…" />}
             </div>
           )}

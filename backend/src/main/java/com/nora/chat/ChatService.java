@@ -229,6 +229,33 @@ public class ChatService {
         return dto(x.conv(), p.userId(), x.room());
     }
 
+    /**
+     * Cambia el nombre de cualquier conversación: en un grupo, quien lo administra; en General, quien modera la sala; en un mensaje directo,
+     * cualquiera de las dos personas. En General y en los directos, dejarlo vacío restablece el nombre de siempre.
+     */
+    @Transactional
+    public ConvDto rename(AuthPrincipal p, String code, UUID id, String newName) {
+        Ctx x = ctx(p, code, id);
+        ChatConversation c = x.conv();
+        String n = newName == null ? "" : newName.strip();
+        if (c.isGroup()) {
+            requireAdmin(x);
+            n = name(n);
+        } else if (c.isRoom()) {
+            if (!rooms.canModerate(x.room(), p.userId(), p.role())) throw ApiException.forbidden("Solo quien modera la sala puede cambiar el nombre de este chat");
+            n = n.isEmpty() ? null : name(n);
+        } else {
+            rooms.requireWriter(p.userId(), p.role(), code);
+            n = n.isEmpty() ? null : name(n);
+        }
+        if (java.util.Objects.equals(n, c.getName())) return dto(c, p.userId(), x.room());
+        c.setName(n);
+        convs.save(c);
+        system(c, p.userId(), actor(p) + (n == null ? " restableció el nombre del chat" : " cambió el nombre a «" + n + "»"), x.room());
+        notifyConv(x.room(), c, "updated");
+        return dto(c, p.userId(), x.room());
+    }
+
     @Transactional
     public List<MemberDto> addMembers(AuthPrincipal p, String code, UUID id, AddMembers req) {
         Ctx x = ctx(p, code, id);

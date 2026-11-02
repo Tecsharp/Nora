@@ -25,6 +25,7 @@ import Tabs from './Tabs'
 import ProgressBar from './ProgressBar'
 import { fmtDateTime } from '../dates'
 import { useBusy } from '../useBusy'
+import { useFolderParam } from '../useFolderParam'
 
 interface FileItem {
   id: string
@@ -101,7 +102,7 @@ export default function FilesTool({ room, onEditDoc, focus }: { room: Room; onEd
   const [remotes, setRemotes] = useState<Record<string, Remote>>({})
   const [pending, setPending] = useState<PendingUpload[]>([])
   const [error, setError] = useState('')
-  const [current, setCurrent] = useState<string | null>(null)
+  const [current, setCurrent] = useFolderParam()
   const [view, setViewState] = useState<View>(readView)
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<Sort>('name')

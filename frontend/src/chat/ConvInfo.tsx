@@ -5,6 +5,7 @@ import Avatar from '../components/Avatar'
 import Menu from '../components/Menu'
 import Modal from '../components/Modal'
 import { useDialogs } from '../dialogs'
+import { canWrite as canWriteIn, isStaff as isStaffIn } from '../roles'
 import { useToast } from '../toast'
 import { chatApi, type Conv, type Policy } from './chatApi'
 import { ConvAvatar } from './ChatBits'
@@ -23,6 +24,8 @@ export default function ConvInfo({ conv, onClose, onGone }: { conv: Conv; onClos
   const { room, online, patch, refresh } = chat
   const isGroup = conv.kind === 'GROUP'
   const admin = isGroup && conv.role === 'ADMIN'
+  // quién puede cambiar el nombre: la administración del grupo, quien modera la sala (General) o cualquiera de las dos personas de un directo
+  const canRename = conv.kind === 'GROUP' ? admin : conv.kind === 'ROOM' ? isStaffIn(room, user) : canWriteIn(room, user)
   const [name, setName] = useState(conv.name ?? '')
   const [description, setDescription] = useState(conv.description)
   const [adding, setAdding] = useState(false)
@@ -32,6 +35,12 @@ export default function ConvInfo({ conv, onClose, onGone }: { conv: Conv; onClos
 
   const save = async (body: Parameters<typeof chatApi.updateGroup>[2]) => {
     try { patch(await chatApi.updateGroup(room.code, conv.id, body)) } catch (e) { fail(e, 'No se pudo guardar'); setName(conv.name ?? ''); setDescription(conv.description) }
+  }
+  const rename = async () => {
+    const n = name.trim()
+    const blankOk = conv.kind !== 'GROUP' // en General y en los directos, vacío = el nombre de siempre
+    if ((!n && !blankOk) || n === (conv.name ?? '')) { setName(conv.name ?? ''); return }
+    try { patch(await chatApi.rename(room.code, conv.id, n)) } catch (e) { fail(e, 'No se pudo cambiar el nombre'); setName(conv.name ?? '') }
   }
   const prefs = async (body: { muted?: boolean; pinned?: boolean }) => {
     try { patch(await chatApi.prefs(room.code, conv.id, body)) } catch (e) { fail(e, 'No se pudo cambiar') }
@@ -59,9 +68,9 @@ export default function ConvInfo({ conv, onClose, onGone }: { conv: Conv; onClos
     <div className="cinfo">
       <header className="cinfo-head">
         <ConvAvatar conv={conv} size={72} />
-        {admin ? (
-          <input className="cinfo-name" value={name} maxLength={80} aria-label="Nombre del grupo" onChange={(e) => setName(e.target.value)}
-            onBlur={() => { if (name.trim() && name.trim() !== conv.name) void save({ name: name.trim() }); else setName(conv.name ?? '') }}
+        {canRename ? (
+          <input className="cinfo-name" value={name} maxLength={80} aria-label="Nombre del chat" placeholder={conv.kind === 'GROUP' ? undefined : chat.title({ ...conv, name: null })} onChange={(e) => setName(e.target.value)}
+            onBlur={() => void rename()}
             onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { e.stopPropagation(); setName(conv.name ?? ''); e.currentTarget.blur() } }} />
         ) : <h3 className="cinfo-title">{chat.title(conv)}</h3>}
         <span className="muted small">{conv.kind === 'ROOM' ? 'Todas las personas de la sala' : conv.kind === 'DM' ? 'Mensaje directo' : `Grupo · ${conv.members.length} ${conv.members.length === 1 ? 'persona' : 'personas'}`}</span>
