@@ -33,6 +33,9 @@ export const callSounds = {
   join: () => tones([{ f: 587.33, at: 0, len: 0.14, type: 'triangle', gain: 0.1 }, { f: 880, at: 0.11, len: 0.2, type: 'triangle', gain: 0.1 }]),
   /** Alguien más sale: dos notas suaves que bajan. */
   leave: () => tones([{ f: 740, at: 0, len: 0.14, type: 'triangle', gain: 0.1 }, { f: 494, at: 0.11, len: 0.22, type: 'triangle', gain: 0.1 }]),
-  /** Alguien levanta la mano: un «tin-tin» alegre. */
-  hand: () => tones([{ f: 880, at: 0, len: 0.12, type: 'square', gain: 0.05 }, { f: 1318.5, at: 0.11, len: 0.22, type: 'square', gain: 0.05 }]),
+  /** Levantar la mano: una campanita («ding-ding») con un brillo agudo, inconfundible entre los demás avisos. */
+  hand: () => tones([
+    { f: 1174.66, at: 0, len: 0.55, gain: 0.16 }, { f: 2349.32, at: 0, len: 0.35, gain: 0.05 },
+    { f: 1567.98, at: 0.16, len: 0.75, gain: 0.16 }, { f: 3135.96, at: 0.16, len: 0.45, gain: 0.05 },
+  ]),
 }

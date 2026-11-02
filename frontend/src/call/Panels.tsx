@@ -6,6 +6,7 @@ import { useRealtime } from '../realtime'
 import { useToast } from '../toast'
 import Avatar from '../components/Avatar'
 import { AttachChips, MessageMeta, useAttachments } from '../chat/Attachments'
+import { ReactionPicker } from '../components/EmojiPicker'
 import { REACTIONS, callApi, callUrl } from './api'
 import type { CallApi } from './useCall'
 
@@ -51,6 +52,17 @@ export function PeoplePanel({ call }: { call: CallApi }) {
         ))}
         {isHost && parts.length > 1 && <button className="cp-wide" onClick={() => call.host('muteAll')}><VolumeX size={15} /> Silenciar a todos</button>}
       </section>
+      {state.invited.length > 0 && (
+        <section className="cp-sec">
+          <h3>{state.invitedKind === 'event' ? 'Invitadas que aún no entran' : 'En la sala, sin entrar'} ({state.invited.length})</h3>
+          {state.invited.map((p) => (
+            <div key={p.userId} className="cp-row away">
+              <Avatar name={p.name} userId={p.userId} version={0} size={32} />
+              <span className="cp-name">{p.name}<small>{state.invitedKind === 'event' ? 'Invitada · no está en la llamada' : 'No está en la llamada'}</small></span>
+            </div>
+          ))}
+        </section>
+      )}
     </div>
   )
 }
@@ -126,7 +138,7 @@ export function ChatPanel({ call, roomCode, user }: { call: CallApi; roomCode: s
   useEffect(() => { end.current?.scrollIntoView({ block: 'end' }) }, [items.length])
   useEffect(() => {
     if (!picking) return
-    const away = (e: MouseEvent) => { if (!(e.target as Element).closest('.cp-picker, .cp-react-btn')) setPicking(null) }
+    const away = (e: MouseEvent) => { if (!(e.target as Element).closest('.cp-picker, .cp-react-btn, .rx-pop')) setPicking(null) }
     document.addEventListener('mousedown', away)
     return () => document.removeEventListener('mousedown', away)
   }, [picking])
@@ -170,7 +182,7 @@ export function ChatPanel({ call, roomCode, user }: { call: CallApi; roomCode: s
               <span className={`cp-react-btn ${picking === m.id ? 'open' : ''}`}>
                 <button type="button" aria-label="Reaccionar" title="Reaccionar" onClick={() => setPicking((p) => (p === m.id ? null : m.id))}><SmilePlus size={15} /></button>
               </span>
-              {picking === m.id && <div className="cp-picker" role="listbox" aria-label="Elegir reacción">{REACTIONS.map((e) => <button key={e} type="button" role="option" aria-selected="false" onClick={() => react(m, e)}>{e}</button>)}</div>}
+              {picking === m.id && <div className="cp-picker"><ReactionPicker dark quick={REACTIONS} onPick={(e) => react(m, e)} onClose={() => setPicking(null)} /></div>}
               {!mine && <strong>{m.authorName}</strong>}
               {m.text && <span>{m.text}</span>}
               <MessageMeta code={roomCode} meta={m.meta} />

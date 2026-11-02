@@ -3,7 +3,8 @@ import { Captions, Check, Hand, Info, LayoutGrid, MessageSquare, Mic, MicOff, Mi
 import type { User } from '../api'
 import { useRealtime } from '../realtime'
 import { callUrl, type Part } from './api'
-import { DEFAULT_REACTIONS, EMOJI_GROUPS, useEmojiFavorites } from './emoji'
+import { EmojiPicker } from '../components/EmojiPicker'
+import { DEFAULT_REACTIONS, useEmojiFavorites } from './emoji'
 import { callSounds } from './sounds'
 import { captionsSupported, type CallApi } from './useCall'
 import type { LocalMedia } from './useLocalMedia'
@@ -43,7 +44,6 @@ export default function CallRoom({ call, media, user, roomCode }: { call: CallAp
   const [unread, setUnread] = useState(0)
   const [full, setFull] = useState(!!document.fullscreenElement)
   const [activeConn, setActiveConn] = useState<string | null>(null)
-  const [emojiGroup, setEmojiGroup] = useState(EMOJI_GROUPS[0]!.id)
   const favs = useEmojiFavorites()
   const [allEmojis, setAllEmojis] = useState(false)
   const root = useRef<HTMLDivElement>(null)
@@ -88,6 +88,7 @@ export default function CallRoom({ call, media, user, roomCode }: { call: CallAp
   }, [call])
   useEffect(() => {
     if (!menu) return
+    if (menu === 'react') return // la barra de reacciones solo se cierra con su botón
     const on = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenu(null) }
     window.addEventListener('keydown', on)
     return () => window.removeEventListener('keydown', on)
@@ -155,8 +156,8 @@ export default function CallRoom({ call, media, user, roomCode }: { call: CallAp
 
   if (!state) return null
   return (
-    <div className="call-root room" ref={root} onClick={() => menu && setMenu(null)}>
-      <div className={`call-stage ${panel ? 'with-panel' : ''}`}>
+    <div className="call-root room" ref={root} onClick={() => menu && menu !== 'react' && setMenu(null)}>
+      <div className={`call-stage ${panel ? 'with-panel' : ''}`} onDoubleClick={(e) => { if (!(e.target as HTMLElement).closest('button, a, input, select, textarea, label, .call-lobby, .call-caps, .react-bar')) toggleFull() }}>
         <div className={`call-grid mode-${mode}`} style={{ ['--cols' as string]: cols }}>
           {mode === 'tiles' && all.map((i) => tile(i))}
           {mode === 'duo' && main && (
@@ -215,14 +216,7 @@ export default function CallRoom({ call, media, user, roomCode }: { call: CallAp
           {menu === 'react' && (
             <div className="react-bar" role="menu" aria-label="Reacciones">
               {allEmojis && (
-                <div className="react-all">
-                  <div className="emo-tabs" role="tablist" aria-label="Categorías de emojis">
-                    {EMOJI_GROUPS.map((g) => <button key={g.id} role="tab" aria-selected={emojiGroup === g.id} className={emojiGroup === g.id ? 'on' : ''} title={g.label} onClick={() => setEmojiGroup(g.id)}>{g.list[0]}</button>)}
-                  </div>
-                  <div className="emo-grid" role="group" aria-label={EMOJI_GROUPS.find((g) => g.id === emojiGroup)?.label}>
-                    {EMOJI_GROUPS.find((g) => g.id === emojiGroup)?.list.map((e) => <button key={e} role="menuitem" aria-label={`Reaccionar con ${e}`} onClick={() => { call.react(e); favs.used(e) }}>{e}</button>)}
-                  </div>
-                </div>
+                <div className="react-all"><EmojiPicker dark onPick={(e) => { call.react(e); favs.used(e) }} /></div>
               )}
               <div className="react-row">
                 {DEFAULT_REACTIONS.map((e) => <button key={e} role="menuitem" className="react-emo" aria-label={`Reaccionar con ${e}`} onClick={() => { call.react(e); favs.used(e) }}>{e}</button>)}
@@ -245,7 +239,7 @@ export default function CallRoom({ call, media, user, roomCode }: { call: CallAp
           <button className={`cbtn ${call.screen ? 'on' : ''}`} onClick={() => (call.screen ? call.stopScreen() : void call.startScreen())} aria-pressed={!!call.screen} aria-label={call.screen ? 'Dejar de presentar' : 'Presentar pantalla'} title={call.screen ? 'Dejar de presentar' : 'Presentar ahora'}>
             {call.screen ? <MonitorOff size={20} /> : <MonitorUp size={20} />}
           </button>
-          <button className={`cbtn ${myPart?.hand ? 'on hand' : ''}`} onClick={() => call.toggleHand()} aria-pressed={!!myPart?.hand} aria-label={myPart?.hand ? 'Bajar la mano' : 'Levantar la mano'} title={myPart?.hand ? 'Bajar la mano' : 'Levantar la mano'}>
+          <button className={`cbtn ${myPart?.hand ? 'on hand' : ''}`} onClick={() => { if (!myPart?.hand) callSounds.hand(); call.toggleHand() }} aria-pressed={!!myPart?.hand} aria-label={myPart?.hand ? 'Bajar la mano' : 'Levantar la mano'} title={myPart?.hand ? 'Bajar la mano' : 'Levantar la mano'}>
             <Hand size={20} />
           </button>
           <div className="cmenu-wrap">

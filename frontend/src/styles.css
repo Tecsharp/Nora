@@ -2283,6 +2283,13 @@ label.qc-check input { width: 16px; height: 16px; flex: none; }
 .chat-emojis .epk-tone-btn, .chat-emojis .epk-tones button { width: 34px; height: 34px; border-radius: 50%; }
 .chat.window .chat-emojis { left: 6px; }
 .chat.window .epk { width: min(312px, calc(100vw - 24px)); }
+.cp-row.away { opacity: 0.78; }
+.cp-row.away .cp-name { color: #cfcfd8; }
+.react-all { padding: 0; background: none; box-shadow: none; width: auto; }
+.cp-picker { padding: 0; background: none; box-shadow: none; width: auto; top: 22px; right: 0; left: auto; z-index: 6; }
+.cp-msg.mine .cp-picker { right: 0; left: auto; }
+.cp-msg:not(.mine) .cp-picker { left: 0; right: auto; }
+
 /* Caja de escritura del chat: «+» (adjuntar y llamadas) · campo con emoji · enviar */
 .chat-input { align-items: flex-end; gap: 8px; padding: 0; background: none; box-shadow: none; border-radius: 0; }
 .chat-input:focus-within { box-shadow: none; }

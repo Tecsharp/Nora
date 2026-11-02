@@ -1,17 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { REACTIONS } from './api'
 
-/** Todos los emojis que ofrece la ventana de reacciones, por categorías. */
-export const EMOJI_GROUPS: { id: string; label: string; list: string[] }[] = [
-  { id: 'faces', label: 'Caras', list: '😀 😃 😄 😁 😆 😅 🤣 😂 🙂 🙃 😉 😊 😇 🥰 😍 🤩 😘 😗 😚 😙 😋 😛 😜 🤪 😝 🤑 🤗 🤭 🤫 🤔 🤐 🤨 😐 😑 😶 😏 😒 🙄 😬 😮‍💨 🤥 😌 😔 😪 🤤 😴 😷 🤒 🤕 🤢 🤮 🤧 🥵 🥶 🥴 😵 🤯 🤠 🥳 😎 🤓 🧐 😕 😟 🙁 ☹️ 😮 😯 😲 😳 🥺 😦 😧 😨 😰 😥 😢 😭 😱 😖 😣 😞 😓 😩 😫 🥱 😤 😡 😠 🤬 😈 👿 💀 💩 🤡 👻 👽 🤖'.split(' ') },
-  { id: 'hands', label: 'Gestos', list: '👍 👎 👌 🤌 ✌️ 🤞 🤟 🤘 🤙 👈 👉 👆 👇 ☝️ ✋ 🤚 🖐️ 🖖 👋 🤝 👏 🙌 👐 🤲 🙏 💪 🦾 ✍️ 🤳 💅 🫶 🫡 🫰 🫱 🫲 👀 👁️ 🧠 🫀'.split(' ') },
-  { id: 'hearts', label: 'Corazones y símbolos', list: '❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 💯 💢 💥 💫 💦 💨 🕳️ 💬 💭 🔥 ✨ ⭐ 🌟 ⚡ ✅ ❌ ❓ ❗ ⚠️ 🚫 ➕ ➖ ➡️ ⬆️ ⬇️ ♻️ 🔔 🔕 📌 📍'.split(' ') },
-  { id: 'party', label: 'Celebración y objetos', list: '🎉 🎊 🎈 🎁 🏆 🥇 🥈 🥉 🏅 🎯 🎮 🎲 🎵 🎶 🎤 🎧 🎸 🥁 📣 📢 💡 🔑 🔒 🔓 🛠️ ⚙️ 💻 🖥️ ⌨️ 🖱️ 📱 ☎️ 📷 🎥 📺 📚 📖 📝 ✏️ 📎 📅 📆 ⏰ ⏳ 💰 💳 📈 📉 📊 🚀 🛸'.split(' ') },
-  { id: 'nature', label: 'Animales y naturaleza', list: '🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🙈 🙉 🙊 🐔 🐧 🐦 🦅 🦉 🦄 🐝 🦋 🐢 🐍 🐙 🐬 🐳 🦈 🌵 🌴 🌳 🌱 🍀 🌸 🌹 🌻 🌞 🌝 🌙 ⭐ ☁️ 🌈 ❄️ 🌊'.split(' ') },
-  { id: 'food', label: 'Comida y bebida', list: '🍎 🍊 🍋 🍌 🍉 🍇 🍓 🍒 🍑 🥭 🍍 🥑 🌽 🥕 🍅 🍔 🍟 🍕 🌭 🌮 🌯 🥪 🍝 🍣 🍜 🍩 🍪 🎂 🍰 🍫 🍿 ☕ 🍵 🥤 🍺 🍻 🥂 🍷 🍹'.split(' ') },
-  { id: 'travel', label: 'Viajes y deportes', list: '🚗 🚕 🚌 🚲 🛵 ✈️ 🚁 🚢 🏠 🏢 🏖️ ⛰️ 🗽 ⚽ 🏀 🏈 ⚾ 🎾 🏐 🏓 🥊 ⛳ 🏊 🚴 🧘 🌍 🗺️ 🧭'.split(' ') },
-]
-
 /** Los de siempre: van a la izquierda de la barra de reacciones y no se mueven nunca. */
 export const DEFAULT_REACTIONS = REACTIONS
 
