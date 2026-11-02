@@ -59,6 +59,13 @@ services:
       NORA_ADMIN_PASSWORD: ${NORA_ADMIN_PASSWORD:-}
       NORA_ALLOWED_ORIGINS: ${NORA_ALLOWED_ORIGINS:-}
       NORA_ALLOW_REGISTRATION: ${NORA_ALLOW_REGISTRATION:-true}
+      # Cómo se entra: password, google o both (el administrador también lo cambia en su panel). Google necesita id y secreto de cliente.
+      NORA_AUTH_MODE: ${NORA_AUTH_MODE:-password}
+      NORA_GOOGLE_CLIENT_ID: ${NORA_GOOGLE_CLIENT_ID:-}
+      NORA_GOOGLE_CLIENT_SECRET: ${NORA_GOOGLE_CLIENT_SECRET:-}
+      NORA_PUBLIC_URL: ${NORA_PUBLIC_URL:-}
+      NORA_GOOGLE_AUTH_URL: ${NORA_GOOGLE_AUTH_URL:-https://accounts.google.com/o/oauth2/v2/auth}
+      NORA_GOOGLE_TOKEN_URL: ${NORA_GOOGLE_TOKEN_URL:-https://oauth2.googleapis.com/token}
       NORA_COOKIE_SECURE: ${NORA_COOKIE_SECURE:-false}
       NORA_DEFAULT_STORAGE_QUOTA_MB: ${NORA_DEFAULT_STORAGE_QUOTA_MB:-1024}
       NORA_DEFAULT_MAX_FILE_MB: ${NORA_DEFAULT_MAX_FILE_MB:-100}

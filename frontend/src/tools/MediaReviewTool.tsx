@@ -13,6 +13,7 @@ import { loadFile, prefetchFile } from '../fileCache'
 import { mimeFor } from '../preview'
 import { fmtTime, mediaKind, streamUrl, useRoomFiles, type MediaKind, type RoomFileLite } from './media'
 import { useItems, type Item } from './useItems'
+import { useBusy } from '../useBusy'
 
 interface ReviewData {
   fileId: string
@@ -113,7 +114,9 @@ export default function MediaReviewTool({ room, focus }: { room: Room; focus?: F
     else m.pause()
   }, [])
 
-  async function post() {
+  // con el vídeo en marcha dos clics seguidos llevan distinto segundo: el candado evita dos comentarios iguales
+  const posting = useBusy()
+  const post = () => posting.run('post', async () => {
     const text = draft.trim()
     if (!text || !file) return
     try {
@@ -124,7 +127,7 @@ export default function MediaReviewTool({ room, focus }: { room: Room; focus?: F
     } catch (e) {
       toast(e instanceof Error ? e.message : 'No se pudo guardar el comentario', 'error')
     }
-  }
+  })
   async function edit(c: Comment) {
     const text = await dialogs.prompt({ title: 'Editar comentario', initial: c.data.text, maxLength: 2000, confirmLabel: 'Guardar' })
     if (text == null || !text.trim()) return
@@ -268,11 +271,11 @@ export default function MediaReviewTool({ room, focus }: { room: Room; focus?: F
             {canWrite ? (
               <div className="mr-composer">
                 <MessageSquarePlus size={18} />
-                <input ref={composer} value={draft} maxLength={2000} placeholder={kind === 'image' ? (pin ? 'Comentario en el punto marcado…' : 'Escribe un comentario (o marca un punto en la imagen)…') : `Comentar en ${fmtTime(time)}…  (Enter para enviar)`}
+                <input ref={composer} value={draft} maxLength={2000} placeholder={kind === 'image' ? (pin ? 'Comentario en el punto marcado…' : 'Escribe un comentario…') : `Comentar en ${fmtTime(time)}…`}
                   onFocus={() => { if (pauseOnType && kind !== 'image') el.current?.pause() }}
                   onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); void post() } else if (e.key === 'Escape') { e.stopPropagation(); setPin(null); composer.current?.blur() } }} />
                 {kind !== 'image' && <label className="check small" title="Pausa el vídeo al empezar a escribir y sigue al enviar"><input type="checkbox" checked={pauseOnType} onChange={(e) => setPauseOnType(e.target.checked)} /> Pausar</label>}
-                <button className="btn primary sm" disabled={!draft.trim()} onClick={() => void post()}>Comentar</button>
+                <button className="btn primary sm" disabled={!draft.trim() || posting.busy()} onClick={() => void post()}>Comentar</button>
               </div>
             ) : <p className="callout small mr-ro">Tu rol en esta sala es de <strong>lector</strong>: puedes ver y reproducir, pero no comentar.</p>}
           </>

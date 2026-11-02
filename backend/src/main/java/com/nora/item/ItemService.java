@@ -193,7 +193,7 @@ public class ItemService {
             case "event" -> {
                 Set<UUID> invited = invitedOf(d);
                 if (!invited.isEmpty() || isPrivate(it)) notifyInvited(room, it, invited, actor); // con invitados o personal: solo se avisa a quien invitaron
-                else notifications.notifyRoom(room, actor, "event", who + " agendó un evento", eventLine(d), link("calendar", it.getId()), null);
+                else notifications.notifyRoom(room, actor, "event", who + " agendó una cita", eventLine(d), link("calendar", it.getId()), null);
             }
             case "review" -> {
                 UUID file = UUID.fromString(String.valueOf(d.get("fileId")));
@@ -350,7 +350,7 @@ public class ItemService {
     // ---- reglas ----
 
     private void requireCanEdit(Room room, AuthPrincipal p, RoomItem it) {
-        if (isPrivate(it) && !isAuthor(p, it)) throw ApiException.forbidden("Solo quien lo creó puede cambiar un evento personal");
+        if (isPrivate(it) && !isAuthor(p, it)) throw ApiException.forbidden("Solo quien lo creó puede cambiar una cita personal");
         if (EDIT_ANY.contains(it.getTool()) || isAuthor(p, it) || rooms.canModerate(room, p.userId(), p.role())) return;
         throw ApiException.forbidden("Solo quien lo creó o quien modera puede cambiarlo");
     }

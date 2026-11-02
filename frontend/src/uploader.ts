@@ -126,7 +126,7 @@ export function startUpload(code: string, file: File, onUpdate: (p: UploadProgre
         throw new FatalError(`No se puede leer «${file.name}». Si es una carpeta, usa «Subir carpeta».`)
       })
       const session = await withRetry(() =>
-        api<Session>(base, 'POST', { name: file.name, size: file.size, contentType: file.type || undefined, fingerprint, folderId: folderId ?? undefined }),
+        api<Session>(base, 'POST', { name: file.name, size: file.size, contentType: file.type || undefined, fingerprint, folderId: folderId ?? undefined }, { dedupe: false }),
       )
       sessionId = session.id
       const have = new Set(session.received.map((p) => p.number))

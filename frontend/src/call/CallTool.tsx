@@ -6,6 +6,7 @@ import { useAuth } from '../auth'
 import { useToast } from '../toast'
 import { callApi, callUrl, normalizeCode, type CallInfo } from './api'
 import { useRoomCalls } from './useRoomCalls'
+import { useBusy } from '../useBusy'
 import { ago } from '../notifications'
 
 /** La herramienta Llamadas: empezar una llamada o videollamada con código, entrar a una abierta y ver las últimas. */
@@ -16,11 +17,12 @@ export default function CallTool({ room }: { room: Room }) {
   const { active, upcoming, recent, loaded, refresh } = useRoomCalls(room.code)
   const [title, setTitle] = useState('')
   const [access, setAccess] = useState<'HOST' | 'OPEN'>('HOST')
-  const [busy, setBusy] = useState(false)
+  const { run, busy: isBusy } = useBusy()
+  const busy = isBusy('start')
   const [code, setCode] = useState('')
 
-  const start = async () => {
-    setBusy(true)
+  // un doble clic abriría dos pestañas: el candado deja pasar solo el primero
+  const start = () => run('start', async () => {
     // la pestaña se abre en el gesto del clic (si no, el navegador la bloquea) y después se le pone la dirección
     const w = window.open('about:blank', '_blank')
     try {
@@ -33,8 +35,7 @@ export default function CallTool({ room }: { room: Room }) {
       w?.close()
       toast((e as Error).message, 'error')
     }
-    setBusy(false)
-  }
+  })
 
   const enter = (e: React.FormEvent) => {
     e.preventDefault()
@@ -66,7 +67,7 @@ export default function CallTool({ room }: { room: Room }) {
 
       <form className="calls-join" onSubmit={enter}>
         <LogIn size={16} />
-        <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Unirse con un código (abc-defg-hij)" aria-label="Código de llamada" />
+        <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Código de la llamada" aria-label="Código de llamada" />
         <button className="btn sm" disabled={!normalizeCode(code)}>Unirse</button>
       </form>
 

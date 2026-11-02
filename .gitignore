@@ -5,3 +5,12 @@ target/
 .idea/
 *.iml
 .DS_Store
+
+# Claude Code (configuración local, memoria y archivos del asistente)
+.claude/
+.claude-*/
+CLAUDE.md
+CLAUDE.local.md
+**/.claude/
+**/CLAUDE.md
+**/CLAUDE.local.md

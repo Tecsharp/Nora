@@ -12,6 +12,7 @@ import { canWrite as canWriteIn, isStaff as isStaffIn } from '../roles'
 import { aiNow, useAi } from '../ai/AiProvider'
 import { fmtDate } from '../dates'
 import { useItems, type Item } from './useItems'
+import { useBusy } from '../useBusy'
 
 type Status = 'todo' | 'doing' | 'review' | 'done'
 type Priority = 'low' | 'medium' | 'high'
@@ -200,7 +201,7 @@ export default function TasksTool({ room, focus }: { room: Room; focus?: FocusTa
                   </div>
                 ))}
                 {over?.status === c.id && over.index >= list.filter((x) => x.id !== dragId).length && dragId && <div className="kb-drop" />}
-                {!loading && !list.length && adding !== c.id && <div className="kb-empty">{q || mine || prio ? 'Sin resultados' : c.id === 'done' ? 'Lo completado aparecerá aquí' : 'Arrastra tareas hasta aquí'}</div>}
+                {!loading && !list.length && adding !== c.id && <div className="kb-empty">{q || mine || prio ? 'Sin resultados' : c.id === 'done' ? 'Lo completado aparecerá aquí' : 'Sin tareas'}</div>}
                 {adding === c.id && <QuickAdd onCancel={() => setAdding(null)} onAdd={async (title) => { await quickAdd(c.id, title) }} />}
               </div>
             </section>
@@ -225,15 +226,16 @@ export default function TasksTool({ room, focus }: { room: Room; focus?: FocusTa
 
 function QuickAdd({ onAdd, onCancel }: { onAdd: (title: string) => Promise<void>; onCancel: () => void }) {
   const [v, setV] = useState('')
-  const [busy, setBusy] = useState(false)
+  const { run, busy: isBusy } = useBusy()
+  const busy = isBusy()
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     const title = v.trim()
-    if (!title || busy) return
-    setBusy(true)
-    await onAdd(title)
-    setV('')
-    setBusy(false)
+    if (!title) return
+    await run('add', async () => {
+      await onAdd(title)
+      setV('')
+    })
   }
   return (
     <form className="kb-quick" onSubmit={submit}>
@@ -242,7 +244,6 @@ function QuickAdd({ onAdd, onCancel }: { onAdd: (title: string) => Promise<void>
       <div className="row">
         <button className="btn primary sm" disabled={!v.trim() || busy}>Añadir</button>
         <button type="button" className="btn ghost sm" onClick={onCancel}>Cerrar</button>
-        <span className="muted small">Enter añade otra</span>
       </div>
     </form>
   )
@@ -402,7 +403,7 @@ function TaskDialog({ t, room, canEdit, canDelete, onClose, onSave, onDelete }: 
           <div className="stack tight">
             <span className="small muted">Etiquetas</span>
             <div className="kb-labels">{d.labels.map((l) => <span key={l} className="kb-label">{l}{canEdit && <button aria-label={`Quitar ${l}`} onClick={() => set('labels', d.labels.filter((x) => x !== l))}><X size={11} /></button>}</span>)}</div>
-            {canEdit && <input value={label} maxLength={24} placeholder="Nueva etiqueta + Enter" onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addLabel() } }} />}
+            {canEdit && <input value={label} maxLength={24} placeholder="Nueva etiqueta" onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addLabel() } }} />}
           </div>
           <p className="muted small">Creada por {t.authorName}{t.authorId && nameOf.has(t.authorId) ? '' : ''} · {fmtDate(t.createdAt)}</p>
         </aside>
@@ -434,27 +435,26 @@ function AiTasksDialog({ room, onClose, onCreate }: { room: Room; onClose: () =>
     }
   }
   const person = (name: string | null) => (name ? room.participants.find((p) => p.displayName.toLowerCase() === name.toLowerCase() || p.displayName.toLowerCase().split(' ')[0] === name.toLowerCase())?.userId ?? null : null)
-  const add = async () => {
+  const adding = useBusy()
+  const add = () => adding.run('add', async () => {
     const chosen = (list ?? []).filter((t) => t.on)
-    setBusy(true)
     try {
       await onCreate(chosen.map((t) => ({ title: t.title, description: t.description, status: 'todo' as const, priority: t.priority, assignee: person(t.assignee), due: t.due, labels: [], checklist: [] })))
       onClose()
     } catch (e) {
       toast(e instanceof Error ? e.message : 'No se pudieron crear', 'error')
-      setBusy(false)
     }
-  }
+  })
 
   return (
     <Modal title="Crear tareas con IA" icon={<Sparkles size={20} />} onClose={onClose} wide
       footer={list
-        ? <><button className="btn ghost" onClick={() => setList(null)}>Volver</button><span className="grow" /><button className="btn primary" disabled={busy || !list.some((t) => t.on)} onClick={() => void add()}>Añadir {list.filter((t) => t.on).length} tareas</button></>
+        ? <><button className="btn ghost" onClick={() => setList(null)}>Volver</button><span className="grow" /><button className="btn primary" disabled={busy || adding.busy() || !list.some((t) => t.on)} onClick={() => void add()}>Añadir {list.filter((t) => t.on).length} tareas</button></>
         : <><span className="grow" /><button className="btn ghost" onClick={onClose}>Cancelar</button><button className="btn ai" disabled={busy || text.trim().length < 5} onClick={() => void run()}><Sparkles size={15} /> {busy ? 'Analizando…' : 'Extraer tareas'}</button></>}>
       {!list ? (
         <div className="stack">
           <p className="muted small">Pega notas de una reunión, un correo o una lista de ideas y la IA propondrá tareas con responsable y fecha cuando las mencione. Podrás revisarlas antes de añadirlas.</p>
-          <textarea rows={12} autoFocus value={text} maxLength={20000} onChange={(e) => setText(e.target.value)} placeholder="Ej.: Ana envía la propuesta al cliente el lunes. Luis revisa el presupuesto antes del viernes…" />
+          <textarea rows={12} autoFocus value={text} maxLength={20000} onChange={(e) => setText(e.target.value)} placeholder="Pega aquí las notas de la reunión…" />
         </div>
       ) : (
         <ul className="kb-suggest">

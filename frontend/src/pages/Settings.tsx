@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Camera, Globe, KeyRound, Laptop, LogOut, Settings as Cog, ShieldAlert, Smartphone, Trash2, User as UserIcon } from 'lucide-react'
 import { api, ApiError, formatBytes, getAccessToken, type User } from '../api'
 import { useAuth } from '../auth'
+import { useAuthConfig } from '../authConfig'
 import Avatar from '../components/Avatar'
 import BackButton from '../components/BackButton'
 import Tabs from '../components/Tabs'
@@ -43,6 +44,9 @@ async function squareAvatar(file: File): Promise<Blob> {
 
 function Profile({ user }: { user: User }) {
   const toast = useToast()
+  const cfg = useAuthConfig()
+  // cambiar el correo pide la contraseña, salvo que la cuenta no tenga (entra con Google) o el sitio ya no use contraseñas
+  const needsPassword = user.hasPassword && cfg?.passwordLogin !== false
   const pick = useRef<HTMLInputElement>(null)
   const [name, setName] = useState(user.displayName)
   const [email, setEmail] = useState(user.email)
@@ -84,7 +88,7 @@ function Profile({ user }: { user: User }) {
     try {
       const body: Record<string, string> = {}
       if (name.trim() !== user.displayName) body.displayName = name.trim()
-      if (emailChanged) { body.email = email.trim(); body.currentPassword = password }
+      if (emailChanged) { body.email = email.trim(); if (needsPassword) body.currentPassword = password }
       if (!Object.keys(body).length) return
       setUser(await api<User>('/me', 'PATCH', body))
       setPassword('')
@@ -116,7 +120,7 @@ function Profile({ user }: { user: User }) {
         <h3>Datos de la cuenta</h3>
         <label>Nombre<input value={name} minLength={2} maxLength={60} required onChange={(e) => setName(e.target.value)} /></label>
         <label>Correo electrónico<input type="email" value={email} maxLength={254} required onChange={(e) => setEmail(e.target.value)} /></label>
-        {emailChanged && (
+        {emailChanged && needsPassword && (
           <label>Contraseña actual<input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
             <span className="muted small">El correo es tu usuario de acceso: para cambiarlo hay que confirmar tu contraseña.</span></label>
         )}
@@ -127,8 +131,9 @@ function Profile({ user }: { user: User }) {
   )
 }
 
-function Security() {
+function Security({ user }: { user: User }) {
   const toast = useToast()
+  const cfg = useAuthConfig()
   const dialogs = useDialogs()
   const [cur, setCur] = useState('')
   const [next, setNext] = useState('')
@@ -147,7 +152,8 @@ function Security() {
     try {
       await api('/me/password', 'PUT', { currentPassword: cur, newPassword: next })
       setCur(''); setNext(''); setNext2('')
-      toast('Contraseña cambiada. Las demás sesiones se han cerrado.', 'success')
+      toast(user.hasPassword ? 'Contraseña cambiada. Las demás sesiones se han cerrado.' : 'Contraseña creada. Las demás sesiones se han cerrado.', 'success')
+      if (!user.hasPassword) window.dispatchEvent(new CustomEvent('nora:session', { detail: { ...user, hasPassword: true } }))
       void load()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo cambiar')
@@ -170,17 +176,18 @@ function Security() {
 
   return (
     <div className="stack" style={{ gap: 18 }}>
-      <form className="card stack" onSubmit={change}>
-        <h3 className="row"><KeyRound size={18} /> Cambiar la contraseña</h3>
-        <label>Contraseña actual<input type="password" autoComplete="current-password" required value={cur} onChange={(e) => setCur(e.target.value)} /></label>
+      {cfg?.passwordLogin !== false && <form className="card stack" onSubmit={change}>
+        <h3 className="row"><KeyRound size={18} /> {user.hasPassword ? 'Cambiar la contraseña' : 'Crear una contraseña'}</h3>
+        {!user.hasPassword && <p className="muted small">Ahora entras con Google. Si creas una contraseña también podrás entrar con tu correo.</p>}
+        {user.hasPassword && <label>Contraseña actual<input type="password" autoComplete="current-password" required value={cur} onChange={(e) => setCur(e.target.value)} /></label>}
         <div className="grid-2">
           <label>Contraseña nueva<input type="password" autoComplete="new-password" required minLength={10} maxLength={72} value={next} onChange={(e) => setNext(e.target.value)} /></label>
           <label>Repite la nueva<input type="password" autoComplete="new-password" required value={next2} onChange={(e) => setNext2(e.target.value)} /></label>
         </div>
         <p className="muted small">De 10 a 72 caracteres, con mayúscula, minúscula y número. Al cambiarla se cierran tus demás sesiones.</p>
         {error && <p className="error small" role="alert">{error}</p>}
-        <div><button className="btn primary" disabled={busy}>{busy ? 'Guardando…' : 'Cambiar contraseña'}</button></div>
-      </form>
+        <div><button className="btn primary" disabled={busy}>{busy ? 'Guardando…' : user.hasPassword ? 'Cambiar contraseña' : 'Crear contraseña'}</button></div>
+      </form>}
       <section className="card stack">
         <div className="section-title" style={{ marginBottom: 0 }}>
           <h3 className="row"><Globe size={18} /> Sesiones abiertas</h3>
@@ -209,6 +216,8 @@ function Account({ user, storageUsed }: { user: User; storageUsed: number }) {
   const navigate = useNavigate()
   const toast = useToast()
   const { logout } = useAuth()
+  const cfg = useAuthConfig()
+  const needsPassword = user.hasPassword && cfg?.passwordLogin !== false
   const [pw, setPw] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -228,7 +237,7 @@ function Account({ user, storageUsed }: { user: User; storageUsed: number }) {
     setBusy(true)
     try {
       await uploads.cancelAll()
-      await api('/me', 'DELETE', { password: pw })
+      await api('/me', 'DELETE', { password: needsPassword ? pw : '' })
       await logout().catch(() => undefined)
       toast('Tu cuenta y tus datos se han eliminado', 'success')
       navigate('/login', { replace: true })
@@ -249,9 +258,9 @@ function Account({ user, storageUsed }: { user: User; storageUsed: number }) {
       <form className="card stack danger-zone" onSubmit={remove}>
         <h3 className="row"><ShieldAlert size={18} /> Borrar mi cuenta</h3>
         <p className="small">Elimina <b>todos tus datos</b> de Nora de forma definitiva: tus salas (con sus archivos, notas y pizarras), lo que hayas subido o creado en otras salas, tu foto, tus sesiones y tus bibliotecas. Los archivos se borran también del almacenamiento. Es lo que recoge la <a href="/data">política de datos</a>.</p>
-        <label>Tu contraseña<input type="password" autoComplete="current-password" required value={pw} onChange={(e) => setPw(e.target.value)} /></label>
+        {needsPassword && <label>Tu contraseña<input type="password" autoComplete="current-password" required value={pw} onChange={(e) => setPw(e.target.value)} /></label>}
         {error && <p className="error small" role="alert">{error}</p>}
-        <div><button className="btn danger-solid" disabled={busy || !pw}><Trash2 size={15} /> {busy ? 'Borrando…' : 'Borrar mi cuenta y mis datos'}</button></div>
+        <div><button className="btn danger-solid" disabled={busy || (needsPassword && !pw)}><Trash2 size={15} /> {busy ? 'Borrando…' : 'Borrar mi cuenta y mis datos'}</button></div>
       </form>
     </div>
   )
@@ -275,7 +284,7 @@ export default function Settings() {
       <Tabs label="Secciones de ajustes" value={tab} onChange={setTab}
         items={[{ id: 'profile', label: <><UserIcon size={15} /> Perfil</> }, { id: 'security', label: <><KeyRound size={15} /> Seguridad</> }, { id: 'account', label: <><ShieldAlert size={15} /> Cuenta</> }]} />
       {tab === 'profile' && <Profile user={user} />}
-      {tab === 'security' && <Security />}
+      {tab === 'security' && <Security user={user} />}
       {tab === 'account' && <Account user={user} storageUsed={used} />}
     </div>
   )

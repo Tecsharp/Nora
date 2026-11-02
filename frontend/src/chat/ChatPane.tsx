@@ -473,7 +473,7 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
           )}
           <div className="chat-input">
             <button type="button" className="icon-btn" aria-label="Emojis" aria-pressed={emojis} onClick={() => setEmojis((v) => !v)}><Smile size={19} /></button>
-            <textarea ref={input} rows={1} value={draft} maxLength={4000} placeholder={variant === 'window' ? 'Escribe un mensaje…' : 'Escribe un mensaje…  (Enter envía, Mayús+Enter salto de línea)'} aria-label="Mensaje"
+            <textarea ref={input} rows={1} value={draft} maxLength={4000} placeholder={'Escribe un mensaje…'} aria-label="Mensaje"
               onChange={(e) => { typed(e.target.value); setCaret(e.target.selectionStart) }} onKeyDown={onKey}
               onKeyUp={(e) => setCaret(e.currentTarget.selectionStart)} onClick={(e) => setCaret(e.currentTarget.selectionStart)} />
             <button className="btn primary chat-send" onClick={() => void send()} disabled={!draft.trim() || sending} aria-label={editing ? 'Guardar cambios' : 'Enviar'}>{editing ? <Check size={17} /> : <Send size={17} />}</button>

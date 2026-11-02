@@ -51,8 +51,21 @@ const ICONS: Record<NonNullable<ConfirmOptions['icon']>, LucideIcon> = { trash: 
 
 export function DialogProvider({ children }: { children: ReactNode }) {
   const [queue, setQueue] = useState<Pending[]>([])
-  const confirm = useCallback((o: ConfirmOptions) => new Promise<boolean>((done) => setQueue((q) => [...q, { kind: 'confirm', o, done }])), [])
-  const prompt = useCallback((o: PromptOptions) => new Promise<string | null>((done) => setQueue((q) => [...q, { kind: 'prompt', o, done }])), [])
+  // Diálogos iguales abiertos o en cola: un doble clic en «Borrar» no debe pedir confirmación dos veces (y mandar dos borrados);
+  // el clic repetido se responde como «Cancelar» y solo sigue el primero.
+  const open = useRef(new Set<string>())
+  const confirm = useCallback((o: ConfirmOptions) => {
+    const key = `confirm\u0000${o.title}\u0000${o.confirmLabel ?? ''}\u0000${o.typeToConfirm ?? ''}`
+    if (open.current.has(key)) return Promise.resolve(false)
+    open.current.add(key)
+    return new Promise<boolean>((done) => setQueue((q) => [...q, { kind: 'confirm', o, done: (v) => { open.current.delete(key); done(v) } }]))
+  }, [])
+  const prompt = useCallback((o: PromptOptions) => {
+    const key = `prompt\u0000${o.title}\u0000${o.initial ?? ''}`
+    if (open.current.has(key)) return Promise.resolve(null)
+    open.current.add(key)
+    return new Promise<string | null>((done) => setQueue((q) => [...q, { kind: 'prompt', o, done: (v) => { open.current.delete(key); done(v) } }]))
+  }, [])
   const notify = useCallback((o: Omit<ConfirmOptions, 'hideCancel'>) => confirm({ ...o, hideCancel: true, confirmLabel: o.confirmLabel ?? 'Entendido' }).then(() => undefined), [confirm])
   const api = useRef<Api>({ confirm, notify, prompt })
   const current = queue[0]

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type KeyboardEvent, type PointerEvent as RPointerEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, BellOff, Check, Clock, Copy, Hash, LayoutDashboard, LayoutGrid, MessageSquare, Plus, Settings, ShieldCheck, Trash2, Users } from 'lucide-react'
 import type { Room } from '../api'
@@ -34,6 +34,18 @@ interface Props {
 }
 
 const SHOWN = 5 // conversaciones que se ven por sección antes de «Ver todas»
+const SIZE_KEY = 'nora-nav-chats-h'
+const MIN_H = 72
+
+/** Alto elegido para la lista de conversaciones; null = se ajusta a lo que hay (sin hueco vacío). */
+function useChatsHeight() {
+  const [h, setH] = useState<number | null>(() => { try { const v = Number(localStorage.getItem(SIZE_KEY)); return v >= MIN_H ? v : null } catch { return null } })
+  const save = (v: number | null) => {
+    setH(v)
+    try { if (v == null) localStorage.removeItem(SIZE_KEY); else localStorage.setItem(SIZE_KEY, String(Math.round(v))) } catch { /* sin almacenamiento */ }
+  }
+  return [h, save] as const
+}
 
 /**
  * Barra lateral de la sala. Arriba, lo que más se usa: las conversaciones (general, grupos y mensajes directos, con lo que no has leído);
@@ -43,6 +55,39 @@ export default function RoomNav(p: Props) {
   const { room, active, online } = p
   const chat = useChat()
   const [more, setMore] = useState<Record<string, boolean>>({})
+  const [chatsH, setChatsH] = useChatsHeight()
+  const chatsRef = useRef<HTMLElement>(null)
+  const navRef = useRef<HTMLElement>(null)
+  // lo más alto que puede ser sin tapar las herramientas ni el pie de la barra
+  const maxH = () => {
+    const nav = navRef.current
+    if (!nav) return MIN_H
+    const others = Array.from(nav.children).reduce((n, el) => (el === chatsRef.current ? n : n + el.getBoundingClientRect().height), 0)
+    return Math.max(MIN_H, nav.clientHeight - others)
+  }
+  const clampH = (v: number) => Math.min(maxH(), Math.max(MIN_H, v))
+
+  // arrastrar la barra que está encima de Resumen y Personas agranda o achica la lista de conversaciones
+  const startResize = (e: RPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    const handle = e.currentTarget
+    const y0 = e.clientY
+    const h0 = chatsRef.current?.getBoundingClientRect().height ?? MIN_H
+    handle.setPointerCapture(e.pointerId)
+    document.body.style.userSelect = 'none'
+    const move = (ev: PointerEvent) => setChatsH(clampH(h0 + ev.clientY - y0))
+    const up = () => { document.body.style.userSelect = ''; handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); handle.removeEventListener('pointercancel', up) }
+    handle.addEventListener('pointermove', move)
+    handle.addEventListener('pointerup', up)
+    handle.addEventListener('pointercancel', up)
+  }
+  const keyResize = (e: KeyboardEvent<HTMLDivElement>) => {
+    const cur = chatsRef.current?.getBoundingClientRect().height ?? MIN_H
+    if (e.key === 'ArrowUp') { e.preventDefault(); setChatsH(clampH(cur - 24)) }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); setChatsH(clampH(cur + 24)) }
+    else if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); setChatsH(null) }
+  }
   const onlineList = room.participants.filter((x) => online.has(x.userId))
   const people = new Map(room.participants.map((x) => [x.userId, x]))
 
@@ -97,7 +142,7 @@ export default function RoomNav(p: Props) {
   const current = TOOLS.find((t) => t.id === active && !pinnedTools.some((x) => x.id === t.id) && t.id !== 'chat')
 
   return (
-    <aside className="ws-nav" aria-label="Navegación de la sala">
+    <aside className="ws-nav" ref={navRef} aria-label="Navegación de la sala">
       <div className="ws-room">
         <Link to="/" className="ws-back"><ArrowLeft size={14} /> Mis salas</Link>
         <h2 className="ws-room-name" title={room.name}>{room.name}</h2>
@@ -111,7 +156,7 @@ export default function RoomNav(p: Props) {
         </div>
       </div>
 
-      <nav className="ws-scroll ws-chats" aria-label="Conversaciones">
+      <nav className={`ws-scroll ws-chats ${chatsH != null ? 'sized' : ''}`} ref={chatsRef} style={chatsH != null ? { height: chatsH } : undefined} aria-label="Conversaciones">
         <div className="ws-chats-head">
           <button className={`ws-chats-title ${active === 'chat' ? 'on' : ''}`} onClick={() => chat.openFull()} title="Abrir todas las conversaciones">
             <MessageSquare size={15} /> Mensajes {chat.unread > 0 && <span className="ws-badge hot">{chat.unread > 99 ? '99+' : chat.unread}</span>}
@@ -125,6 +170,18 @@ export default function RoomNav(p: Props) {
           <p className="ws-empty">Crea un grupo o escribe a alguien desde <button onClick={() => chat.openFull()}>Mensajes</button>.</p>
         )}
       </nav>
+
+      <div
+        className="ws-resize"
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Cambiar el tamaño de la lista de conversaciones"
+        title="Cambiar el tamaño de la lista"
+        tabIndex={0}
+        onPointerDown={startResize}
+        onDoubleClick={() => setChatsH(null)}
+        onKeyDown={keyResize}
+      ><i /></div>
 
       <div className="ws-tools" aria-label="Sala y herramientas">
         <div className="ws-pair">

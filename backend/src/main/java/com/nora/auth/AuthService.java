@@ -71,6 +71,9 @@ public class AuthService {
 
     @Transactional
     public User register(RegisterRequest req) {
+        if (!settings.passwordLogin()) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "En este sitio solo se entra con Google");
+        }
         if (!settings.registrationEnabled()) {
             throw new ApiException(HttpStatus.FORBIDDEN, "El registro está desactivado");
         }
@@ -83,7 +86,10 @@ public class AuthService {
         if (users.existsByEmail(normalized)) {
             throw ApiException.conflict("Ya existe una cuenta con ese email");
         }
-        User u = new User(normalized, displayName.trim(), encoder.encode(rawPassword), role);
+        // sin contraseña (cuentas que entran con Google) se guarda una aleatoria que nadie conoce
+        boolean hasPassword = rawPassword != null && !rawPassword.isBlank();
+        User u = new User(normalized, displayName.trim(), encoder.encode(hasPassword ? rawPassword : randomSecret()), role);
+        u.setPasswordSet(hasPassword);
         var d = settings.defaults();
         u.setStorageQuotaBytes(d.storageQuotaMb() * 1024 * 1024);
         u.setMaxFileSizeBytes(d.maxFileMb() * 1024 * 1024);
@@ -95,6 +101,9 @@ public class AuthService {
 
     @Transactional(noRollbackFor = ApiException.class)
     public Session login(LoginRequest req, String userAgent) {
+        if (!settings.passwordLogin()) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "En este sitio solo se entra con Google");
+        }
         User user = users.findByEmail(req.email().trim().toLowerCase(Locale.ROOT)).orElse(null);
         if (user == null) {
             encoder.matches(req.password(), dummyHash);
@@ -102,6 +111,10 @@ public class AuthService {
         }
         if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(Instant.now())) {
             throw new ApiException(HttpStatus.TOO_MANY_REQUESTS, "Cuenta bloqueada temporalmente. Inténtalo más tarde");
+        }
+        if (!user.isPasswordSet()) {
+            encoder.matches(req.password(), dummyHash);
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "Esta cuenta entra con Google");
         }
         if (!encoder.matches(req.password(), user.getPasswordHash())) {
             int attempts = user.getFailedAttempts() + 1;
@@ -119,6 +132,48 @@ public class AuthService {
         user.setLockedUntil(null);
         user.setLastLoginAt(Instant.now());
         return issue(user, Boolean.TRUE.equals(req.remember()), userAgent, Instant.now());
+    }
+
+    /**
+     * Entrada con una identidad ya verificada por Google. Se reconoce a la persona por su «sub» de Google; si es la primera vez, por su
+     * correo (verificado por Google), de modo que quien ya tenía cuenta con contraseña pasa a poder entrar de las dos formas. Si no hay cuenta, se crea
+     * (solo si el registro está abierto).
+     */
+    @Transactional
+    public Session loginWithGoogle(GoogleAuthService.Identity id, boolean remember, String userAgent) {
+        String email = id.email().trim().toLowerCase(Locale.ROOT);
+        User user = users.findByGoogleSub(id.sub()).orElse(null);
+        if (user == null) {
+            user = users.findByEmail(email).orElse(null);
+            if (user != null) {
+                if (user.getGoogleSub() != null && !user.getGoogleSub().equals(id.sub())) throw new OAuthError("conflict");
+                user.setGoogleSub(id.sub());
+            }
+        }
+        if (user == null) {
+            if (!settings.registrationEnabled()) throw new OAuthError("registration_disabled");
+            user = createUser(email, googleName(id.name(), email), null, Role.USER);
+            user.setGoogleSub(id.sub());
+        }
+        if (!user.isEnabled()) throw new OAuthError("account_disabled");
+        user.setFailedAttempts(0);
+        user.setLockedUntil(null);
+        user.setLastLoginAt(Instant.now());
+        return issue(user, remember, userAgent, Instant.now());
+    }
+
+    /** El nombre de Google adaptado a lo que admite Nora (letras, números y . _ ' - ; de 2 a 60 caracteres). */
+    static String googleName(String name, String email) {
+        String n = name == null ? "" : name.replaceAll("[^\\p{L}\\p{N} ._'-]", "").trim();
+        if (n.length() < 2) n = email.substring(0, email.indexOf('@') > 0 ? email.indexOf('@') : email.length()).replaceAll("[^\\p{L}\\p{N} ._'-]", "");
+        if (n.length() < 2) n = "Usuario";
+        return n.length() > 60 ? n.substring(0, 60).trim() : n;
+    }
+
+    private String randomSecret() {
+        byte[] b = new byte[32];
+        random.nextBytes(b);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(b);
     }
 
     @Transactional(noRollbackFor = ApiException.class)
@@ -201,9 +256,11 @@ public class AuthService {
     @Transactional
     public void changePassword(UUID userId, String current, String next, String currentRaw) {
         User u = users.findById(userId).orElseThrow(() -> ApiException.notFound("Usuario no encontrado"));
-        if (!encoder.matches(current == null ? "" : current, u.getPasswordHash())) throw ApiException.badRequest("La contraseña actual no es correcta");
+        // quien entra con Google y aún no tiene contraseña la elige sin tener que dar la actual
+        if (u.isPasswordSet() && !encoder.matches(current == null ? "" : current, u.getPasswordHash())) throw ApiException.badRequest("La contraseña actual no es correcta");
         checkPassword(next);
         u.setPasswordHash(encoder.encode(next));
+        u.setPasswordSet(true);
         revokeOthers(userId, currentRaw); // el resto de dispositivos tiene que volver a entrar
     }
 
@@ -211,6 +268,8 @@ public class AuthService {
     @Transactional(readOnly = true)
     public void requirePassword(UUID userId, String password) {
         User u = users.findById(userId).orElseThrow(() -> ApiException.notFound("Usuario no encontrado"));
+        // sin contraseña (cuenta de Google o sitio que solo entra con Google) basta con la sesión abierta
+        if (!u.isPasswordSet() || !settings.passwordLogin()) return;
         if (!encoder.matches(password == null ? "" : password, u.getPasswordHash())) throw ApiException.badRequest("La contraseña no es correcta");
     }
 
@@ -220,6 +279,7 @@ public class AuthService {
 
     @Transactional
     public ResetLink createResetLink(UUID adminId, UUID targetId) {
+        if (!settings.passwordLogin()) throw ApiException.badRequest("En este sitio solo se entra con Google: no hay contraseñas que cambiar");
         users.findById(targetId).orElseThrow(() -> ApiException.notFound("Usuario no encontrado"));
         byte[] bytes = new byte[32];
         random.nextBytes(bytes);
@@ -257,6 +317,7 @@ public class AuthService {
         checkPassword(next);
         User u = users.findById(row.userId()).orElseThrow(() -> ApiException.notFound("Este enlace no es válido"));
         u.setPasswordHash(encoder.encode(next));
+        u.setPasswordSet(true);
         u.setFailedAttempts(0);
         u.setLockedUntil(null);
         jdbc.update("update password_resets set used_at = now() where id = ?", row.id());

@@ -24,8 +24,8 @@ import org.springframework.web.multipart.MultipartFile;
 public class MeController {
 
     public record ProfileRequest(@Size(max = 60) String displayName, @Size(max = 254) String email, @Size(max = 72) String currentPassword) {}
-    public record PasswordRequest(@NotBlank @Size(max = 72) String currentPassword, @NotBlank @Size(max = 72) String newPassword) {}
-    public record DeleteRequest(@NotBlank @Size(max = 72) String password) {}
+    public record PasswordRequest(@Size(max = 72) String currentPassword, @NotBlank @Size(max = 72) String newPassword) {}
+    public record DeleteRequest(@Size(max = 72) String password) {}
 
     private final UserRepository users;
     private final FileService files;

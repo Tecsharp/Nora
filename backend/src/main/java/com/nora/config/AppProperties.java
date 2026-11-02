@@ -9,6 +9,8 @@ public record AppProperties(
         boolean cookieSecure,
         List<String> allowedOrigins,
         boolean allowRegistration,
+        String authMode,
+        Google google,
         Admin admin,
         Defaults defaults,
         Storage storage,
@@ -18,6 +20,11 @@ public record AppProperties(
         Chat chat) {
 
     public record Jwt(String secret, long accessTtlMinutes, long refreshTtlDays) {}
+
+    /** Inicio de sesión con Google (OAuth 2.0 / OpenID Connect). Sin id y secreto de cliente queda desactivado. {@code publicUrl} fija la dirección pública (vacío = se deduce de la petición). */
+    public record Google(String clientId, String clientSecret, String publicUrl, String authUrl, String tokenUrl) {
+        public boolean configured() { return clientId != null && !clientId.isBlank() && clientSecret != null && !clientSecret.isBlank(); }
+    }
 
     public record Admin(String email, String password, String name) {}
 

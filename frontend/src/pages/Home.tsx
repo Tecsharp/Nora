@@ -11,6 +11,7 @@ import { api, ApiError, formatBytes, type Room, type RoomSummary, type User } fr
 import { useAuth } from '../auth'
 import ExpiryDialog from '../components/ExpiryDialog'
 import { remaining } from '../time'
+import { useBusy } from '../useBusy'
 
 interface Me {
   user: User
@@ -21,6 +22,7 @@ export default function Home() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [rooms, setRooms] = useState<RoomSummary[] | null>(null)
+  const { run, busy } = useBusy()
   const [me, setMe] = useState<Me | null>(null)
   const [name, setName] = useState('')
   const [minutes, setMinutes] = useState(120)
@@ -68,27 +70,31 @@ export default function Home() {
 
   async function create(e: FormEvent) {
     e.preventDefault()
-    setError('')
-    try {
-      const room = await api<Room>('/rooms', 'POST', {
-        name, minutes, requireApproval: approval, defaultRole: defRole, maxParticipants: maxP.trim() ? Number(maxP) : undefined, keepWhenExpired: keep,
-      })
-      navigate(`/room/${room.code}`)
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Error al crear la sala')
-    }
+    await run('create', async () => {
+      setError('')
+      try {
+        const room = await api<Room>('/rooms', 'POST', {
+          name, minutes, requireApproval: approval, defaultRole: defRole, maxParticipants: maxP.trim() ? Number(maxP) : undefined, keepWhenExpired: keep,
+        })
+        navigate(`/room/${room.code}`)
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : 'Error al crear la sala')
+      }
+    })
   }
 
   async function join(e: FormEvent) {
     e.preventDefault()
-    setError('')
-    try {
-      const res = await api<Room | { pending: true; roomName: string; code: string }>('/rooms/join', 'POST', { code: code.trim() })
-      if ('pending' in res) setWaiting({ code: res.code, roomName: res.roomName })
-      else navigate(`/room/${res.code}`)
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Error al unirse a la sala')
-    }
+    await run('join', async () => {
+      setError('')
+      try {
+        const res = await api<Room | { pending: true; roomName: string; code: string }>('/rooms/join', 'POST', { code: code.trim() })
+        if ('pending' in res) setWaiting({ code: res.code, roomName: res.roomName })
+        else navigate(`/room/${res.code}`)
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : 'Error al unirse a la sala')
+      }
+    })
   }
 
   const first = user?.displayName?.split(' ')[0]
@@ -163,10 +169,10 @@ export default function Home() {
                       {r.isOwner ? (
                         <span className="row">
                           <button className="btn primary sm" onClick={() => setReactivate(r)}>Reactivar</button>
-                          <button className="btn danger sm" onClick={async () => {
+                          <button className="btn danger sm" disabled={busy(`del:${r.code}`)} onClick={() => void run(`del:${r.code}`, async () => {
                             if (!(await dialogs.confirm({ title: '¿Eliminar la sala?', message: <>«{r.name}» se borrará con todos sus archivos y contenido. No se puede deshacer.</>, confirmLabel: 'Eliminar', tone: 'danger', icon: 'trash', typeToConfirm: 'ELIMINAR' }))) return
                             try { await api(`/rooms/${r.code}`, 'DELETE'); reload() } catch { toast('No se pudo eliminar la sala', 'error') }
-                          }}>Eliminar</button>
+                          })}>Eliminar</button>
                         </span>
                       ) : <span className="muted small">El propietario puede reactivarla.</span>}
                     </div>
@@ -212,7 +218,7 @@ export default function Home() {
               <input required maxLength={12} placeholder="NX-ABC123" aria-label="Código de la sala" autoCapitalize="characters" autoComplete="off"
                 value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} />
             </div>
-            <button className="btn block">Unirse <ArrowRight size={16} /></button>
+            <button className="btn block" disabled={busy('join')}>{busy('join') ? 'Uniéndote…' : <>Unirse <ArrowRight size={16} /></>}</button>
           </form>
           <form className="card stack" onSubmit={create}>
             <h2 className="row"><Plus size={20} /> Crear sala</h2>
@@ -240,7 +246,7 @@ export default function Home() {
                 <RoomOptions approval={approval} setApproval={setApproval} role={defRole} setRole={setDefRole} max={maxP} setMax={setMaxP} cap={limits?.maxParticipants} />
               </div>
             )}
-            <button className="btn primary block">Crear sala</button>
+            <button className="btn primary block" disabled={busy('create')}>{busy('create') ? 'Creando…' : 'Crear sala'}</button>
           </form>
         </aside>
       </div>
