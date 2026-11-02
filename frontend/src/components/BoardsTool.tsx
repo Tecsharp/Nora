@@ -14,6 +14,7 @@ import Menu, { type MenuItem } from './Menu'
 import Tabs from './Tabs'
 import { useMarquee } from '../marquee'
 import { fmtDateTime } from '../dates'
+import { useBusy } from '../useBusy'
 
 interface BoardItem extends DocInfo {
   createdBy: string
@@ -81,6 +82,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
     }
   })
   const [creating, setCreating] = useState(false)
+  const { run, busy: locked } = useBusy()
   const [folderName, setFolderName] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [anchor, setAnchor] = useState<string | null>(null)
@@ -212,14 +214,16 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
 
   async function createFolder(e: FormEvent) {
     e.preventDefault()
-    try {
-      const f = await api<FolderItem>(`/rooms/${room.code}/folders?kind=FILE`, 'POST', { name: folderName, parentId: current })
-      setFolders((all) => (all.some((x) => x.id === f.id) ? all : [...all, f]))
-      setCreating(false)
-      setFolderName('')
-    } catch (err) {
-      fail(err)
-    }
+    await run('folder', async () => {
+      try {
+        const f = await api<FolderItem>(`/rooms/${room.code}/folders?kind=FILE`, 'POST', { name: folderName, parentId: current })
+        setFolders((all) => (all.some((x) => x.id === f.id) ? all : [...all, f]))
+        setCreating(false)
+        setFolderName('')
+      } catch (err) {
+        fail(err)
+      }
+    })
   }
 
   async function renameFolder(f: FolderItem) {
@@ -244,7 +248,8 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
     await api(`/rooms/${room.code}/folders/${f.id}`, 'DELETE').catch(fail)
   }
 
-  async function create() {
+  // doble clic en «Nueva pizarra»: se crea y se abre una sola
+  const create = () => run('board', async () => {
     setBusy('Creando…')
     try {
       onOpen(await api<BoardItem>(`/rooms/${room.code}/docs`, 'POST', { kind: 'BOARD', name: 'Pizarra sin título', folderId: current }))
@@ -253,7 +258,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
     } finally {
       setBusy('')
     }
-  }
+  })
 
   /** Importa una pizarra: .excalidraw/.json tal cual; PNG o SVG con la escena incrustada se convierten aquí. */
   async function importFile(file: File) {
@@ -456,7 +461,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
       {creating && (
         <form className="inline-form" onSubmit={createFolder}>
           <input autoFocus required maxLength={60} placeholder="Nombre de la carpeta" aria-label="Nombre de la carpeta" value={folderName} onChange={(e) => setFolderName(e.target.value)} />
-          <button className="btn primary sm" disabled={!folderName.trim()}>Crear</button>
+          <button className="btn primary sm" disabled={!folderName.trim() || locked('folder')}>Crear</button>
           <button type="button" className="btn ghost sm" onClick={() => setCreating(false)}>Cancelar</button>
         </form>
       )}
@@ -497,7 +502,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
           <div className="empty">
             {searching ? <Search size={36} /> : <PenTool size={36} />}
             <strong>{searching ? 'Sin resultados' : current ? 'Esta carpeta está vacía' : 'Todavía no hay pizarras'}</strong>
-            <span className="small">{searching ? 'Prueba con otro nombre.' : canWrite ? 'Crea una pizarra, importa un archivo .excalidraw o arrastra aquí pizarras desde otra carpeta.' : 'Todavía no hay nada que ver.'}</span>
+            <span className="small">{searching ? 'Sin resultados.' : canWrite ? 'Crea o importa una pizarra.' : 'Todavía no hay nada que ver.'}</span>
           </div>
         ) : (
           <>
@@ -515,7 +520,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
 
       <div className="ex-status">
         <span>{shownFolders.length} carpeta{shownFolders.length === 1 ? '' : 's'} · {shownBoards.length} pizarra{shownBoards.length === 1 ? '' : 's'}</span>
-        <span className="hide-sm">{canWrite ? 'Ctrl/⌘ o Mayús + clic para seleccionar varias · arrástralas a una carpeta para moverlas' : 'Clic para abrir'}</span>
+        <span className="hide-sm">{canWrite ? 'Ctrl/⌘ o Mayús + clic para seleccionar varias' : 'Clic para abrir'}</span>
       </div>
     </div>
   )

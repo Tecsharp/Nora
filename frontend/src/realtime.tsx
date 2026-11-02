@@ -115,7 +115,7 @@ class RealtimeClient {
     this.setStatus('connecting')
     let ticket: string
     try {
-      ticket = (await api<{ ticket: string }>('/ws/ticket', 'POST')).ticket
+      ticket = (await api<{ ticket: string }>('/ws/ticket', 'POST', undefined, { dedupe: false })).ticket
     } catch {
       this.setStatus('offline')
       this.scheduleRetry()

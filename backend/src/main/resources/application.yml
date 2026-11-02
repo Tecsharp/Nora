@@ -45,6 +45,14 @@ app:
   cookie-secure: ${NORA_COOKIE_SECURE:false}
   allowed-origins: ${NORA_ALLOWED_ORIGINS:}
   allow-registration: ${NORA_ALLOW_REGISTRATION:true}
+  # Cómo se entra: password (correo y contraseña), google (solo Google) o both (las dos). El administrador puede cambiarlo en el panel.
+  auth-mode: ${NORA_AUTH_MODE:password}
+  google:
+    client-id: ${NORA_GOOGLE_CLIENT_ID:}
+    client-secret: ${NORA_GOOGLE_CLIENT_SECRET:}
+    public-url: ${NORA_PUBLIC_URL:}
+    auth-url: ${NORA_GOOGLE_AUTH_URL:https://accounts.google.com/o/oauth2/v2/auth}
+    token-url: ${NORA_GOOGLE_TOKEN_URL:https://oauth2.googleapis.com/token}
   admin:
     email: ${NORA_ADMIN_EMAIL:}
     password: ${NORA_ADMIN_PASSWORD:}

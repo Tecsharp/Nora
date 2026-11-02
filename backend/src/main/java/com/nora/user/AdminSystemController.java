@@ -1,9 +1,12 @@
 package com.nora.user;
 
+import com.nora.auth.AuthPrincipal;
+import com.nora.common.ApiException;
 import com.nora.config.SettingsService;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 /** Resumen del sistema y ajustes que decide el administrador. */
@@ -14,7 +17,10 @@ public class AdminSystemController {
     private final JdbcTemplate jdbc;
     private final SettingsService settings;
 
-    public AdminSystemController(JdbcTemplate jdbc, SettingsService settings) {
+    private final UserRepository users;
+
+    public AdminSystemController(JdbcTemplate jdbc, SettingsService settings, UserRepository users) {
+        this.users = users;
         this.jdbc = jdbc;
         this.settings = settings;
     }
@@ -47,7 +53,12 @@ public class AdminSystemController {
     }
 
     @PutMapping("/settings")
-    public Map<String, Object> update(@RequestBody SettingsService.Update req) {
+    public Map<String, Object> update(@RequestBody SettingsService.Update req, @AuthenticationPrincipal AuthPrincipal me) {
+        // «Solo Google» sin que el propio administrador haya entrado nunca con Google lo dejaría fuera de su panel
+        if ("google".equalsIgnoreCase(req.authMode() == null ? "" : req.authMode().trim())
+                && users.findById(me.userId()).map(u -> u.getGoogleSub() == null).orElse(true)) {
+            throw ApiException.badRequest("Antes entra una vez con Google con tu cuenta de administrador (usa «Ambas») para no quedarte fuera");
+        }
         return settings.update(req);
     }
 }

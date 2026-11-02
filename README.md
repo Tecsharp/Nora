@@ -58,7 +58,7 @@ Salas colaborativas **temporales** para trabajar en equipo: archivos, pizarra, d
 ### 📅 Planificación
 - **Tablero** de tareas con arrastrar y soltar.
 - **Votaciones** anónimas con cierre automático.
-- **Calendario** con mes, semana y día, **invitaciones**, **llamada en el evento** y vista de **disponibilidad** de cada persona (sus eventos personales solo salen como «Ocupado»).
+- **Calendario** con mes, semana y día, **invitaciones**, **llamada en la cita** y vista de **disponibilidad** de cada persona (sus eventos personales solo salen como «Ocupado»).
 
 </td>
 <td width="50%" valign="top">
@@ -212,6 +212,9 @@ Todo se controla desde el `.env` (el `setup.sh` lo crea y lo mantiene al día). 
 |---|---|---|
 | `NORA_PORT` / `NORA_BIND` | Puerto y dirección donde escucha (`127.0.0.1` = solo esta máquina) | `29817` / `0.0.0.0` |
 | `NORA_ALLOW_REGISTRATION` | Permitir que cualquiera se registre | `true` |
+| `NORA_AUTH_MODE` | Cómo se entra: `password`, `google` o `both` (el administrador lo cambia también en Admin → Sistema y manda sobre esta variable) | `password` |
+| `NORA_GOOGLE_CLIENT_ID` · `NORA_GOOGLE_CLIENT_SECRET` | Credenciales OAuth de Google; sin ellas solo hay correo y contraseña | vacío |
+| `NORA_PUBLIC_URL` | Dirección pública (p. ej. `https://nora.tudominio.com`) para la redirección de Google; vacío = se deduce de la petición | vacío |
 | `NORA_DEFAULT_STORAGE_QUOTA_MB` · `NORA_DEFAULT_MAX_FILE_MB` | Espacio por cuenta y tamaño máximo de archivo | `1024` · `100` |
 | `NORA_DEFAULT_ROOM_MINUTES` · `NORA_DEFAULT_MAX_ROOMS` | Duración de las salas y salas activas por cuenta | `120` · `5` |
 | `NORA_CALL_MAX_PARTICIPANTS` | Personas máximas por llamada | `8` |

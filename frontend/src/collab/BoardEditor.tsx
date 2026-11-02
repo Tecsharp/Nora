@@ -611,7 +611,7 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
       </Excalidraw>
       {sbEl && !phone && createPortal(
         // dentro de la propia barra: así Excalidraw no la cierra al pulsar el asa (lo haría con un clic «fuera»)
-        <div className="board-sb-handle" role="separator" aria-orientation="vertical" aria-label="Cambiar el ancho de la barra de bibliotecas" title="Arrastra para cambiar el ancho (doble clic: ancho original)"
+        <div className="board-sb-handle" role="separator" aria-orientation="vertical" aria-label="Cambiar el ancho de la barra de bibliotecas" title="Cambiar el ancho"
           onPointerDown={startResize} onDoubleClick={() => { setSbWidth(302); try { localStorage.removeItem('nora-board-sidebar') } catch { /* nada */ } }} />,
         sbEl,
       )}

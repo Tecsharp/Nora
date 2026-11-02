@@ -38,6 +38,7 @@ import PlayerTool from '../tools/PlayerTool'
 import { fmt as fmtFocus, useFocus } from '../tools/useFocus'
 import { setFilesOpen } from '../ui'
 import { resumeInterrupted } from '../uploadManager'
+import { useBusy } from '../useBusy'
 
 
 const DocEditor = lazy(() => import('../collab/DocEditor'))
@@ -193,7 +194,9 @@ export default function RoomPage() {
     if (isOwnerLike) loadRequests()
   }, [isOwnerLike, loadRequests])
 
-  async function decide(userId: string, approve: boolean) {
+  // una sola respuesta por solicitud: pulsar «Aprobar» y «Rechazar» seguidos no manda dos
+  const deciding = useBusy()
+  const decide = (userId: string, approve: boolean) => deciding.run(`req:${userId}`, async () => {
     try {
       await api(`/rooms/${code}/join-requests/${userId}`, 'POST', { approve })
       setRequests((all) => all.filter((r) => r.userId !== userId))
@@ -202,7 +205,7 @@ export default function RoomPage() {
       toast(err instanceof ApiError ? err.message : 'No se pudo responder', 'error')
       loadRequests()
     }
-  }
+  })
 
   const openDoc = useCallback((d: DocInfo) => {
     setEditingDoc(d) // el editor se abre encima: al cerrarlo se vuelve a Archivos
@@ -300,7 +303,7 @@ export default function RoomPage() {
     calls: roomCalls.active.length > 0 ? <span className="ws-badge hot" title="Llamada en curso" aria-label={`${roomCalls.active.length} llamadas en curso`}>{roomCalls.active.length}</span> : null,
     player: playing ? <span className="ws-badge info" title="Sonando"><span className="pl-eq"><i /><i /><i /></span></span> : null,
     focus: focus.state.status === 'running' ? <span className="ws-badge info mono" title="Temporizador en marcha">{fmtFocus(focus.remaining)}</span> : null,
-    calendar: calendar.today > 0 ? <span className="ws-badge info" aria-label={`${calendar.today} eventos hoy`} title="Eventos de hoy">{calendar.today}</span> : null,
+    calendar: calendar.today > 0 ? <span className="ws-badge info" aria-label={`${calendar.today} citas hoy`} title="Citas de hoy">{calendar.today}</span> : null,
   }
   const title = active === OVERVIEW ? 'Resumen' : active === PEOPLE.id ? 'Personas' : tool?.label ?? ''
 

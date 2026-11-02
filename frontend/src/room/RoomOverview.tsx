@@ -109,7 +109,7 @@ export default function RoomOverview({ room, owner, requests, onOpen, onExtend }
             })}
           </Section>
 
-          <Section onOpen={onOpen} title="Próximos eventos" icon={<CalendarDays size={15} />} tool="calendar" count={upcoming.length} empty={events.loading ? 'Cargando…' : 'No hay eventos próximos.'}>
+          <Section onOpen={onOpen} title="Próximas citas" icon={<CalendarDays size={15} />} tool="calendar" count={upcoming.length} empty={events.loading ? 'Cargando…' : 'No hay eventos próximos.'}>
             {upcoming.map((e) => (
               <li key={e.id}>
                 <button className="ws-row link" onClick={() => onOpen('calendar', e.id)}>
@@ -147,7 +147,7 @@ export default function RoomOverview({ room, owner, requests, onOpen, onExtend }
             ))}
           </Section>
 
-          <Section onOpen={onOpen} title="Archivos recientes" icon={<FolderOpen size={15} />} tool="files" count={recent.length} empty="Todavía no hay archivos. Arrastra algunos a Archivos para empezar.">
+          <Section onOpen={onOpen} title="Archivos recientes" icon={<FolderOpen size={15} />} tool="files" count={recent.length} empty="Sin archivos.">
             {recent.map((f) => (
               <li key={f.id}>
                 <button className="ws-row link" onClick={() => onOpen('files', undefined, f.id)}>

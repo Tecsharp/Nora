@@ -13,6 +13,7 @@ import AiAssist, { TEXT_ACTIONS, type AiAction } from '../ai/AiAssist'
 import { useTextareaAi } from '../ai/useTextareaAi'
 import { FileText as FileTextIcon } from 'lucide-react'
 import Modal from './Modal'
+import { useBusy } from '../useBusy'
 
 interface Note {
   id: string
@@ -59,6 +60,7 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
   const [creating, setCreating] = useState(false)
+  const { run, busy } = useBusy()
   const [folderName, setFolderName] = useState('')
   const [editing, setEditing] = useState<Note | null>(null)
   const composerRef = useRef<HTMLTextAreaElement>(null)
@@ -170,27 +172,31 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
   // ---- acciones ----
   async function add(e: FormEvent) {
     e.preventDefault()
-    setError('')
-    try {
-      const note = await api<Note>(`${path}?kind=${kind}`, 'POST', { content: text, folderId: current })
-      setText('')
-      setItems((all) => (all.some((n) => n.id === note.id) ? all : [note, ...all]))
-    } catch (err) {
-      fail(err)
-    }
+    await run('add', async () => {
+      setError('')
+      try {
+        const note = await api<Note>(`${path}?kind=${kind}`, 'POST', { content: text, folderId: current })
+        setText('')
+        setItems((all) => (all.some((n) => n.id === note.id) ? all : [note, ...all]))
+      } catch (err) {
+        fail(err)
+      }
+    })
   }
 
   async function createFolder(e: FormEvent) {
     e.preventDefault()
-    setError('')
-    try {
-      const f = await api<FolderItem>(folderPath, 'POST', { name: folderName, parentId: current })
-      setFolders((all) => (all.some((x) => x.id === f.id) ? all : [...all, f]))
-      setCreating(false)
-      setFolderName('')
-    } catch (err) {
-      fail(err)
-    }
+    await run('folder', async () => {
+      setError('')
+      try {
+        const f = await api<FolderItem>(folderPath, 'POST', { name: folderName, parentId: current })
+        setFolders((all) => (all.some((x) => x.id === f.id) ? all : [...all, f]))
+        setCreating(false)
+        setFolderName('')
+      } catch (err) {
+        fail(err)
+      }
+    })
   }
 
   async function renameFolder(f: FolderItem) {
@@ -318,7 +324,7 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
             <span className="muted small">Se añadirá en «{where(current)}»</span>
             <span className="row">
               <AiAssist actions={NOTE_ACTIONS} getText={composerAi.getText} onApply={composerAi.onApply} disabled={!text.trim()} />
-              <button className="btn primary sm" disabled={!text.trim()}><Plus size={15} /> Añadir</button>
+              <button className="btn primary sm" disabled={!text.trim() || busy('add')}><Plus size={15} /> Añadir</button>
             </span>
           </div>
         </form>
@@ -336,7 +342,7 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
       {creating && (
         <form className="inline-form" onSubmit={createFolder}>
           <input autoFocus required maxLength={60} placeholder="Nombre de la carpeta" aria-label="Nombre de la carpeta" value={folderName} onChange={(e) => setFolderName(e.target.value)} />
-          <button className="btn primary sm" disabled={!folderName.trim()}>Crear</button>
+          <button className="btn primary sm" disabled={!folderName.trim() || busy('folder')}>Crear</button>
           <button type="button" className="btn ghost sm" onClick={() => setCreating(false)}>Cancelar</button>
         </form>
       )}
@@ -440,7 +446,7 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
 
       <div className="ex-status">
         <span>{shownFolders.length} carpeta{shownFolders.length === 1 ? '' : 's'} · {shown.length} nota{shown.length === 1 ? '' : 's'}</span>
-        <span className="hide-sm">{canWrite ? 'Arrastra con el ratón para seleccionar varias · arrástralas a una carpeta para moverlas' : 'Clic para abrir'}</span>
+        <span className="hide-sm">{canWrite ? 'Selecciona varias con el ratón' : 'Clic para abrir'}</span>
       </div>
 
       {editing && (

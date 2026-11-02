@@ -12,7 +12,10 @@ public record UserDto(
         Instant createdAt,
         Limits limits,
         int avatarVersion,
-        Instant lastLoginAt) {
+        Instant lastLoginAt,
+        /** false = la cuenta entra con Google y aún no tiene contraseña. */
+        boolean hasPassword,
+        boolean googleLinked) {
 
     /** null = infinito. */
     public record Limits(
@@ -26,6 +29,6 @@ public record UserDto(
         return new UserDto(u.getId(), u.getEmail(), u.getDisplayName(), u.getRole(), u.isEnabled(), u.getCreatedAt(),
                 new Limits(u.getStorageQuotaBytes(), u.getMaxFileSizeBytes(), u.getMaxRoomMinutes(),
                         u.getMaxActiveRooms(), u.getMaxParticipants()),
-                u.getAvatarVersion(), u.getLastLoginAt());
+                u.getAvatarVersion(), u.getLastLoginAt(), u.isPasswordSet(), u.getGoogleSub() != null);
     }
 }

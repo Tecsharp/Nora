@@ -1,6 +1,6 @@
 import { useFocusTarget, type FocusTarget } from './focus'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { CalendarDays, CalendarPlus, Check, ChevronLeft, ChevronRight, Copy, Download, HelpCircle, ListTodo, Lock, MapPin, Pencil, Plus, ShieldCheck, Sparkles, Trash2, UserPlus, Users, Video, Wand2, X } from 'lucide-react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as RMouseEvent } from 'react'
+import { AlignLeft, CalendarDays, CalendarPlus, Check, ChevronLeft, ChevronRight, Clock, Copy, Download, HelpCircle, ListTodo, Lock, MapPin, Pencil, Plus, ShieldCheck, Sparkles, Trash2, UserPlus, Users, Video, Wand2, X } from 'lucide-react'
 import type { Room } from '../api'
 import { useAuth } from '../auth'
 import Avatar from '../components/Avatar'
@@ -103,7 +103,7 @@ export default function CalendarTool({ room, focus }: { room: Room; focus?: Focu
   const [cursor, setCursor] = useState(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }) // cualquier día del periodo que se mira
     const [view, setView] = useState<View>(() => { try { return (localStorage.getItem('nora-cal-view') as View) || 'week' } catch { return 'week' } })
   const changeView = (v: View) => { setView(v); try { localStorage.setItem('nora-cal-view', v) } catch { /* sin almacenamiento */ } }
-  const [openState, setOpen] = useState<{ id?: string; draft?: Partial<EventData>; edit: boolean } | null>(null)
+  const [openState, setOpen] = useState<{ id?: string; draft?: Partial<EventData>; edit: boolean; quick?: boolean; anchor?: { x: number; y: number } | null } | null>(null)
   // el evento abierto se lee siempre de la lista en vivo: así las respuestas que llegan se ven al instante
   const open = openState ? { ...openState, ev: openState.id ? items.find((x) => x.id === openState.id) : undefined } : null
   const [aiOpen, setAiOpen] = useState(false)
@@ -141,7 +141,8 @@ export default function CalendarTool({ room, focus }: { room: Room; focus?: Focu
   }, [byDay, todayKey])
   const fail = (e: unknown, fallback: string) => toast(e instanceof Error ? e.message : fallback, 'error')
 
-  const newOn = (k: string) => setOpen({ edit: true, draft: { title: '', description: '', location: '', allDay: false, start: `${k}T09:00`, end: `${k}T10:00`, color: COLORS[0]! } })
+  const newOn = (k: string, anchor?: { x: number; y: number } | null) => setOpen({ edit: true, quick: true, anchor, draft: { title: '', description: '', location: '', allDay: false, start: `${k}T09:00`, end: `${k}T10:00`, color: COLORS[0]! } })
+  const fromButton = (e: RMouseEvent<HTMLElement>) => { const r = e.currentTarget.getBoundingClientRect(); return { x: r.right - 470, y: r.bottom + 8 } }
 
   return (
     <div className="cal">
@@ -160,19 +161,19 @@ export default function CalendarTool({ room, focus }: { room: Room; focus?: Focu
           <button role="tab" aria-selected={view === 'agenda'} className={view === 'agenda' ? 'on' : ''} onClick={() => changeView('agenda')}><ListTodo size={13} /> Agenda</button>
           <button role="tab" aria-selected={view === 'avail'} className={view === 'avail' ? 'on' : ''} onClick={() => changeView('avail')} title="Cuándo está libre cada persona"><Users size={13} /> Disponibilidad</button>
         </div>
-        <button className="btn sm ghost" disabled={!items.length} title="Descargar todos los eventos (.ics) para tu calendario" onClick={() => download(`${room.name}.ics`, ics(items, room.name))}><Download size={14} /> .ics</button>
+        <button className="btn sm ghost" disabled={!items.length} title="Descargar todas las citas (.ics) para tu calendario" onClick={() => download(`${room.name}.ics`, ics(items, room.name))}><Download size={14} /> .ics</button>
         {canWrite && ai.enabled && <button className="btn ai sm" onClick={() => setAiOpen(true)}><Sparkles size={14} /> Crear desde texto</button>}
-        {canWrite && <button className="btn primary sm" onClick={() => newOn(todayKey)}><Plus size={15} /> Nuevo evento</button>}
+        {canWrite && <button className="btn primary sm" onClick={(e) => newOn(todayKey, fromButton(e))}><Plus size={15} /> Nueva cita</button>}
       </div>
       {error && <p className="error small center-text">{error}</p>}
 
       {view === 'week' || view === 'day' ? (
         <TimeGrid days={view === 'week' ? weekDays : [cursor]} byDay={byDay} todayKey={todayKey} canWrite={canWrite}
           onOpen={(e) => setOpen({ id: e.id, edit: false })}
-          onCreate={(start, end, allDay) => setOpen({ edit: true, draft: { title: '', description: '', location: '', allDay, start, end, color: COLORS[0]! } })} />
+          onCreate={(start, end, allDay, at) => setOpen({ edit: true, quick: true, anchor: at, draft: { title: '', description: '', location: '', allDay, start, end, color: COLORS[0]! } })} />
       ) : view === 'avail' ? (
         <AvailView room={room} cursor={cursor} meId={user?.id} canWrite={canWrite} onOpen={(id) => setOpen({ id, edit: false })}
-          onCreate={(draft) => setOpen({ edit: true, draft: { title: '', description: '', location: '', allDay: false, color: COLORS[0]!, ...draft } })} />
+          onCreate={(draft) => setOpen({ edit: true, quick: true, draft: { title: '', description: '', location: '', allDay: false, color: COLORS[0]!, ...draft } })} />
       ) : view === 'month' ? (
         <div className="cal-month">
           <div className="cal-week head">{WEEKDAYS.map((w) => <span key={w}>{w}</span>)}</div>
@@ -181,7 +182,7 @@ export default function CalendarTool({ room, focus }: { room: Room; focus?: Focu
               const k = ymd(d)
               const evs = byDay.get(k) ?? []
               return (
-                <div key={k} className={`cal-cell ${d.getMonth() !== cursor.getMonth() ? 'out' : ''} ${k === todayKey ? 'today' : ''}`} onClick={() => canWrite && newOn(k)}>
+                <div key={k} className={`cal-cell ${d.getMonth() !== cursor.getMonth() ? 'out' : ''} ${k === todayKey ? 'today' : ''}`} onClick={(e) => canWrite && newOn(k, { x: e.clientX, y: e.clientY })}>
                   <span className="cal-num">{d.getDate()}</span>
                   {evs.slice(0, 3).map((e) => (
                     <button key={e.id} className={`cal-chip ${e.data.allDay ? 'allday' : ''}`} style={{ ['--c' as string]: e.data.color ?? COLORS[0] }} onClick={(ev) => { ev.stopPropagation(); setOpen({ id: e.id, edit: false }) }} title={`${e.data.title} · ${when(e.data)}`}>
@@ -197,9 +198,9 @@ export default function CalendarTool({ room, focus }: { room: Room; focus?: Focu
       ) : (
         <div className="cal-agenda">
           {!agenda.length && !loading && (
-            <div className="cal-empty"><CalendarDays size={32} /><strong>No hay eventos próximos</strong>
+            <div className="cal-empty"><CalendarDays size={32} /><strong>No hay citas próximas</strong>
               <span className="small">{canWrite ? 'Crea una reunión, una entrega o un recordatorio para que todo el equipo lo vea.' : 'Cuando alguien cree un evento aparecerá aquí.'}</span>
-              {canWrite && <button className="btn primary" onClick={() => newOn(todayKey)}><CalendarPlus size={15} /> Nuevo evento</button>}</div>
+              {canWrite && <button className="btn primary" onClick={() => newOn(todayKey)}><CalendarPlus size={15} /> Nueva cita</button>}</div>
           )}
           {agenda.map(([k, evs]) => (
             <section key={k} className="cal-day">
@@ -221,7 +222,12 @@ export default function CalendarTool({ room, focus }: { room: Room; focus?: Focu
         </div>
       )}
 
-      {open && <EventDialog key={open.ev?.id ?? 'new'} ev={open.ev} draft={open.draft} startEditing={open.edit} room={room} people={people} meId={user?.id}
+      {open && !open.ev && open.quick && (
+        <QuickCreate key="quick" room={room} draft={open.draft} anchor={open.anchor} meId={user?.id} meName={user?.displayName ?? ''} meVersion={user?.avatarVersion} onClose={() => setOpen(null)}
+          onMore={(d) => setOpen({ edit: true, draft: d })}
+          onSave={async (d) => { await create({ ...d, startMs: parse(d.start).getTime(), endMs: parse(d.end).getTime() }) }} />
+      )}
+      {open && !(open.quick && !open.ev) && <EventDialog key={open.ev?.id ?? 'new'} ev={open.ev} draft={open.draft} startEditing={open.edit} room={room} people={people} meId={user?.id}
         canEdit={canWrite && (!open.ev || open.ev.authorId === user?.id || staff)} onClose={() => setOpen(null)}
         onSave={async (d) => {
           const withTimes = { ...d, startMs: parse(d.start).getTime(), endMs: parse(d.end).getTime() }
@@ -230,10 +236,10 @@ export default function CalendarTool({ room, focus }: { room: Room; focus?: Focu
         onRsvp={(s) => open.ev && act(open.ev.id, 'rsvp', { status: s }).catch((e) => fail(e, 'No se pudo responder'))}
         onDelete={async () => {
           if (!open.ev) return
-          if (!(await dialogs.confirm({ title: '¿Borrar el evento?', message: <>«{open.ev.data.title}» desaparecerá del calendario de todas las personas.</>, confirmLabel: 'Borrar', tone: 'danger', icon: 'trash' }))) return
+          if (!(await dialogs.confirm({ title: '¿Borrar la cita?', message: <>«{open.ev.data.title}» desaparecerá del calendario de todas las personas.</>, confirmLabel: 'Borrar', tone: 'danger', icon: 'trash' }))) return
           try { await remove(open.ev.id); setOpen(null) } catch (e) { fail(e, 'No se pudo borrar') }
         }} />}
-      {aiOpen && <AiEventDialog onClose={() => setAiOpen(false)} onPick={(d) => { setAiOpen(false); setOpen({ edit: true, draft: d }) }} />}
+      {aiOpen && <AiEventDialog onClose={() => setAiOpen(false)} onPick={(d) => { setAiOpen(false); setOpen({ edit: true, quick: true, draft: d }) }} />}
     </div>
   )
 }
@@ -269,7 +275,7 @@ function layout(evs: Ev[], k: string): Seg[] {
 }
 
 function TimeGrid({ days, byDay, todayKey, canWrite, onOpen, onCreate }: {
-  days: Date[]; byDay: Map<string, Ev[]>; todayKey: string; canWrite: boolean; onOpen: (e: Ev) => void; onCreate: (start: string, end: string, allDay: boolean) => void
+  days: Date[]; byDay: Map<string, Ev[]>; todayKey: string; canWrite: boolean; onOpen: (e: Ev) => void; onCreate: (start: string, end: string, allDay: boolean, at?: { x: number; y: number }) => void
 }) {
   const scroller = useRef<HTMLDivElement>(null)
   const [now, setNow] = useState(() => new Date())
@@ -303,7 +309,7 @@ function TimeGrid({ days, byDay, todayKey, canWrite, onOpen, onCreate }: {
             {days.map((d) => {
               const k = ymd(d)
               return (
-                <div key={k} className="tg-allcell" onClick={() => canWrite && onCreate(`${k}T00:00`, `${k}T00:00`, true)}>
+                <div key={k} className="tg-allcell" onClick={(e) => canWrite && onCreate(`${k}T00:00`, `${k}T00:00`, true, { x: e.clientX, y: e.clientY })}>
                   {(byDay.get(k) ?? []).filter((e) => e.data.allDay).map((e) => (
                     <button key={e.id} className="cal-chip allday" style={{ ['--c' as string]: e.data.color ?? COLORS[0] }} title={`${e.data.title} · ${when(e.data)}`} onClick={(ev) => { ev.stopPropagation(); onOpen(e) }}><span>{e.data.title}</span></button>
                   ))}
@@ -327,11 +333,11 @@ function TimeGrid({ days, byDay, todayKey, canWrite, onOpen, onCreate }: {
                   setDrag({ k, a, b: a + 30 })
                 }}
                 onPointerMove={(e) => { if (drag?.k === k) setDrag({ ...drag, b: Math.max(drag.a + 15, minuteAt(e, e.currentTarget)) }) }}
-                onPointerUp={() => {
+                onPointerUp={(e) => {
                   if (drag?.k === k) {
                     const dd = drag
                     setDrag(null)
-                    onCreate(iso(k, dd.a), iso(k, Math.min(1439, dd.b)), false)
+                    onCreate(iso(k, dd.a), iso(k, Math.min(1439, dd.b)), false, { x: e.clientX, y: e.clientY })
                   }
                 }}
                 onPointerCancel={() => setDrag(null)}>
@@ -380,7 +386,7 @@ function AvailView({ room, cursor, meId, canWrite, onCreate, onOpen }: { room: R
           <select value={dur} onChange={(e) => setDur(Number(e.target.value))}>{[30, 45, 60, 90, 120].map((m) => <option key={m} value={m}>{m} min</option>)}</select>
         </label>
       </div>
-      <p className="av-note small muted"><Lock size={12} /> Solo ves cuándo está ocupada cada persona. Sus eventos personales aparecen como «Ocupado», sin detalles.</p>
+      <p className="av-note small muted"><Lock size={12} /> Solo ves cuándo está ocupada cada persona. Sus citas personales aparecen como «Ocupado», sin detalles.</p>
       {loading ? <p className="muted small">Cargando…</p> : (
         <AvailabilityGrid users={users} ids={ids} meId={meId} day={day} onPick={canWrite ? (d, m) => create(d, m, m + dur) : undefined} onOpenEvent={onOpen} />
       )}
@@ -396,6 +402,207 @@ function AvailView({ room, cursor, meId, canWrite, onCreate, onOpen }: { room: R
           ))}
         </div>
       </section>
+    </div>
+  )
+}
+
+/**
+ * Creación rápida, como la de Google Calendar: una tarjeta flotante junto al hueco que se pulsó, con el título, la hora, las personas
+ * invitadas, la llamada, el lugar y la descripción. «Más opciones» abre el formulario completo con lo que ya se escribió.
+ */
+function QuickCreate({ room, draft, anchor, meId, meName, meVersion, onClose, onSave, onMore }: {
+  room: Room; draft?: Partial<EventData>; anchor?: { x: number; y: number } | null; meId?: string; meName: string; meVersion?: number
+  onClose: () => void; onSave: (d: EventData) => Promise<void>; onMore: (d: EventData) => void
+}) {
+  const toast = useToast()
+  const [d, setD] = useState<EventData>(() => ({ title: '', description: '', location: '', allDay: false, start: '', end: '', color: COLORS[0]!, invitees: [], private: false, withCall: false, callAccess: 'OPEN', ...(draft ?? {}) }))
+  const [saving, setSaving] = useState(false)
+  const [q, setQ] = useState('')
+  const [pick, setPick] = useState(false)
+  const [colors, setColors] = useState(false)
+  const [showDesc, setShowDesc] = useState(!!d.description)
+  const [showPlace, setShowPlace] = useState(!!d.location)
+  const box = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
+  const set = <K extends keyof EventData>(k: K, v: EventData[K]) => setD((x) => ({ ...x, [k]: v }))
+  const invitees = d.invitees ?? []
+  const others = room.participants.filter((p) => p.userId !== meId)
+  const candidates = others.filter((p) => !invitees.includes(p.userId) && p.displayName.toLowerCase().includes(q.trim().toLowerCase()))
+  const byId = useMemo(() => new Map(room.participants.map((p) => [p.userId, p])), [room.participants])
+
+  // la tarjeta se coloca junto al clic (o centrada) sin salirse de la pantalla
+  useLayoutEffect(() => {
+    const el = box.current
+    if (!el) return
+    const w = el.offsetWidth, h = el.offsetHeight
+    const x = anchor ? anchor.x + 14 : (window.innerWidth - w) / 2
+    const y = anchor ? anchor.y - 30 : Math.max(24, (window.innerHeight - h) / 3)
+    setPos({ x: Math.max(12, Math.min(x, window.innerWidth - w - 12)), y: Math.max(12, Math.min(y, window.innerHeight - h - 12)) })
+  }, [anchor])
+  // si la tarjeta crece (invitados, descripción…) se sube lo justo para que no se salga por abajo
+  useEffect(() => {
+    const el = box.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => setPos((p) => (p ? { x: p.x, y: Math.max(12, Math.min(p.y, window.innerHeight - el.offsetHeight - 12)) } : p)))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', on)
+    return () => window.removeEventListener('keydown', on)
+  }, [onClose])
+  const drag = (e: React.PointerEvent) => {
+    if (!pos) return
+    const ox = e.clientX - pos.x, oy = e.clientY - pos.y
+    const move = (m: PointerEvent) => setPos({ x: Math.max(0, Math.min(m.clientX - ox, window.innerWidth - 120)), y: Math.max(0, Math.min(m.clientY - oy, window.innerHeight - 60)) })
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up) }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+
+  const startDay = day(d.start || ymd(new Date()))
+  const avail = useAvailability(room.code, startDay, ymd(addDays(new Date(`${startDay}T00:00:00`), 6)))
+  const group = [...(meId ? [meId] : []), ...invitees]
+  const dur = Math.max(30, Math.round((parse(d.end).getTime() - parse(d.start).getTime()) / 60000) || 60)
+  const clashes = !d.allDay && d.start && d.end ? avail.users.filter((u) => group.includes(u.userId) && u.busy.some((b) => b.start < d.end && b.end > d.start)) : []
+  const suggest = () => {
+    const sl = findSlots(avail.users, group, startDay, 7, dur, 1)[0]
+    if (!sl) return toast('No hay un hueco libre para todas las personas en los próximos días laborables', 'info')
+    setD((x) => ({ ...x, start: isoAt(sl.day, sl.start), end: isoAt(sl.day, sl.end) }))
+  }
+
+  // al mover el inicio, el final se mueve con él (se conserva la duración)
+  const shift = (start: string) => {
+    const len = Math.max(0, parse(d.end).getTime() - parse(d.start).getTime())
+    const e = new Date(parse(start).getTime() + len)
+    setD((x) => ({ ...x, start, end: `${ymd(e)}T${pad(e.getHours())}:${pad(e.getMinutes())}` }))
+  }
+  const dateOf = (s: string) => day(s)
+  const save = async () => {
+    if (!d.title.trim()) return toast('Ponle un título', 'warning')
+    if (d.end < d.start) return toast('La cita no puede terminar antes de empezar', 'warning')
+    setSaving(true)
+    try {
+      await onSave({ ...d, title: d.title.trim(), start: d.allDay ? `${day(d.start)}T00:00` : d.start, end: d.allDay ? `${day(d.end)}T00:00` : d.end })
+      onClose()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'No se pudo guardar', 'error')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="qc" ref={box} role="dialog" aria-label="Nueva cita" style={pos ? { left: pos.x, top: pos.y } : { visibility: 'hidden' }}>
+      <div className="qc-top" onPointerDown={drag}><i /><button className="icon-btn sm" onClick={onClose} aria-label="Cerrar" onPointerDown={(e) => e.stopPropagation()}><X size={18} /></button></div>
+      <div className="qc-body">
+        <input autoFocus className="qc-title" value={d.title} maxLength={150} placeholder="Agregar título" aria-label="Título" onChange={(e) => set('title', e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') void save() }} />
+
+        <div className="qc-row">
+          <Clock size={18} />
+          <div className="qc-when">
+            <div className="qc-line">
+              <input type="date" className="qc-in" aria-label="Fecha" value={dateOf(d.start)} onChange={(e) => { if (e.target.value) shift(`${e.target.value}T${d.allDay ? '09:00' : hhmm(d.start)}`) }} />
+              {!d.allDay && (
+                <>
+                  <input type="time" className="qc-in" aria-label="Hora de inicio" value={hhmm(d.start)} onChange={(e) => { if (e.target.value) shift(`${day(d.start)}T${e.target.value}`) }} />
+                  <span>–</span>
+                  <input type="time" className="qc-in" aria-label="Hora de fin" value={hhmm(d.end)} onChange={(e) => { if (e.target.value) set('end', `${day(d.end)}T${e.target.value}`) }} />
+                </>
+              )}
+            </div>
+            <label className="qc-check"><input type="checkbox" checked={d.allDay} onChange={(e) => set('allDay', e.target.checked)} /> Todo el día</label>
+          </div>
+        </div>
+
+        <div className="qc-row top">
+          <Users size={18} />
+          <div className="qc-grow">
+            <div className="qc-invite">
+              <input className="qc-field" placeholder="Agregar invitados" aria-label="Agregar invitados" value={q} onChange={(e) => { setQ(e.target.value); setPick(true) }} onFocus={() => setPick(true)} onBlur={() => setTimeout(() => setPick(false), 140)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && candidates[0]) { e.preventDefault(); set('invitees', [...invitees, candidates[0].userId]); setQ('') } }} />
+              {pick && candidates.length > 0 && (
+                <div className="qc-pop" role="listbox">
+                  {!q && others.length > 1 && <button type="button" className="qc-opt all" onMouseDown={(e) => { e.preventDefault(); set('invitees', others.map((p) => p.userId)); setQ('') }}><Users size={15} /> Invitar a toda la sala</button>}
+                  {candidates.map((p) => (
+                    <button key={p.userId} type="button" role="option" className="qc-opt" onMouseDown={(e) => { e.preventDefault(); set('invitees', [...invitees, p.userId]); setQ('') }}>
+                      <Avatar name={p.displayName} userId={p.userId} version={p.avatarVersion} size={22} /> {p.displayName}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            {invitees.length > 0 && (
+              <div className="qc-chips">
+                {invitees.map((u) => { const p = byId.get(u); return (
+                  <span key={u} className="qc-chip"><Avatar name={p?.displayName ?? '?'} userId={u} version={p?.avatarVersion} size={18} />{p?.displayName.split(' ')[0] ?? '?'}
+                    <button type="button" aria-label={`Quitar a ${p?.displayName}`} onClick={() => set('invitees', invitees.filter((x) => x !== u))}><X size={12} /></button></span>
+                ) })}
+              </div>
+            )}
+            {invitees.length > 0 && !d.allDay && (
+              <div className="qc-avail">
+                <div className="row between"><span className="small muted">Disponibilidad</span><button type="button" className="btn sm ghost" onClick={suggest}><Wand2 size={13} /> Sugerir hora libre</button></div>
+                {!avail.loading && <AvailabilityGrid users={avail.users} ids={group} meId={meId} day={startDay} proposal={{ start: d.start, end: d.end }} from={8 * 60} to={20 * 60}
+                  onPick={(dd, m) => setD((x) => ({ ...x, start: isoAt(dd, m), end: isoAt(dd, m + dur) }))} />}
+                {clashes.length > 0
+                  ? <span className="av-warn small"><X size={13} /> {clashes.map((u) => (u.userId === meId ? 'Tú' : u.displayName.split(' ')[0])).join(', ')} {clashes.length > 1 ? 'tienen' : 'tiene'} algo a esa hora.</span>
+                  : !avail.loading && <span className="av-fine small"><Check size={13} /> Todas las personas elegidas están libres.</span>}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="qc-row">
+          <Video size={18} className={d.withCall ? 'on' : ''} />
+          {!d.withCall ? (
+            <button type="button" className="qc-link" onClick={() => set('withCall', true)}>Agregar una llamada de Nora</button>
+          ) : (
+            <div className="qc-call">
+              <b>Llamada de Nora</b><small>El código se crea al guardar</small>
+              <div className="seg" role="radiogroup" aria-label="Quién entra a la llamada">
+                <button type="button" role="radio" aria-checked={d.callAccess !== 'HOST'} className={d.callAccess !== 'HOST' ? 'on' : ''} onClick={() => set('callAccess', 'OPEN')}>Entran directamente</button>
+                <button type="button" role="radio" aria-checked={d.callAccess === 'HOST'} className={d.callAccess === 'HOST' ? 'on' : ''} onClick={() => set('callAccess', 'HOST')}>Yo admito</button>
+              </div>
+              <button type="button" className="icon-btn sm" aria-label="Quitar la llamada" onClick={() => set('withCall', false)}><X size={15} /></button>
+            </div>
+          )}
+        </div>
+
+        <div className="qc-row">
+          <MapPin size={18} />
+          {showPlace ? <input autoFocus={!d.location} className="qc-field" placeholder="Agregar lugar" aria-label="Lugar" maxLength={200} value={d.location} onChange={(e) => set('location', e.target.value)} />
+            : <button type="button" className="qc-link" onClick={() => setShowPlace(true)}>Agregar lugar</button>}
+        </div>
+
+        <div className="qc-row top">
+          <AlignLeft size={18} />
+          {showDesc ? <textarea autoFocus={!d.description} className="qc-field" rows={3} placeholder="Agregar descripción" aria-label="Descripción" maxLength={2000} value={d.description} onChange={(e) => set('description', e.target.value)} />
+            : <button type="button" className="qc-link" onClick={() => setShowDesc(true)}>Agregar descripción</button>}
+        </div>
+
+        <div className="qc-row top">
+          <CalendarDays size={18} />
+          <div className="qc-me">
+            <div className="qc-who"><Avatar name={meName} userId={meId ?? ''} version={meVersion} size={20} /><b>{meName}</b>
+              <button type="button" className="qc-dot" style={{ background: d.color ?? COLORS[0] }} aria-label="Color de la cita" onClick={() => setColors((v) => !v)} /></div>
+            {colors && <div className="cal-colors">{COLORS.map((c) => <button key={c} type="button" className={d.color === c ? 'on' : ''} style={{ background: c }} aria-label={`Color ${c}`} onClick={() => { set('color', c); setColors(false) }}>{d.color === c && <Check size={13} />}</button>)}</div>}
+            <small>
+              Ocupado ·{' '}
+              <select className="qc-select" title="Visible para la sala, o personal: los demás solo ven que estás «Ocupado»" aria-label="Visibilidad" value={d.private ? 'private' : 'room'} onChange={(e) => set('private', e.target.value === 'private')}>
+                <option value="room">Visible para la sala</option>
+                <option value="private">Personal</option>
+              </select>
+              · Aviso 10 minutos antes
+            </small>
+          </div>
+        </div>
+      </div>
+      <div className="qc-foot">
+        <button type="button" className="qc-more" onClick={() => onMore({ ...d, title: d.title.trim() })}>Más opciones</button>
+        <button type="button" className="qc-save" disabled={saving || !d.title.trim()} onClick={() => void save()}>{saving ? 'Guardando…' : 'Guardar'}</button>
+      </div>
     </div>
   )
 }
@@ -419,8 +626,8 @@ function EventDialog({ ev, draft, startEditing, room, people, meId, canEdit, onC
   const toggleInvite = (u: string) => set('invitees', invitees.includes(u) ? invitees.filter((x) => x !== u) : [...invitees, u])
 
   const save = async () => {
-    if (!d.title.trim()) return toast('El evento necesita un título', 'warning')
-    if (d.end < d.start) return toast('El evento no puede terminar antes de empezar', 'warning')
+    if (!d.title.trim()) return toast('La cita necesita un título', 'warning')
+    if (d.end < d.start) return toast('La cita no puede terminar antes de empezar', 'warning')
     setSaving(true)
     try {
       await onSave({ ...d, title: d.title.trim(), start: d.allDay ? `${day(d.start)}T00:00` : d.start, end: d.allDay ? `${day(d.end)}T00:00` : d.end })
@@ -445,10 +652,10 @@ function EventDialog({ ev, draft, startEditing, room, people, meId, canEdit, onC
 
   if (edit) {
     return (
-      <Modal title={ev ? 'Editar evento' : 'Nuevo evento'} icon={<CalendarPlus size={20} />} onClose={onClose} wide
+      <Modal title={ev ? 'Editar cita' : 'Nueva cita'} icon={<CalendarPlus size={20} />} onClose={onClose} wide
         footer={<>{ev && <button className="btn danger" onClick={onDelete}><Trash2 size={15} /> Borrar</button>}<span className="grow" /><button className="btn ghost" onClick={onClose}>Cancelar</button><button className="btn primary" disabled={saving || !d.title.trim()} onClick={() => void save()}>{saving ? 'Guardando…' : 'Guardar'}</button></>}>
         <div className="stack">
-          <input autoFocus className="kb-title-input" value={d.title} maxLength={150} placeholder="Título del evento" aria-label="Título" onChange={(e) => set('title', e.target.value)} />
+          <input autoFocus className="kb-title-input" value={d.title} maxLength={150} placeholder="Título" aria-label="Título" onChange={(e) => set('title', e.target.value)} />
           <label className="check"><input type="checkbox" checked={d.allDay} onChange={(e) => set('allDay', e.target.checked)} /> Todo el día</label>
           <div className="grid-2">
             <label className="stack tight"><span className="small muted">Empieza</span>
@@ -489,7 +696,7 @@ function EventDialog({ ev, draft, startEditing, room, people, meId, canEdit, onC
                 <button type="button" role="radio" aria-checked={d.callAccess === 'HOST'} className={d.callAccess === 'HOST' ? 'on' : ''} onClick={() => set('callAccess', 'HOST')}><Lock size={13} /> Yo admito a cada persona</button>
               </div>
             )}
-            <label className="check"><input type="checkbox" checked={!!d.private} onChange={(e) => set('private', e.target.checked)} /> <Lock size={15} /> <span><b>Evento personal</b><small>Solo tú y quien invites veréis los detalles. El resto de la sala solo verá que estás «Ocupado».</small></span></label>
+            <label className="check"><input type="checkbox" checked={!!d.private} onChange={(e) => set('private', e.target.checked)} /> <Lock size={15} /> <span><b>Cita personal</b><small>Solo tú y quien invites veréis los detalles. El resto de la sala solo verá que estás «Ocupado».</small></span></label>
           </div>
 
           <label className="stack tight"><span className="small muted">Lugar o enlace de la reunión</span><input value={d.location} maxLength={200} placeholder="Sala 2, o https://…" onChange={(e) => set('location', e.target.value)} /></label>
@@ -502,11 +709,11 @@ function EventDialog({ ev, draft, startEditing, room, people, meId, canEdit, onC
   }
   const invited = (d.invitees ?? []).map((u) => ({ u, p: people.get(u) }))
   return (
-    <Modal title="Evento" icon={<CalendarDays size={20} />} onClose={onClose}
+    <Modal title="Cita" icon={<CalendarDays size={20} />} onClose={onClose}
       footer={<>{ev && <button className="btn ghost" onClick={() => download(`${d.title}.ics`, ics([ev], room.name))}><Download size={15} /> Añadir a mi calendario</button>}<span className="grow" />{canEdit && <button className="btn" onClick={() => setEdit(true)}><Pencil size={15} /> Editar</button>}<button className="btn ghost" onClick={onClose}>Cerrar</button></>}>
       <div className="cal-view" style={{ ['--c' as string]: d.color ?? COLORS[0] }}>
         <h3><i />{d.title}</h3>
-        {d.private && <p className="cal-private small"><Lock size={13} /> Evento personal: solo lo ven quien lo creó y sus invitados.</p>}
+        {d.private && <p className="cal-private small"><Lock size={13} /> Cita personal: solo la ven quien la creó y sus invitados.</p>}
         <p className="cal-when"><CalendarDays size={15} /> {when(d)}</p>
         {d.call && (
           <div className="cal-callbox">
@@ -565,11 +772,11 @@ function AiEventDialog({ onClose, onPick }: { onClose: () => void; onPick: (d: P
     }
   }
   return (
-    <Modal title="Crear evento con IA" icon={<Sparkles size={20} />} onClose={onClose}
-      footer={<><span className="grow" /><button className="btn ghost" onClick={onClose}>Cancelar</button><button className="btn ai" disabled={busy || text.trim().length < 4} onClick={() => void run()}><Sparkles size={15} /> {busy ? 'Entendiendo…' : 'Crear evento'}</button></>}>
+    <Modal title="Crear cita con IA" icon={<Sparkles size={20} />} onClose={onClose}
+      footer={<><span className="grow" /><button className="btn ghost" onClick={onClose}>Cancelar</button><button className="btn ai" disabled={busy || text.trim().length < 4} onClick={() => void run()}><Sparkles size={15} /> {busy ? 'Entendiendo…' : 'Crear cita'}</button></>}>
       <div className="stack">
-        <p className="muted small">Cuéntalo con tus palabras y podrás revisar el evento antes de guardarlo.</p>
-        <textarea autoFocus rows={4} value={text} maxLength={1000} onChange={(e) => setText(e.target.value)} placeholder="Ej.: mañana a las 17:00 reunión de equipo en la sala 2, dura una hora y media" />
+        <p className="muted small">Cuéntalo con tus palabras y podrás revisar la cita antes de guardarla.</p>
+        <textarea autoFocus rows={4} value={text} maxLength={1000} onChange={(e) => setText(e.target.value)} placeholder="Describe la cita" />
       </div>
     </Modal>
   )
