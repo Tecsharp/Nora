@@ -1,4 +1,5 @@
 import { api } from '../api'
+import type { MsgMeta } from './Attachments'
 
 export type ConvKind = 'ROOM' | 'GROUP' | 'DM'
 export type Policy = 'ALL' | 'ADMINS'
@@ -38,6 +39,8 @@ export interface Message {
   /** Lo citado (autor y texto), resuelto por el servidor aunque el original no esté cargado. */
   reply: { id: string; authorName: string; text: string } | null
   reactions: Record<string, string[]>
+  /** Archivos y llamada que acompañan al mensaje. */
+  meta?: MsgMeta
   edited: boolean
   createdAt: string
   updatedAt: string
@@ -60,7 +63,8 @@ export const chatApi = {
     api<MessageWindow>(`${base(code)}/conversations/${conv}/window?around=${around}&limit=${limit}`),
   search: (code: string, q: string, conv?: string, before?: string, limit = 30) =>
     api<SearchResult>(`${base(code)}/search?q=${encodeURIComponent(q)}&limit=${limit}${conv ? `&conv=${conv}` : ''}${before ? `&before=${encodeURIComponent(before)}` : ''}`),
-  send: (code: string, conv: string, text: string, replyTo?: string) => api<Message>(`${base(code)}/conversations/${conv}/messages`, 'POST', { text, replyTo }),
+  send: (code: string, conv: string, text: string, replyTo?: string, extra?: { files?: string[]; call?: string }) =>
+    api<Message>(`${base(code)}/conversations/${conv}/messages`, 'POST', { text, replyTo, files: extra?.files?.length ? extra.files : undefined, call: extra?.call }),
   edit: (code: string, conv: string, id: string, text: string) => api<Message>(`${base(code)}/conversations/${conv}/messages/${id}`, 'PATCH', { text }),
   remove: (code: string, conv: string, id: string) => api(`${base(code)}/conversations/${conv}/messages/${id}`, 'DELETE'),
   react: (code: string, conv: string, id: string, emoji: string) => api<Message>(`${base(code)}/conversations/${conv}/messages/${id}/react`, 'POST', { emoji }),

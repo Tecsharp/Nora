@@ -21,7 +21,7 @@ public final class ChatDtos {
     public record ReplyPreview(UUID id, String authorName, String text) {}
 
     public record MessageDto(UUID id, UUID conv, UUID authorId, String authorName, String kind, String text, UUID replyTo, ReplyPreview reply,
-                             Map<String, List<String>> reactions, boolean edited, Instant createdAt, Instant updatedAt) {}
+                             Map<String, List<String>> reactions, Map<String, Object> meta, boolean edited, Instant createdAt, Instant updatedAt) {}
 
     /** Una ventana de mensajes y si hay más hacia atrás o hacia delante (para ir a un mensaje antiguo sin cargar todo lo de en medio). */
     public record WindowDto(List<MessageDto> items, boolean hasOlder, boolean hasNewer) {}
@@ -40,7 +40,8 @@ public final class ChatDtos {
 
     public record OpenDm(UUID userId) {}
 
-    public record SendMessage(String text, UUID replyTo) {}
+    /** {@code files}: archivos de la sala ya subidos; {@code call}: código de una llamada de esta sala. */
+    public record SendMessage(String text, UUID replyTo, List<UUID> files, String call) {}
 
     public record Edit(String text) {}
 

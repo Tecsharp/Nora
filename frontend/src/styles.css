@@ -2144,3 +2144,25 @@ label.qc-check input { width: 16px; height: 16px; flex: none; }
 .ft-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 16px; border-top: 1px solid var(--hairline); }
 .qc-avail { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .qc[hidden] { display: none; }
+
+/* Adjuntos y llamadas en el chat */
+.chat-attach { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 2px 6px; }
+.chat-achip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 4px 6px 4px 9px; border-radius: 999px; background: var(--surface-2, #1c1c20); color: var(--text, #eee); font-size: 0.78rem; box-shadow: inset 0 0 0 1px var(--hairline, rgba(255, 255, 255, 0.08)); }
+.chat-achip .truncate { max-width: 160px; }
+.chat-achip small { color: var(--muted, #999); }
+.chat-achip button { display: grid; place-items: center; width: 18px; height: 18px; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; padding: 0; }
+.chat-achip button:hover { background: rgba(255, 255, 255, 0.14); }
+.chat-achip.busy { color: var(--muted, #999); padding-right: 10px; }
+.chat-meta-box { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; min-width: 200px; }
+.chat-file, .chat-call { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 12px; background: rgba(255, 255, 255, 0.07); color: inherit; font: inherit; text-align: left; text-decoration: none; cursor: pointer; }
+.chat-file:hover:not(:disabled), .chat-call:hover { background: rgba(255, 255, 255, 0.13); }
+.chat-file-ico { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: rgba(255, 255, 255, 0.1); }
+.chat-file-ico.call { background: var(--accent-soft, rgba(124, 106, 247, 0.25)); color: var(--accent-text, #b9aefc); }
+.chat-file-name { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.chat-file-name b { font-size: 0.86rem; font-weight: 600; }
+.chat-file-name small { font-size: 0.72rem; opacity: 0.7; }
+.chat-call-go { flex: none; padding: 4px 12px; border-radius: 999px; background: var(--accent, #7c6af7); color: #fff; font-size: 0.78rem; font-weight: 650; }
+.chat-msg.mine .chat-bubble .chat-file, .chat-msg.mine .chat-bubble .chat-call { background: rgba(255, 255, 255, 0.16); }
+.chat-bubble a.chat-call, .chat-bubble a.chat-call:hover, .cp-msg a.chat-call { text-decoration: none; color: inherit; }
+.chat-bubble a.chat-call .chat-call-go { color: #fff; }
+.chat-bubble a.chat-call small, .chat-bubble button.chat-file small { color: inherit; }

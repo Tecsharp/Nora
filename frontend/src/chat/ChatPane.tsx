@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { ArrowDown, Check, CornerUpLeft, Copy, Pencil, Send, Smile, SmilePlus, Sparkles, Trash2, X } from 'lucide-react'
+import { ArrowDown, Check, CornerUpLeft, Copy, Paperclip, Pencil, Send, Smile, SmilePlus, Sparkles, Trash2, Video, X } from 'lucide-react'
 import { useAuth } from '../auth'
 import Avatar from '../components/Avatar'
 import Menu from '../components/Menu'
@@ -9,6 +9,8 @@ import { rt } from '../realtime'
 import { canWrite as canWriteIn, isStaff as isStaffIn } from '../roles'
 import { useToast } from '../toast'
 import { flash } from '../tools/focus'
+import { callApi } from '../call/api'
+import { AttachChips, MessageMeta, useAttachments } from './Attachments'
 import type { Conv, Message } from './chatApi'
 import { useChat } from './ChatProvider'
 import type { MessagesStore } from './useMessages'
@@ -71,6 +73,9 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
   const [editing, setEditing] = useState<Message | null>(null)
   const [emojis, setEmojis] = useState(false)
   const [sending, setSending] = useState(false)
+  const att = useAttachments(room.code)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const [calling, setCalling] = useState(false)
   const [pickFor, setPickFor] = useState<string | null>(null) // mensaje con el selector de reacciones abierto
   const [activeMsg, setActiveMsg] = useState<string | null>(null) // mensaje tocado (en pantallas táctiles no hay «hover»)
   const [unseen, setUnseen] = useState(0)
@@ -291,11 +296,13 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
 
   async function send() {
     const text = draft.trim()
-    if (!text || sending) return
+    const files = editing ? [] : att.files
+    if ((!text && !files.length) || sending || att.uploading > 0) return
     setSending(true)
     try {
       if (editing) await store.edit(editing.id, text)
-      else await store.send(text, replyTo?.id)
+      else await store.send(text, replyTo?.id, { files: files.map((f) => f.id) })
+      att.clear()
       setDraft('')
       setReplyTo(null)
       setEditing(null)
@@ -307,6 +314,24 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
     } finally {
       setSending(false)
       input.current?.focus()
+    }
+  }
+
+  /** Crea una llamada en el momento (sin pasar por el calendario) y manda su enlace a la conversación. */
+  async function startCall() {
+    if (calling) return
+    setCalling(true)
+    const w = window.open('about:blank', '_blank') // la pestaña se abre en el gesto del clic, y después se le pone la dirección
+    try {
+      const c = await callApi.create(room.code, { title: chat.title(conv), access: 'OPEN' })
+      await store.send('', undefined, { call: c.code })
+      requestAnimationFrame(() => toBottom())
+      if (w) w.location.href = `/call/${c.code}`
+    } catch (e) {
+      w?.close()
+      toast(e instanceof Error ? e.message : 'No se pudo iniciar la llamada', 'error')
+    } finally {
+      setCalling(false)
     }
   }
 
@@ -390,14 +415,15 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
               {m.replyTo && (quoted
                 ? <button type="button" className="chat-quote" onClick={() => void goTo(quoted.id)}><strong>{quoted.authorName}</strong><span>{quoted.text}</span></button>
                 : <div className="chat-quote gone"><span>Mensaje borrado</span></div>)}
-              <p>{rich(m.text, names, user?.displayName ?? '')}{m.edited && <small className="chat-edited"> (editado)</small>}</p>
+              {m.text && <p>{rich(m.text, names, user?.displayName ?? '')}{m.edited && <small className="chat-edited"> (editado)</small>}</p>}
+              <MessageMeta code={room.code} meta={m.meta} />
             </div>
             <div className="chat-actions" role="toolbar" aria-label="Acciones del mensaje" onClick={(e) => e.stopPropagation()}>
               <button type="button" className="chat-act chat-act-react" aria-label="Reaccionar" aria-expanded={pickFor === m.id} title="Reaccionar" onClick={() => setPickFor((p) => (p === m.id ? null : m.id))}><SmilePlus size={15} /></button>
               {canWrite && <button type="button" className="chat-act" aria-label="Responder" title="Responder" onClick={() => { setReplyTo(m); setEditing(null); input.current?.focus() }}><CornerUpLeft size={15} /></button>}
               <Menu label="Más acciones" items={[
-                { label: 'Copiar texto', icon: <Copy size={16} />, onClick: () => void navigator.clipboard.writeText(m.text).then(() => toast('Copiado', 'success')) },
-                ...(mine && canWrite ? [{ label: 'Editar', icon: <Pencil size={16} />, onClick: () => startEdit(m) }] : []),
+                ...(m.text ? [{ label: 'Copiar texto', icon: <Copy size={16} />, onClick: () => void navigator.clipboard.writeText(m.text).then(() => toast('Copiado', 'success')) }] : []),
+                ...(mine && canWrite && m.text ? [{ label: 'Editar', icon: <Pencil size={16} />, onClick: () => startEdit(m) }] : []),
                 ...((mine || staff) && canWriteIn(room, user) ? [{ label: 'Borrar', icon: <Trash2 size={16} />, danger: true, onClick: () => void del(m) }] : []),
               ]} />
               {pickFor === m.id && (
@@ -471,12 +497,16 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
               ))}
             </ul>
           )}
+          {!editing && <AttachChips files={att.files} uploading={att.uploading} onRemove={att.remove} />}
           <div className="chat-input">
             <button type="button" className="icon-btn" aria-label="Emojis" aria-pressed={emojis} onClick={() => setEmojis((v) => !v)}><Smile size={19} /></button>
+            {!editing && <button type="button" className="icon-btn" aria-label="Adjuntar archivos" title="Adjuntar archivos" onClick={() => fileInput.current?.click()}><Paperclip size={19} /></button>}
+            {!editing && <button type="button" className="icon-btn" aria-label="Iniciar una llamada" title="Iniciar una llamada" disabled={calling} onClick={() => void startCall()}><Video size={19} /></button>}
+            <input ref={fileInput} type="file" multiple hidden aria-label="Elegir archivos" onChange={(e) => { const l = e.target.files; if (l) void att.add(l); e.target.value = '' }} />
             <textarea ref={input} rows={1} value={draft} maxLength={4000} placeholder={'Escribe un mensaje…'} aria-label="Mensaje"
               onChange={(e) => { typed(e.target.value); setCaret(e.target.selectionStart) }} onKeyDown={onKey}
               onKeyUp={(e) => setCaret(e.currentTarget.selectionStart)} onClick={(e) => setCaret(e.currentTarget.selectionStart)} />
-            <button className="btn primary chat-send" onClick={() => void send()} disabled={!draft.trim() || sending} aria-label={editing ? 'Guardar cambios' : 'Enviar'}>{editing ? <Check size={17} /> : <Send size={17} />}</button>
+            <button className="btn primary chat-send" onClick={() => void send()} disabled={(!draft.trim() && !att.files.length) || sending || att.uploading > 0} aria-label={editing ? 'Guardar cambios' : 'Enviar'}>{editing ? <Check size={17} /> : <Send size={17} />}</button>
           </div>
           {emojis && (
             <div className="chat-emojis" role="listbox" aria-label="Emojis">

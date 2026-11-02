@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { Room } from '../api'
 import { useAuth } from '../auth'
 import { useRealtime } from '../realtime'
+import { previewOf } from './Attachments'
 import { chatApi, type Conv, type Message } from './chatApi'
 
 export interface DockWindow { id: string; min: boolean }
@@ -147,7 +148,7 @@ export function ChatProvider({ room, online, fullOpen, onOpenFull, children }: {
     const seen = viewing.current.has(d.conv) && document.hasFocus()
     setConvs((l) => sortConvs(l.map((x) => (x.id === d.conv ? {
       ...x, lastMessageAt: m.createdAt,
-      last: { id: m.id, authorId: m.authorId, authorName: m.authorName, kind: m.kind, text: m.text.slice(0, 120), createdAt: m.createdAt },
+      last: { id: m.id, authorId: m.authorId, authorName: m.authorName, kind: m.kind, text: previewOf(m).slice(0, 120), createdAt: m.createdAt },
       unread: m.kind === 'TEXT' && !mineMsg && !seen ? x.unread + 1 : x.unread,
     } : x))))
     if (seen && m.kind === 'TEXT' && !mineMsg) markRead(d.conv)
@@ -156,7 +157,7 @@ export function ChatProvider({ room, online, fullOpen, onOpenFull, children }: {
   })
   useRealtime('chat.message.updated', (d: { room: string; conv: string; message: Message }) => {
     if (d.room !== code) return
-    setConvs((l) => l.map((x) => (x.id === d.conv && x.last?.id === d.message.id ? { ...x, last: { ...x.last, text: d.message.text.slice(0, 120) } } : x)))
+    setConvs((l) => l.map((x) => (x.id === d.conv && x.last?.id === d.message.id ? { ...x, last: { ...x.last, text: previewOf(d.message).slice(0, 120) } } : x)))
   })
   useRealtime('chat.message.deleted', (d: { room: string }) => { if (d.room === code) refreshSoon() })
   useRealtime('chat.conv', (d: { room: string }) => { if (d.room === code) refreshSoon() })

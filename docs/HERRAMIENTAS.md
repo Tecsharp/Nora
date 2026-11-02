@@ -24,7 +24,7 @@ las **conversaciones abiertas como ventanas** que se minimizan, se cierran o se 
 El estado del dock se recuerda por sala. En pantallas estrechas el dock se reduce al botón «Chat» y abre la vista completa.
 
 **Vista completa** (tarjeta Chat, al estilo de Telegram Web): lista de chats con buscador y filtros (Todos, No leídos, Grupos, Directos), conversación y panel de ajustes. Mensajes con respuestas citadas, reacciones, @menciones con
-autocompletado, enlaces clicables, editar/borrar los propios (y borrar quien modera o administra), «Mensajes nuevos» al abrir, carga de anteriores y resumen con IA. Los lectores leen y reaccionan pero no escriben.
+autocompletado, enlaces clicables, **archivos adjuntos** (el clip de la caja de escritura: se suben a *Archivos* de la sala y el mensaje los lleva para descargarlos; hasta 10 por mensaje), **llamada al instante** (el botón de video crea una llamada sin pasar por el calendario y manda su enlace como tarjeta con «Unirse»), editar/borrar los propios (y borrar quien modera o administra), «Mensajes nuevos» al abrir, carga de anteriores y resumen con IA. Los lectores leen y reaccionan pero no escriben.
 
 **Configuración de un grupo:** nombre, descripción y color; quién puede escribir y quién puede agregar personas (todas o solo administración); miembros con rol de administración (nombrar, quitar, expulsar); agregar personas de la sala;
 silenciar y fijar (por persona); salir y borrar el grupo. El grupo nunca se queda sin administración (si sale la última persona administradora, pasa a la más antigua). Los cambios quedan como mensajes de sistema.
