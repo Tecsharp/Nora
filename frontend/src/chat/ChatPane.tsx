@@ -75,6 +75,7 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
   const [sending, setSending] = useState(false)
   const att = useAttachments(room.code)
   const fileInput = useRef<HTMLInputElement>(null)
+  const pickAnchor = useRef<Element | null>(null) // el botón de reaccionar que abrió los rápidos
   const [calling, setCalling] = useState(false)
   const [plusOpen, setPlusOpen] = useState(false)
   const [pickFor, setPickFor] = useState<string | null>(null) // mensaje con el selector de reacciones abierto
@@ -382,7 +383,7 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
   }, [plusOpen])
   useEffect(() => {
     if (!pickFor) return
-    const away = (e: MouseEvent) => { if (!(e.target as Element).closest('.chat-picker, .chat-act-react, .rx-pop')) setPickFor(null) }
+    const away = (e: MouseEvent) => { if (!(e.target as Element).closest('.chat-picker, .chat-act-react, .rx-pop, .rx-row')) setPickFor(null) }
     const key = (e: globalThis.KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); setPickFor(null) } }
     document.addEventListener('mousedown', away)
     document.addEventListener('keydown', key, true)
@@ -437,7 +438,7 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
               <MessageMeta code={room.code} meta={m.meta} />
             </div>
             <div className="chat-actions" role="toolbar" aria-label="Acciones del mensaje" onClick={(e) => e.stopPropagation()}>
-              <button type="button" className="chat-act chat-act-react" aria-label="Reaccionar" aria-expanded={pickFor === m.id} title="Reaccionar" onClick={() => setPickFor((p) => (p === m.id ? null : m.id))}><SmilePlus size={15} /></button>
+              <button type="button" className="chat-act chat-act-react" aria-label="Reaccionar" aria-expanded={pickFor === m.id} title="Reaccionar" onClick={(e) => { pickAnchor.current = e.currentTarget; setPickFor((p) => (p === m.id ? null : m.id)) }}><SmilePlus size={15} /></button>
               {canWrite && <button type="button" className="chat-act" aria-label="Responder" title="Responder" onClick={() => { setReplyTo(m); setEditing(null); input.current?.focus() }}><CornerUpLeft size={15} /></button>}
               <Menu label="Más acciones" items={[
                 ...(m.text ? [{ label: 'Copiar texto', icon: <Copy size={16} />, onClick: () => void navigator.clipboard.writeText(m.text).then(() => toast('Copiado', 'success')) }] : []),
@@ -446,7 +447,7 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
               ]} />
               {pickFor === m.id && (
                 <div className="chat-picker">
-                  <ReactionPicker quick={QUICK} onPick={(e) => { setActiveMsg(null); void react(m, e) }} onClose={() => setPickFor(null)} />
+                  <ReactionPicker quick={QUICK} anchor={() => pickAnchor.current} onPick={(e) => { setActiveMsg(null); void react(m, e) }} onClose={() => setPickFor(null)} />
                 </div>
               )}
             </div>
@@ -484,7 +485,7 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
             const row = rows[v.index]
             if (!row) return null
             return (
-              <div key={v.key} data-index={v.index} data-rowkey={row.key} ref={virtualizer.measureElement} className={`chat-vrow ${row.type} ${row.head ? 'head' : ''}`} style={{ transform: `translateY(${v.start}px)` }}>
+              <div key={v.key} data-index={v.index} data-rowkey={row.key} ref={virtualizer.measureElement} className={`chat-vrow ${row.type} ${row.head ? 'head' : ''} ${row.m && (pickFor === row.m.id || activeMsg === row.m.id) ? 'raised' : ''}`} style={{ transform: `translateY(${v.start}px)` }}>
                 {renderRow(row)}
               </div>
             )

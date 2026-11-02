@@ -2347,3 +2347,13 @@ label.qc-check input { width: 16px; height: 16px; flex: none; }
 /* La barra de reacciones va centrada en la pantalla (no en el hueco que deja el panel lateral) y nunca se sale de ella */
 .react-bar { position: fixed; bottom: 92px; left: 50%; transform: translateX(-50%); max-width: calc(100vw - 16px); }
 @media (min-width: 761px) { .call-root.room .call-stage.with-panel ~ .call-bar .react-bar { left: calc((100vw - 360px) / 2); max-width: calc(100vw - 376px); } }
+
+/* Acciones de un mensaje (reaccionar, responder, más): al lado de la burbuja, dentro de su propia fila. Debajo se pintaban bajo el mensaje siguiente (cada fila de la lista es una capa) y no se podían pulsar */
+.chat-actions, .chat-msg.mine .chat-actions { top: 50%; transform: translateY(-50%); }
+.chat-msg.mine .chat-actions { left: auto; right: calc(100% + 6px); }
+.chat-msg:not(.mine) .chat-actions { right: auto; left: calc(100% + 6px); }
+.chat-msg .chat-col { max-width: min(540px, calc(100% - 128px)); }
+.chat-msg.mine .chat-picker { left: 0; right: auto; }
+.chat-msg:not(.mine) .chat-picker { right: 0; left: auto; }
+.chat-vrow { z-index: 1; }
+.chat-vrow:hover, .chat-vrow:focus-within, .chat-vrow.raised { z-index: 6; }

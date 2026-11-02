@@ -126,12 +126,26 @@ export function EmojiPicker({ onPick, dark, autoFocus = true }: { onPick: (emoji
  */
 export const CHAT_EMOJI_KEY = 'nora-chat-emoji-use'
 
-export function ReactionPicker({ quick, onPick, onClose, dark, className }: { quick: string[]; onPick: (e: string) => void; onClose?: () => void; dark?: boolean; className?: string }) {
+export function ReactionPicker({ quick, onPick, onClose, dark, className, anchor }: { quick: string[]; onPick: (e: string) => void; onClose?: () => void; dark?: boolean; className?: string; anchor?: () => Element | null }) {
   const [open, setOpen] = useState(false)
   const defaults = useMemo(() => quick.slice(0, 5), [quick])
   const favs = useEmojiFavorites(CHAT_EMOJI_KEY, defaults)
   const choose = (e: string) => { favs.used(e); onPick(e) }
   const plus = useRef<HTMLButtonElement>(null)
+  const rowEl = useRef<HTMLDivElement>(null)
+  const [rowPos, setRowPos] = useState<{ left: number; top: number } | null>(null)
+  // con `anchor`, los rápidos se pintan fuera de la lista del chat (en el cuerpo de la página), junto al botón que los abrió y dentro de la pantalla:
+  // dentro de la lista un mensaje de abajo los tapaba y las ventanas flotantes los recortaban
+  useLayoutEffect(() => {
+    if (!anchor) return
+    const a = anchor()?.getBoundingClientRect()
+    const el = rowEl.current
+    if (!a || !el) return
+    const w = el.offsetWidth, h = el.offsetHeight
+    const left = Math.max(8, Math.min(a.left, window.innerWidth - w - 8))
+    const below = a.bottom + 6
+    setRowPos({ left, top: below + h > window.innerHeight - 8 ? Math.max(8, a.top - h - 6) : below })
+  }, [anchor, favs.fav.length])
   const pop = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
 
@@ -155,8 +169,9 @@ export function ReactionPicker({ quick, onPick, onClose, dark, className }: { qu
     return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', key, true) }
   }, [open])
 
-  return (
-    <div className={`rx-row ${dark ? 'dark' : ''} ${className ?? ''}`} role="listbox" aria-label="Elegir reacción">
+  const row = (
+    <div ref={rowEl} className={`rx-row ${dark ? 'dark' : ''} ${anchor ? 'floating' : ''} ${className ?? ''}`} role="listbox" aria-label="Elegir reacción"
+      style={anchor ? (rowPos ? { position: 'fixed', left: rowPos.left, top: rowPos.top, zIndex: 400 } : { position: 'fixed', visibility: 'hidden', left: 0, top: 0 }) : undefined}>
       {defaults.map((e) => <button key={e} type="button" role="option" aria-selected="false" onClick={() => { choose(e); onClose?.() }}>{e}</button>)}
       {favs.fav.length > 0 && <i className="rx-sep" aria-hidden />}
       {favs.fav.map((e) => <button key={e} type="button" role="option" aria-selected="false" className="fav" title="De los que más usas" onClick={() => { choose(e); onClose?.() }}>{e}</button>)}
@@ -167,4 +182,5 @@ export function ReactionPicker({ quick, onPick, onClose, dark, className }: { qu
         </div>, document.body)}
     </div>
   )
+  return anchor ? createPortal(row, document.body) : row
 }
