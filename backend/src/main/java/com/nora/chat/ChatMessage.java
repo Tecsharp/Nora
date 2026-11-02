@@ -41,6 +41,11 @@ public class ChatMessage {
     @Column(nullable = false, columnDefinition = "jsonb")
     private Map<String, List<String>> reactions = new LinkedHashMap<>();
 
+    /** Adjuntos: «files» (archivos de la sala con su nombre, tamaño y tipo) y «call» (código y título de una llamada). */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(nullable = false, columnDefinition = "jsonb")
+    private Map<String, Object> meta = new LinkedHashMap<>();
+
     @Column(nullable = false)
     private boolean edited;
 
@@ -71,6 +76,8 @@ public class ChatMessage {
     public UUID getReplyTo() { return replyTo; }
     public Map<String, List<String>> getReactions() { return reactions; }
     public void setReactions(Map<String, List<String>> r) { this.reactions = r; this.updatedAt = Instant.now(); }
+    public Map<String, Object> getMeta() { return meta; }
+    public void setMeta(Map<String, Object> meta) { this.meta = meta; }
     public boolean isEdited() { return edited; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }

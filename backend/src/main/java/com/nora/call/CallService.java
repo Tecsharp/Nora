@@ -56,7 +56,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class CallService {
 
     private static final String CODE_ALPHABET = "abcdefghjkmnpqrstuvwxyz";
-    private static final Set<String> REACTIONS = Set.of("👍", "👏", "❤️", "🎉", "😂", "😮", "😢", "🤔", "🔥", "🙏");
+    /** Cualquier emoji sirve como reacción (la ventana de reacciones los ofrece todos): sin letras, números, espacios ni signos de marcado. */
+    private static boolean isEmoji(String s) {
+        if (s == null || s.isEmpty() || s.length() > 24) return false;
+        return s.codePoints().noneMatch(cp -> Character.isLetterOrDigit(cp) || Character.isWhitespace(cp) || Character.isISOControl(cp) || cp == '<' || cp == '>' || cp == '&' || cp == '"' || cp == '\'');
+    }
     private static final int MAX_OPEN_PER_ROOM = 5;
 
     /** Una persona (pestaña) dentro de la llamada. */
@@ -91,6 +95,9 @@ public class CallService {
         final List<Part> parts = new CopyOnWriteArrayList<>();
         final Map<String, Waiting> lobby = new LinkedHashMap<>();
         volatile Instant emptySince = Instant.now();
+        /** Quiénes están invitadas (para la lista de «Invitadas que no han entrado»); se calcula una vez por minuto, no en cada cambio de estado. */
+        volatile List<Map<String, Object>> invitedBase;
+        volatile Instant invitedAt = Instant.EPOCH;
         /** Quien se cayó hace un momento (corte de red) vuelve a entrar sin tener que esperar de nuevo al anfitrión. */
         final Map<UUID, Instant> recent = new ConcurrentHashMap<>();
     }
@@ -99,6 +106,9 @@ public class CallService {
                           Instant createdAt, Instant endedAt, List<String> people, int count, int max, Instant scheduledAt, Instant scheduledEnd) {}
 
     private final CallRepository calls;
+    private final com.nora.item.RoomItemRepository roomItems;
+    private final com.nora.room.RoomMemberRepository roomMembers;
+    private final com.nora.user.UserRepository users;
     private final RoomService rooms;
     private final ChatService chat;
     private final NotificationService notifications;
@@ -109,9 +119,12 @@ public class CallService {
     private final SecureRandom random = new SecureRandom();
     private volatile AssistService.Hub hub;
 
-    public CallService(CallRepository calls, @Lazy RoomService rooms, @Lazy ChatService chat, NotificationService notifications, ApplicationEventPublisher events,
-                       @Value("${NORA_CALL_MAX_PARTICIPANTS:8}") int maxParticipants, @Value("${NORA_CALL_EMPTY_MINUTES:5}") int emptyMinutes) {
+    public CallService(CallRepository calls, com.nora.item.RoomItemRepository roomItems, com.nora.room.RoomMemberRepository roomMembers, com.nora.user.UserRepository users, @Lazy RoomService rooms, @Lazy ChatService chat, NotificationService notifications, ApplicationEventPublisher events,
+                       @Value("${NORA_CALL_MAX_PARTICIPANTS:8}") int maxParticipants, @Value("${NORA_CALL_EMPTY_MINUTES:10}") int emptyMinutes) {
         this.calls = calls;
+        this.roomItems = roomItems;
+        this.roomMembers = roomMembers;
+        this.users = users;
         this.rooms = rooms;
         this.chat = chat;
         this.notifications = notifications;
@@ -221,12 +234,27 @@ public class CallService {
         if (c.getConversationId() != null) return c.getConversationId();
         Set<UUID> people = new LinkedHashSet<>();
         if (l != null) for (Part p : l.parts) people.add(p.userId);
-        String title = "Llamada" + (c.getTitle().isBlank() ? "" : " · " + c.getTitle());
-        UUID conv = chat.createCallChat(room, userId, userName, title, people);
+        UUID conv = chat.createCallChat(room, userId, userName, callChatName(c, l, userName), people);
         c.setConversationId(conv);
         calls.save(c);
         if (l != null) broadcast(c, l);
         return conv;
+    }
+
+    /** Nombre del chat de una llamada: su código y las personas (las que están dentro y las invitadas), p. ej. «abc-defg-hij, Abisai Vázquez, Josué Zala». */
+    private String callChatName(Call c, Live l, String creatorName) {
+        List<String> names = new ArrayList<>();
+        names.add(creatorName);
+        if (l != null) {
+            for (Part p : l.parts) if (!names.contains(p.name)) names.add(p.name);
+            for (Map<String, Object> m : invited(c, l)) { String n = String.valueOf(m.get("name")); if (!names.contains(n)) names.add(n); }
+        }
+        StringBuilder sb = new StringBuilder(c.getCode());
+        for (String n : names) {
+            if (sb.length() + 2 + n.length() > 79) { sb.append('…'); break; }
+            sb.append(", ").append(n);
+        }
+        return sb.toString();
     }
 
     // ---------------------------------------------------------------- WebSocket
@@ -335,7 +363,7 @@ public class CallService {
         Live l = live.get(code);
         Part p = l == null ? null : find(l, from.id());
         String emoji = msg.path("emoji").asText("");
-        if (p == null || !REACTIONS.contains(emoji)) return;
+        if (p == null || !isEmoji(emoji)) return;
         sendAll(l, "call.reaction", Map.of("code", code, "from", from.id(), "name", p.name, "emoji", emoji));
     }
 
@@ -522,7 +550,45 @@ public class CallService {
             }
         }
         out.put("lobby", lobby);
+        out.put("invited", invited(c, l));
+        out.put("invitedKind", c.getEventId() != null ? "event" : "room");
         return out;
+    }
+
+    /**
+     * Personas invitadas que aún no están dentro: en una llamada de una cita del calendario, quien la creó y sus invitadas; en cualquier
+     * otra, las personas de la sala (todas pueden entrar).
+     */
+    private List<Map<String, Object>> invited(Call c, Live l) {
+        List<Map<String, Object>> base = l.invitedBase;
+        if (base == null || l.invitedAt.isBefore(Instant.now().minusSeconds(60))) {
+            Set<UUID> ids = new LinkedHashSet<>();
+            if (c.getEventId() != null) {
+                roomItems.findById(c.getEventId()).ifPresent(ev -> {
+                    if (ev.getAuthorId() != null) ids.add(ev.getAuthorId());
+                    if (ev.getData().get("invitees") instanceof List<?> inv) {
+                        for (Object o : inv) {
+                            try { ids.add(UUID.fromString(String.valueOf(o))); } catch (IllegalArgumentException ignored) { /* no válido */ }
+                        }
+                    }
+                });
+            } else {
+                roomMembers.findByRoomId(c.getRoomId()).forEach((m) -> ids.add(m.getUserId()));
+            }
+            List<Map<String, Object>> out = new ArrayList<>();
+            for (var u : users.findAllById(ids)) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("userId", u.getId());
+                m.put("name", u.getDisplayName());
+                out.add(m);
+            }
+            out.sort((a, b) -> String.valueOf(a.get("name")).compareToIgnoreCase(String.valueOf(b.get("name"))));
+            l.invitedBase = base = out;
+            l.invitedAt = Instant.now();
+        }
+        Set<UUID> in = new java.util.HashSet<>();
+        for (Part p : l.parts) in.add(p.userId);
+        return base.stream().filter((m) -> !in.contains((UUID) m.get("userId"))).toList();
     }
 
     private CallDto dto(Call c, Room room) {

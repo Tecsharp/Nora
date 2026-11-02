@@ -14,6 +14,7 @@ import { useTextareaAi } from '../ai/useTextareaAi'
 import { FileText as FileTextIcon } from 'lucide-react'
 import Modal from './Modal'
 import { useBusy } from '../useBusy'
+import { useFolderParam } from '../useFolderParam'
 
 interface Note {
   id: string
@@ -55,7 +56,7 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
   const code = room.code
   const [items, setItems] = useState<Note[]>([])
   const [folders, setFolders] = useState<FolderItem[]>([])
-  const [current, setCurrent] = useState<string | null>(null)
+  const [current, setCurrent] = useFolderParam()
   const [text, setText] = useState('')
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')

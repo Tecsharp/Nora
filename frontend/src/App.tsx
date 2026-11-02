@@ -33,9 +33,9 @@ export default function App() {
       <Route path="/call/:code" element={<Protected><CallPage /></Protected>} />
       <Route element={<Layout />}>
         <Route path="/" element={<Protected><Home /></Protected>} />
-        <Route path="/room/:code" element={<Protected><RoomPage /></Protected>} />
-        <Route path="/settings" element={<Protected><Settings /></Protected>} />
-        <Route path="/admin" element={<Protected admin><Admin /></Protected>} />
+        <Route path="/room/:code/:tool?/:sub?" element={<Protected><RoomPage /></Protected>} />
+        <Route path="/settings/:tab?" element={<Protected><Settings /></Protected>} />
+        <Route path="/admin/:tab?" element={<Protected admin><Admin /></Protected>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

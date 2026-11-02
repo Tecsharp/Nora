@@ -18,7 +18,7 @@ const FILTERS: { id: Filter; label: string }[] = [{ id: 'all', label: 'Todos' },
 const SUMMARY: AiAction[] = [{ id: 'sum', label: 'Resumir la conversación', task: 'chat_summary' }]
 
 /** Vista completa del chat, al estilo de Telegram Web: todas las conversaciones a la izquierda y la elegida a la derecha, con sus ajustes. */
-export default function ChatApp({ focus }: { focus?: FocusTarget | null }) {
+export default function ChatApp({ focus, urlConv, onUrlConv }: { focus?: FocusTarget | null; urlConv?: string; onUrlConv?: (id: string | null) => void }) {
   const chat = useChat()
   const { user } = useAuth()
   const toast = useToast()
@@ -40,9 +40,12 @@ export default function ChatApp({ focus }: { focus?: FocusTarget | null }) {
     setSel(focus.conv)
     if (focus.msg) setTarget({ id: focus.msg, nonce: focus.nonce })
   }, [focus, convs])
+  // la conversación abierta vive en la dirección (/room/ABC/chat/<id>): al recargar o abrir el enlace se vuelve a ella
+  useEffect(() => { if (urlConv && urlConv !== sel && loaded && convs.some((c) => c.id === urlConv)) setSel(urlConv) }, [urlConv, loaded, convs]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (loaded && sel !== (urlConv ?? null) && !(sel === null && urlConv && convs.some((c) => c.id === urlConv))) onUrlConv?.(sel) }, [sel]) // eslint-disable-line react-hooks/exhaustive-deps
   // por defecto, la general (o la que se estaba mirando en el dock)
   useEffect(() => {
-    if (sel || !loaded || chat.narrow || (focus?.conv && convs.some((c) => c.id === focus.conv))) return // en el celular se empieza por la lista; con una conversación pedida (barra lateral, aviso) manda esa
+    if (sel || !loaded || chat.narrow || (urlConv && convs.some((c) => c.id === urlConv)) || (focus?.conv && convs.some((c) => c.id === focus.conv))) return // en el celular se empieza por la lista; con una conversación pedida (barra lateral, aviso) manda esa
     const dockFirst = chat.dock.wins.find((w) => !w.min && convs.some((c) => c.id === w.id))?.id
     setSel(dockFirst ?? convs.find((c) => c.kind === 'ROOM')?.id ?? convs[0]?.id ?? null)
   }, [sel, loaded, convs, chat.dock.wins, chat.narrow, focus])

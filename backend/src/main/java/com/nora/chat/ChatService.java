@@ -2,7 +2,9 @@ package com.nora.chat;
 
 import com.nora.auth.AuthPrincipal;
 import com.nora.chat.ChatDtos.*;
+import com.nora.call.CallRepository;
 import com.nora.common.ApiException;
+import com.nora.file.RoomFileRepository;
 import com.nora.notify.NotificationService;
 import com.nora.room.Room;
 import com.nora.room.RoomMember;
@@ -52,10 +54,15 @@ public class ChatService {
     private final NotificationService notifications;
     private final ApplicationEventPublisher events;
     private final com.nora.config.AppProperties props;
+    private final RoomFileRepository roomFiles;
+    private final CallRepository callRepo;
 
     public ChatService(ChatConversationRepository convs, ChatMemberRepository members, ChatMessageRepository messages, RoomService rooms,
-                       RoomMemberRepository roomMembers, UserRepository users, NotificationService notifications, ApplicationEventPublisher events, com.nora.config.AppProperties props) {
+                       RoomMemberRepository roomMembers, UserRepository users, NotificationService notifications, ApplicationEventPublisher events, com.nora.config.AppProperties props,
+                       RoomFileRepository roomFiles, CallRepository callRepo) {
         this.props = props;
+        this.roomFiles = roomFiles;
+        this.callRepo = callRepo;
         this.convs = convs;
         this.members = members;
         this.messages = messages;
@@ -102,7 +109,7 @@ public class ChatService {
             if (c.isDm()) for (ChatMember cm : cms) if (!cm.getUserId().equals(viewer)) other = cm.getUserId();
             out.add(new ConvDto(c.getId(), c.getKind(), c.getName(), c.getDescription(), c.getColor(), c.getCreatedBy(), c.getPostPolicy(), c.getAddPolicy(),
                     c.getCreatedAt(), c.getLastMessageAt(),
-                    last == null ? null : new LastMessage(last.getId(), last.getAuthorId(), last.getAuthorName(), last.getKind(), clip(last.getText(), 120), last.getCreatedAt()),
+                    last == null ? null : new LastMessage(last.getId(), last.getAuthorId(), last.getAuthorName(), last.getKind(), clip(preview(last), 120), last.getCreatedAt()),
                     c.isGroup() ? sortedMembers(cms) : List.of(), me == null ? "MEMBER" : me.getRole(), me != null && me.isMuted(), me != null && me.isPinned(),
                     me == null ? 0 : unread.getOrDefault(c.getId(), 0L), me == null ? null : me.getLastReadAt(), other));
         }
@@ -220,6 +227,33 @@ public class ChatService {
         for (String ch : changes) system(x.conv(), p.userId(), actor(p) + " " + ch, x.room());
         notifyConv(x.room(), x.conv(), "updated");
         return dto(x.conv(), p.userId(), x.room());
+    }
+
+    /**
+     * Cambia el nombre de cualquier conversación: en un grupo, quien lo administra; en General, quien modera la sala; en un mensaje directo,
+     * cualquiera de las dos personas. En General y en los directos, dejarlo vacío restablece el nombre de siempre.
+     */
+    @Transactional
+    public ConvDto rename(AuthPrincipal p, String code, UUID id, String newName) {
+        Ctx x = ctx(p, code, id);
+        ChatConversation c = x.conv();
+        String n = newName == null ? "" : newName.strip();
+        if (c.isGroup()) {
+            requireAdmin(x);
+            n = name(n);
+        } else if (c.isRoom()) {
+            if (!rooms.canModerate(x.room(), p.userId(), p.role())) throw ApiException.forbidden("Solo quien modera la sala puede cambiar el nombre de este chat");
+            n = n.isEmpty() ? null : name(n);
+        } else {
+            rooms.requireWriter(p.userId(), p.role(), code);
+            n = n.isEmpty() ? null : name(n);
+        }
+        if (java.util.Objects.equals(n, c.getName())) return dto(c, p.userId(), x.room());
+        c.setName(n);
+        convs.save(c);
+        system(c, p.userId(), actor(p) + (n == null ? " restableció el nombre del chat" : " cambió el nombre a «" + n + "»"), x.room());
+        notifyConv(x.room(), c, "updated");
+        return dto(c, p.userId(), x.room());
     }
 
     @Transactional
@@ -377,10 +411,12 @@ public class ChatService {
         rooms.requireWriter(p.userId(), p.role(), code);
         ChatConversation c = x.conv();
         if (c.isGroup() && c.getPostPolicy().equals("ADMINS") && !(x.me() != null && x.me().isAdmin())) throw ApiException.forbidden("En este grupo solo escriben las personas administradoras");
-        String text = text(req.text());
+        Map<String, Object> meta = attachments(x.room(), req);
+        String text = meta.isEmpty() ? text(req.text()) : optionalText(req.text());
         UUID reply = req.replyTo();
         if (reply != null && messages.findByIdAndConversationId(reply, id).isEmpty()) reply = null;
         ChatMessage m = new ChatMessage(id, p.userId(), actor(p), "TEXT", text, reply);
+        m.setMeta(meta);
         messages.save(m);
         c.setLastMessageAt(m.getCreatedAt());
         convs.save(c);
@@ -560,7 +596,7 @@ public class ChatService {
         }
         return new ConvDto(c.getId(), c.getKind(), c.getName(), c.getDescription(), c.getColor(), c.getCreatedBy(), c.getPostPolicy(), c.getAddPolicy(),
                 c.getCreatedAt(), c.getLastMessageAt(),
-                last == null ? null : new LastMessage(last.getId(), last.getAuthorId(), last.getAuthorName(), last.getKind(), clip(last.getText(), 120), last.getCreatedAt()),
+                last == null ? null : new LastMessage(last.getId(), last.getAuthorId(), last.getAuthorName(), last.getKind(), clip(preview(last), 120), last.getCreatedAt()),
                 c.isGroup() ? memberDtos(c) : List.of(), me == null ? "MEMBER" : me.getRole(), me != null && me.isMuted(), me != null && me.isPinned(), unread, me == null ? null : me.getLastReadAt(), other);
     }
 
@@ -570,7 +606,7 @@ public class ChatService {
 
     private static MessageDto msg(ChatMessage m, ReplyPreview reply) {
         return new MessageDto(m.getId(), m.getConversationId(), m.getAuthorId(), m.getAuthorName(), m.getKind(), m.getText(), m.getReplyTo(), reply,
-                m.getReactions(), m.isEdited(), m.getCreatedAt(), m.getUpdatedAt());
+                m.getReactions(), m.getMeta() == null ? Map.of() : m.getMeta(), m.isEdited(), m.getCreatedAt(), m.getUpdatedAt());
     }
 
     /** Pasa mensajes a DTO resolviendo de una vez las citas de todos ellos (una consulta, no una por mensaje). */
@@ -579,7 +615,7 @@ public class ChatService {
         Map<UUID, ChatMessage> cited = ids.isEmpty() ? Map.of() : messages.findAllById(ids).stream().collect(Collectors.toMap(ChatMessage::getId, m -> m));
         return list.stream().map(m -> {
             ChatMessage c = m.getReplyTo() == null ? null : cited.get(m.getReplyTo());
-            return msg(m, c == null ? null : new ReplyPreview(c.getId(), c.getAuthorName(), clip(c.getText(), 160)));
+            return msg(m, c == null ? null : new ReplyPreview(c.getId(), c.getAuthorName(), clip(preview(c), 160)));
         }).toList();
     }
 
@@ -612,6 +648,55 @@ public class ChatService {
         if (n.isEmpty()) throw ApiException.badRequest("El grupo necesita un nombre");
         if (n.length() > 80) throw ApiException.badRequest("El nombre es demasiado largo (máximo 80 caracteres)");
         return n;
+    }
+
+    /** Texto que acompaña a un adjunto: puede ir vacío. */
+    private static String optionalText(String s) {
+        String t = s == null ? "" : s.strip();
+        if (t.length() > 4000) throw ApiException.badRequest("El mensaje es demasiado largo (máximo 4000 caracteres)");
+        return t;
+    }
+
+    /** Lo que se ve en la lista de conversaciones y en las citas cuando el mensaje no tiene texto. */
+    private static String preview(ChatMessage m) {
+        if (m.getText() != null && !m.getText().isBlank()) return m.getText();
+        Map<String, Object> meta = m.getMeta();
+        if (meta != null && meta.get("files") instanceof List<?> l && !l.isEmpty()) {
+            Object first = l.get(0);
+            String name = first instanceof Map<?, ?> f && f.get("name") != null ? String.valueOf(f.get("name")) : "archivo";
+            return "📎 " + name + (l.size() > 1 ? " y " + (l.size() - 1) + " más" : "");
+        }
+        if (meta != null && meta.get("call") instanceof Map<?, ?> c) return "📞 " + (c.get("title") == null || String.valueOf(c.get("title")).isBlank() ? "Llamada" : c.get("title"));
+        return "";
+    }
+
+    /** Archivos de la sala y llamada que acompañan al mensaje (se comprueba que sean de esta sala). */
+    private Map<String, Object> attachments(Room room, SendMessage req) {
+        Map<String, Object> meta = new LinkedHashMap<>();
+        if (req.files() != null && !req.files().isEmpty()) {
+            if (req.files().size() > 10) throw ApiException.badRequest("Máximo 10 archivos por mensaje");
+            List<Map<String, Object>> list = new ArrayList<>();
+            for (var f : roomFiles.findAllById(new LinkedHashSet<>(req.files()))) {
+                if (!f.getRoomId().equals(room.getId())) continue;
+                Map<String, Object> o = new LinkedHashMap<>();
+                o.put("id", f.getId().toString());
+                o.put("name", f.getOriginalName());
+                o.put("size", f.getSizeBytes());
+                o.put("type", f.getContentType());
+                list.add(o);
+            }
+            if (list.isEmpty()) throw ApiException.badRequest("Esos archivos no están en esta sala");
+            meta.put("files", list);
+        }
+        if (req.call() != null && !req.call().isBlank()) {
+            var call = callRepo.findByCode(req.call().strip().toLowerCase(Locale.ROOT)).filter(c -> !c.isEnded() && c.getRoomId().equals(room.getId()))
+                    .orElseThrow(() -> ApiException.badRequest("Esa llamada ya no existe"));
+            Map<String, Object> o = new LinkedHashMap<>();
+            o.put("code", call.getCode());
+            o.put("title", call.getTitle());
+            meta.put("call", o);
+        }
+        return meta;
     }
 
     private static String text(String s) {

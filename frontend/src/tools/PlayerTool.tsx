@@ -119,7 +119,7 @@ export default function PlayerTool({ room, onPlaying }: { room: Room; onPlaying?
         {!state.item ? (
           <div className="pl-empty">
             <Tv size={40} />
-            <strong>Escuchad o mirad algo juntos</strong>
+            <strong>Escuchen o vean algo juntos</strong>
             <span className="small">Agrega a la cola un video de YouTube, un enlace directo (mp3, mp4…) o un audio/video de la sala. Lo que reproduzca alguien suena a la vez para todas las personas.</span>
           </div>
         ) : (

@@ -106,7 +106,7 @@ export default function RoomNav(p: Props) {
             ? <span className="ws-av"><Avatar name={other.displayName} userId={other.userId} version={other.avatarVersion} size={22} />{online.has(other.userId) && <i className="ws-on" aria-label="En línea" />}</span>
             : c.kind === 'ROOM' ? <span className="ws-cdot general"><Hash size={13} /></span>
               : <span className="ws-cdot" style={{ background: c.color ?? 'var(--accent)' }}>{chat.title(c).slice(0, 1).toUpperCase()}</span>}
-          <span className="ws-item-label">{c.kind === 'ROOM' ? 'General' : chat.title(c)}</span>
+          <span className="ws-item-label">{chat.title(c)}</span>
           {unreadBadge(c)}
         </button>
       </li>
