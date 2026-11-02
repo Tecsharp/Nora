@@ -696,7 +696,7 @@ function EventDialog({ ev, draft, startEditing, room, people, meId, canEdit, onC
                 <button type="button" role="radio" aria-checked={d.callAccess === 'HOST'} className={d.callAccess === 'HOST' ? 'on' : ''} onClick={() => set('callAccess', 'HOST')}><Lock size={13} /> Yo admito a cada persona</button>
               </div>
             )}
-            <label className="check"><input type="checkbox" checked={!!d.private} onChange={(e) => set('private', e.target.checked)} /> <Lock size={15} /> <span><b>Cita personal</b><small>Solo tú y quien invites veréis los detalles. El resto de la sala solo verá que estás «Ocupado».</small></span></label>
+            <label className="check"><input type="checkbox" checked={!!d.private} onChange={(e) => set('private', e.target.checked)} /> <Lock size={15} /> <span><b>Cita personal</b><small>Solo tú y quien invites verán los detalles. El resto de la sala solo verá que estás «Ocupado».</small></span></label>
           </div>
 
           <label className="stack tight"><span className="small muted">Lugar o enlace de la reunión</span><input value={d.location} maxLength={200} placeholder="Sala 2, o https://…" onChange={(e) => set('location', e.target.value)} /></label>
