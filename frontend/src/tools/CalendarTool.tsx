@@ -10,7 +10,7 @@ import { useToast } from '../toast'
 import { canWrite as canWriteIn, isStaff as isStaffIn } from '../roles'
 import { aiNow, useAi } from '../ai/AiProvider'
 import { useItems, type Item } from './useItems'
-import { AvailabilityGrid, findSlots, isoAt, useAvailability } from './Availability'
+import { AvailabilityGrid, busyOn, findSlots, isoAt, useAvailability } from './Availability'
 import { callUrl } from '../call/api'
 
 type Rsvp = 'yes' | 'no' | 'maybe'
@@ -36,6 +36,8 @@ interface EventData {
   callAccess?: 'OPEN' | 'HOST'
 }
 type Ev = Item<EventData>
+/** Búsqueda de horario en curso: de quién se miran las agendas, la hora que se propone y cómo devolverla a la cita que se está creando. */
+interface Sched { owner: 'quick' | 'edit'; people: string[]; start: string; end: string; skipEvent?: string | null; apply: (start: string, end: string) => void }
 type View = 'month' | 'week' | 'day' | 'agenda' | 'avail'
 
 const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
@@ -107,6 +109,9 @@ export default function CalendarTool({ room, focus }: { room: Room; focus?: Focu
   // el evento abierto se lee siempre de la lista en vivo: así las respuestas que llegan se ven al instante
   const open = openState ? { ...openState, ev: openState.id ? items.find((x) => x.id === openState.id) : undefined } : null
   const [aiOpen, setAiOpen] = useState(false)
+  // «Buscar horario»: el calendario pasa a mostrar las agendas de las personas invitadas, lado a lado, para elegir una hora en la que todas estén libres
+  const [sched, setSched] = useState<Sched | null>(null)
+  const closeSched = (apply: boolean, start: string, end: string) => { if (apply) sched?.apply(start, end); setSched(null) }
   // desde una notificación: se va al día del evento y se abre su ficha
   useFocusTarget(focus, !loading, (f) => {
     const ev = items.find((x) => x.id === f.item)
@@ -146,7 +151,7 @@ export default function CalendarTool({ room, focus }: { room: Room; focus?: Focu
 
   return (
     <div className="cal">
-      <div className="cal-bar">
+      {!sched && <div className="cal-bar">
         <div className="row">
           <button className="icon-btn" aria-label="Anterior" onClick={() => shiftBy(-1)}><ChevronLeft size={18} /></button>
           <h3 className="cal-title">{title} <span>{cursor.getFullYear()}</span></h3>
@@ -164,10 +169,12 @@ export default function CalendarTool({ room, focus }: { room: Room; focus?: Focu
         <button className="btn sm ghost" disabled={!items.length} title="Descargar todas las citas (.ics) para tu calendario" onClick={() => download(`${room.name}.ics`, ics(items, room.name))}><Download size={14} /> .ics</button>
         {canWrite && ai.enabled && <button className="btn ai sm" onClick={() => setAiOpen(true)}><Sparkles size={14} /> Crear desde texto</button>}
         {canWrite && <button className="btn primary sm" onClick={(e) => newOn(todayKey, fromButton(e))}><Plus size={15} /> Nueva cita</button>}
-      </div>
+      </div>}
       {error && <p className="error small center-text">{error}</p>}
 
-      {view === 'week' || view === 'day' ? (
+      {sched ? (
+        <FindTime key="find" room={room} meId={user?.id} sched={sched} onClose={closeSched} />
+      ) : view === 'week' || view === 'day' ? (
         <TimeGrid days={view === 'week' ? weekDays : [cursor]} byDay={byDay} todayKey={todayKey} canWrite={canWrite}
           onOpen={(e) => setOpen({ id: e.id, edit: false })}
           onCreate={(start, end, allDay, at) => setOpen({ edit: true, quick: true, anchor: at, draft: { title: '', description: '', location: '', allDay, start, end, color: COLORS[0]! } })} />
@@ -223,11 +230,11 @@ export default function CalendarTool({ room, focus }: { room: Room; focus?: Focu
       )}
 
       {open && !open.ev && open.quick && (
-        <QuickCreate key="quick" room={room} draft={open.draft} anchor={open.anchor} meId={user?.id} meName={user?.displayName ?? ''} meVersion={user?.avatarVersion} onClose={() => setOpen(null)}
+        <QuickCreate key="quick" hidden={sched?.owner === 'quick'} onFind={(s) => setSched({ ...s, owner: 'quick' })} room={room} draft={open.draft} anchor={open.anchor} meId={user?.id} meName={user?.displayName ?? ''} meVersion={user?.avatarVersion} onClose={() => setOpen(null)}
           onMore={(d) => setOpen({ edit: true, draft: d })}
           onSave={async (d) => { await create({ ...d, startMs: parse(d.start).getTime(), endMs: parse(d.end).getTime() }) }} />
       )}
-      {open && !(open.quick && !open.ev) && <EventDialog key={open.ev?.id ?? 'new'} ev={open.ev} draft={open.draft} startEditing={open.edit} room={room} people={people} meId={user?.id}
+      {open && !(open.quick && !open.ev) && <EventDialog key={open.ev?.id ?? 'new'} hidden={sched?.owner === 'edit'} onFind={(s) => setSched({ ...s, owner: 'edit' })} ev={open.ev} draft={open.draft} startEditing={open.edit} room={room} people={people} meId={user?.id}
         canEdit={canWrite && (!open.ev || open.ev.authorId === user?.id || staff)} onClose={() => setOpen(null)}
         onSave={async (d) => {
           const withTimes = { ...d, startMs: parse(d.start).getTime(), endMs: parse(d.end).getTime() }
@@ -407,11 +414,135 @@ function AvailView({ room, cursor, meId, canWrite, onCreate, onOpen }: { room: R
 }
 
 /**
+ * «Buscar horario»: el calendario muestra las agendas de las personas invitadas lado a lado en un día (como «Buscar una hora» de Google Calendar).
+ * En verde, los tramos en que todas están libres; un clic en la cuadrícula coloca la cita ahí, y «Siguiente horario libre» salta al próximo
+ * hueco común, en el mismo día o en otro.
+ */
+function FindTime({ room, meId, sched, onClose }: { room: Room; meId?: string; sched: Sched; onClose: (apply: boolean, start: string, end: string) => void }) {
+  const toast = useToast()
+  const [dur, setDur] = useState(() => Math.max(30, Math.round((parse(sched.end).getTime() - parse(sched.start).getTime()) / 60000) || 60))
+  const [dayKey, setDayKey] = useState(() => day(sched.start || ymd(new Date())))
+  const [startMin, setStartMin] = useState(() => (sched.start ? mins(sched.start) : 9 * 60))
+  const [ids, setIds] = useState(sched.people)
+  const scroller = useRef<HTMLDivElement>(null)
+  const avail = useAvailability(room.code, dayKey, ymd(addDays(new Date(`${dayKey}T00:00:00`), 13)))
+  const byId = useMemo(() => new Map(room.participants.map((p) => [p.userId, p])), [room.participants])
+  // lo que se está editando no cuenta como ocupado
+  const users = useMemo(() => avail.users.map((u) => ({ ...u, busy: u.busy.filter((b) => !sched.skipEvent || b.eventId !== sched.skipEvent) })), [avail.users, sched.skipEvent])
+  const cols = useMemo(() => sched.people.map((id) => users.find((u) => u.userId === id)).filter((u): u is NonNullable<typeof u> => !!u).filter((u) => ids.includes(u.userId)), [users, sched.people, ids])
+  const endMin = Math.min(1439, startMin + dur)
+  const free = useMemo(() => {
+    // tramos (en el horario laboral) en que nadie de las columnas tiene nada y que caben en la duración
+    const busy = cols.flatMap((u) => busyOn(u, dayKey)).sort((a, b) => a.from - b.from)
+    const out: { a: number; b: number }[] = []
+    let t = 8 * 60
+    for (const x of busy) { if (x.from > t) out.push({ a: t, b: Math.min(x.from, 19 * 60) }); t = Math.max(t, x.to) }
+    if (t < 19 * 60) out.push({ a: t, b: 19 * 60 })
+    return out.filter((f) => f.b > f.a && f.b - f.a >= dur)
+  }, [cols, dayKey, dur])
+  const clashes = cols.filter((u) => busyOn(u, dayKey).some((x) => x.from < endMin && x.to > startMin))
+
+  const ready = !(avail.loading && !users.length)
+  useEffect(() => { if (ready) scroller.current?.scrollTo({ top: Math.max(0, ((startMin - 90) / 60) * HOUR) }) }, [dayKey, ready]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(false, sched.start, sched.end) }
+    window.addEventListener('keydown', on)
+    return () => window.removeEventListener('keydown', on)
+  }, [onClose, sched.start, sched.end])
+
+  const shiftDay = (n: number) => setDayKey((k) => ymd(addDays(new Date(`${k}T00:00:00`), n)))
+  const next = () => {
+    const slots = findSlots(users, cols.map((u) => u.userId), ymd(new Date()) > dayKey ? ymd(new Date()) : dayKey, 14, dur, 60)
+    if (!slots.length) return toast('No hay un horario libre para todas las personas en los próximos 14 días laborables', 'info')
+    const after = slots.find((sl) => sl.day > dayKey || (sl.day === dayKey && sl.start > startMin))
+    const pick = after ?? slots[0]!
+    setDayKey(pick.day)
+    setStartMin(pick.start)
+    if (!after) toast('Ya no hay más horarios libres adelante: se vuelve al primero', 'info')
+  }
+  const minuteAt = (e: { clientY: number }, el: HTMLElement) => Math.max(0, Math.min(1440 - dur, Math.round(((e.clientY - el.getBoundingClientRect().top) / HOUR) * 60 / 15) * 15))
+  const toggle = (id: string) => setIds((cur) => (cur.includes(id) ? (cur.length > 1 ? cur.filter((x) => x !== id) : cur) : [...cur, id]))
+  const d = new Date(`${dayKey}T00:00:00`)
+  const label0 = nice(d)
+  const label = `${label0.charAt(0).toUpperCase()}${label0.slice(1)}${dayKey === ymd(new Date()) ? ' (hoy)' : ''}`
+  const range = `${hhmm(iso(dayKey, startMin))}–${hhmm(iso(dayKey, endMin))}`
+
+  return (
+    <div className="ft">
+      <div className="ft-bar">
+        <button className="btn sm ghost" onClick={() => onClose(false, sched.start, sched.end)}><ChevronLeft size={15} /> Volver a la cita</button>
+        <div className="row">
+          <button className="icon-btn" aria-label="Día anterior" onClick={() => shiftDay(-1)}><ChevronLeft size={18} /></button>
+          <h3 className="cal-title ft-day" style={{ textTransform: "none" }}>{label}</h3>
+          <button className="icon-btn" aria-label="Día siguiente" onClick={() => shiftDay(1)}><ChevronRight size={18} /></button>
+          <button className="btn sm" onClick={() => setDayKey(ymd(new Date()))}>Hoy</button>
+        </div>
+        <span className="spacer" />
+        <label className="av-dur small muted">Duración
+          <select value={dur} onChange={(e) => setDur(Number(e.target.value))}>{[15, 30, 45, 60, 90, 120, 180].map((m) => <option key={m} value={m}>{m >= 60 && m % 60 === 0 ? `${m / 60} h` : `${m} min`}</option>)}</select>
+        </label>
+        <button className="btn sm" onClick={next}><Wand2 size={14} /> Siguiente horario libre</button>
+        <button className="btn sm primary" onClick={() => onClose(true, iso(dayKey, startMin), iso(dayKey, endMin))}><Check size={14} /> Usar {range}</button>
+      </div>
+      <div className="ft-people">
+        {sched.people.map((id) => { const p = byId.get(id); if (!p) return null; return (
+          <button key={id} type="button" className={`av-chip ${ids.includes(id) ? 'on' : ''}`} aria-pressed={ids.includes(id)} onClick={() => toggle(id)}>
+            <Avatar name={p.displayName} userId={id} version={p.avatarVersion} size={18} />{id === meId ? 'Tú' : p.displayName.split(' ')[0]}
+          </button>
+        ) })}
+        <span className="muted small ft-legend"><i className="ft-sw free" /> Todas libres <i className="ft-sw busy" /> Ocupado <i className="ft-sw prop" /> Horario elegido</span>
+      </div>
+      {avail.loading && !users.length ? <p className="muted small center-text">Cargando agendas…</p> : (
+        <div className="ft-scroll" ref={scroller}>
+          <div className="ft-inner" style={{ ['--n' as string]: cols.length }}>
+            <div className="ft-head">
+              <span className="ft-gutter" />
+              {cols.map((u) => (
+                <div key={u.userId} className="ft-who" title={u.displayName}>
+                  <Avatar name={u.displayName} userId={u.userId} version={u.avatarVersion} size={30} />
+                  <b>{u.userId === meId ? 'Tú' : u.displayName.split(' ')[0]}</b>
+                </div>
+              ))}
+            </div>
+            <div className="ft-body" style={{ height: HOUR * 24 }}>
+              <div className="ft-hours">{Array.from({ length: 24 }, (_, h) => <span key={h} style={{ top: h * HOUR }}>{h === 0 ? '' : `${pad(h)}:00`}</span>)}</div>
+              <div className="ft-cols" onClick={(e) => { if ((e.target as HTMLElement).closest('.ft-ev')) return; setStartMin(minuteAt(e, e.currentTarget)) }}>
+                {Array.from({ length: 24 }, (_, h) => <i key={h} className="tg-line" style={{ top: h * HOUR }} />)}
+                {free.map((f) => <div key={f.a} className="ft-free" style={{ top: (f.a / 60) * HOUR, height: ((f.b - f.a) / 60) * HOUR }} />)}
+                {cols.map((u, i) => (
+                  <div key={u.userId} className="ft-col" style={{ left: `${(i / cols.length) * 100}%`, width: `${100 / cols.length}%` }}>
+                    {busyOn(u, dayKey).map((x, j) => (
+                      <div key={j} className={`ft-ev ${x.b.title ? 'known' : ''}`} style={{ top: (x.from / 60) * HOUR, height: Math.max(18, ((x.to - x.from) / 60) * HOUR - 2) }}
+                        title={`${x.b.title ?? 'Ocupado'} · ${x.b.allDay ? 'Todo el día' : `${x.b.start.slice(11)}–${x.b.end.slice(11)}`}`}>
+                        <b>{x.b.title ?? 'Ocupado'}</b>
+                        {x.to - x.from >= 45 && <span>{x.b.allDay ? 'Todo el día' : `${x.b.start.slice(11)}–${x.b.end.slice(11)}`}</span>}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+                <div className={`ft-prop ${clashes.length ? 'clash' : ''}`} style={{ top: (startMin / 60) * HOUR, height: Math.max(20, ((endMin - startMin) / 60) * HOUR) }}><span>{range}</span></div>
+                {dayKey === ymd(new Date()) && <div className="tg-now" style={{ top: ((new Date().getHours() * 60 + new Date().getMinutes()) / 60) * HOUR }}><i /></div>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="ft-foot">
+        {clashes.length > 0
+          ? <span className="av-warn small"><X size={13} /> {clashes.length === 1 ? `${clashes[0]!.userId === meId ? 'Tú' : clashes[0]!.displayName.split(' ')[0]} tiene` : `${clashes.length} personas tienen`} algo a esa hora</span>
+          : <span className="av-fine small"><Check size={13} /> Todas las personas están libres a esa hora</span>}
+      </div>
+    </div>
+  )
+}
+
+/**
  * Creación rápida, como la de Google Calendar: una tarjeta flotante junto al hueco que se pulsó, con el título, la hora, las personas
  * invitadas, la llamada, el lugar y la descripción. «Más opciones» abre el formulario completo con lo que ya se escribió.
  */
-function QuickCreate({ room, draft, anchor, meId, meName, meVersion, onClose, onSave, onMore }: {
+function QuickCreate({ room, draft, anchor, meId, meName, meVersion, hidden, onFind, onClose, onSave, onMore }: {
   room: Room; draft?: Partial<EventData>; anchor?: { x: number; y: number } | null; meId?: string; meName: string; meVersion?: number
+  hidden?: boolean; onFind: (s: Omit<Sched, 'owner'>) => void
   onClose: () => void; onSave: (d: EventData) => Promise<void>; onMore: (d: EventData) => void
 }) {
   const toast = useToast()
@@ -448,10 +579,10 @@ function QuickCreate({ room, draft, anchor, meId, meName, meVersion, onClose, on
     return () => ro.disconnect()
   }, [])
   useEffect(() => {
-    const on = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const on = (e: KeyboardEvent) => { if (e.key === 'Escape' && !hidden) onClose() }
     window.addEventListener('keydown', on)
     return () => window.removeEventListener('keydown', on)
-  }, [onClose])
+  }, [onClose, hidden])
   const drag = (e: React.PointerEvent) => {
     if (!pos) return
     const ox = e.clientX - pos.x, oy = e.clientY - pos.y
@@ -464,13 +595,8 @@ function QuickCreate({ room, draft, anchor, meId, meName, meVersion, onClose, on
   const startDay = day(d.start || ymd(new Date()))
   const avail = useAvailability(room.code, startDay, ymd(addDays(new Date(`${startDay}T00:00:00`), 6)))
   const group = [...(meId ? [meId] : []), ...invitees]
-  const dur = Math.max(30, Math.round((parse(d.end).getTime() - parse(d.start).getTime()) / 60000) || 60)
   const clashes = !d.allDay && d.start && d.end ? avail.users.filter((u) => group.includes(u.userId) && u.busy.some((b) => b.start < d.end && b.end > d.start)) : []
-  const suggest = () => {
-    const sl = findSlots(avail.users, group, startDay, 7, dur, 1)[0]
-    if (!sl) return toast('No hay un horario libre para todas las personas en los próximos días laborables', 'info')
-    setD((x) => ({ ...x, start: isoAt(sl.day, sl.start), end: isoAt(sl.day, sl.end) }))
-  }
+  const find = () => onFind({ people: group, start: d.start, end: d.end, apply: (start, end) => setD((x) => ({ ...x, start, end })) })
 
   // al mover el inicio, el final se mueve con él (se conserva la duración)
   const shift = (start: string) => {
@@ -493,7 +619,7 @@ function QuickCreate({ room, draft, anchor, meId, meName, meVersion, onClose, on
   }
 
   return (
-    <div className="qc" ref={box} role="dialog" aria-label="Nueva cita" style={pos ? { left: pos.x, top: pos.y } : { visibility: 'hidden' }}>
+    <div className="qc" ref={box} role="dialog" aria-label="Nueva cita" hidden={hidden} style={pos ? { left: pos.x, top: pos.y } : { visibility: 'hidden' }}>
       <div className="qc-top" onPointerDown={drag}><i /><button className="icon-btn sm" onClick={onClose} aria-label="Cerrar" onPointerDown={(e) => e.stopPropagation()}><X size={18} /></button></div>
       <div className="qc-body">
         <input autoFocus className="qc-title" value={d.title} maxLength={150} placeholder="Agregar título" aria-label="Título" onChange={(e) => set('title', e.target.value)}
@@ -543,12 +669,10 @@ function QuickCreate({ room, draft, anchor, meId, meName, meVersion, onClose, on
             )}
             {invitees.length > 0 && !d.allDay && (
               <div className="qc-avail">
-                <div className="row between"><span className="small muted">Disponibilidad</span><button type="button" className="btn sm ghost" onClick={suggest}><Wand2 size={13} /> Sugerir hora libre</button></div>
-                {!avail.loading && <AvailabilityGrid users={avail.users} ids={group} meId={meId} day={startDay} proposal={{ start: d.start, end: d.end }} from={8 * 60} to={20 * 60}
-                  onPick={(dd, m) => setD((x) => ({ ...x, start: isoAt(dd, m), end: isoAt(dd, m + dur) }))} />}
+                <button type="button" className="btn sm ghost" onClick={find}><Wand2 size={13} /> Buscar horario</button>
                 {clashes.length > 0
-                  ? <span className="av-warn small"><X size={13} /> {clashes.map((u) => (u.userId === meId ? 'Tú' : u.displayName.split(' ')[0])).join(', ')} {clashes.length > 1 ? 'tienen' : 'tiene'} algo a esa hora.</span>
-                  : !avail.loading && <span className="av-fine small"><Check size={13} /> Todas las personas elegidas están libres.</span>}
+                  ? <span className="av-warn small"><X size={13} /> {clashes.length === 1 ? `${clashes[0]!.userId === meId ? 'Tú' : clashes[0]!.displayName.split(' ')[0]} tiene` : `${clashes.length} personas tienen`} algo a esa hora</span>
+                  : !avail.loading && <span className="av-fine small"><Check size={13} /> Todas libres</span>}
               </div>
             )}
           </div>
@@ -607,8 +731,9 @@ function QuickCreate({ room, draft, anchor, meId, meName, meVersion, onClose, on
   )
 }
 
-function EventDialog({ ev, draft, startEditing, room, people, meId, canEdit, onClose, onSave, onRsvp, onDelete }: {
+function EventDialog({ ev, draft, startEditing, room, people, meId, canEdit, hidden, onFind, onClose, onSave, onRsvp, onDelete }: {
   ev?: Ev; draft?: Partial<EventData>; startEditing: boolean; room: Room; people: Map<string, Room['participants'][number]>; meId?: string; canEdit: boolean
+  hidden?: boolean; onFind: (s: Omit<Sched, 'owner'>) => void
   onClose: () => void; onSave: (d: EventData) => Promise<void>; onRsvp: (s: Rsvp | 'none') => void; onDelete: () => void
 }) {
   const toast = useToast()
@@ -642,14 +767,10 @@ function EventDialog({ ev, draft, startEditing, room, people, meId, canEdit, onC
   const startDay = day(d.start || ymd(new Date()))
   const avail = useAvailability(room.code, startDay, ymd(addDays(new Date(`${startDay}T00:00:00`), 6)))
   const group = [...(meId ? [meId] : []), ...invitees]
-  const dur = Math.max(30, Math.round((parse(d.end).getTime() - parse(d.start).getTime()) / 60000) || 60)
   const clashes = !d.allDay && d.start && d.end ? avail.users.filter((u) => group.includes(u.userId) && u.busy.some((b) => b.eventId !== (ev?.id ?? null) && b.start < d.end && b.end > d.start)) : []
-  const suggest = () => {
-    const s = findSlots(avail.users, group, startDay, 7, dur, 1)[0]
-    if (!s) return toast('No hay un horario libre para todas las personas en los próximos días laborables', 'info')
-    setD((x) => ({ ...x, start: isoAt(s.day, s.start), end: isoAt(s.day, s.end) }))
-  }
+  const find = () => onFind({ people: group, start: d.start, end: d.end, skipEvent: ev?.id ?? null, apply: (start, end) => setD((x) => ({ ...x, start, end })) })
 
+  if (hidden) return null
   if (edit) {
     return (
       <Modal title={ev ? 'Editar cita' : 'Nueva cita'} icon={<CalendarPlus size={20} />} onClose={onClose} wide
@@ -678,13 +799,10 @@ function EventDialog({ ev, draft, startEditing, room, people, meId, canEdit, onC
           </div>
 
           {!d.allDay && d.start && (
-            <div className="stack tight">
-              <div className="row between"><span className="small muted">Disponibilidad ese día</span>
-                <button type="button" className="btn sm ghost" onClick={suggest}><Wand2 size={13} /> Sugerir hora libre</button></div>
-              {avail.loading ? <span className="muted small">Cargando…</span> : <AvailabilityGrid users={avail.users} ids={group} meId={meId} day={startDay} proposal={{ start: d.start, end: d.end }} from={7 * 60} to={21 * 60}
-                onPick={(dd, m) => setD((x) => ({ ...x, start: isoAt(dd, m), end: isoAt(dd, m + dur) }))} />}
-              {clashes.length > 0 && <span className="av-warn small"><X size={13} /> {clashes.map((u) => (u.userId === meId ? 'Tú' : u.displayName.split(' ')[0])).join(', ')} {clashes.length > 1 ? 'tienen' : 'tiene'} algo a esa hora.</span>}
-              {group.length > 0 && clashes.length === 0 && !avail.loading && <span className="av-fine small"><Check size={13} /> Todas las personas elegidas están libres a esa hora.</span>}
+            <div className="row">
+              <button type="button" className="btn sm ghost" onClick={find}><Wand2 size={13} /> Buscar horario</button>
+              {clashes.length > 0 && <span className="av-warn small"><X size={13} /> {clashes.length === 1 ? `${clashes[0]!.userId === meId ? 'Tú' : clashes[0]!.displayName.split(' ')[0]} tiene` : `${clashes.length} personas tienen`} algo a esa hora</span>}
+              {group.length > 1 && clashes.length === 0 && !avail.loading && <span className="av-fine small"><Check size={13} /> Todas libres a esa hora</span>}
             </div>
           )}
 
