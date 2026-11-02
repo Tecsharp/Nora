@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { rt, useRealtime, useRtStatus } from '../realtime'
 import { useToast } from '../toast'
+import { callSounds } from './sounds'
 import { callApi, type CallInfo, type CallState, type Part } from './api'
 import type { LocalMedia } from './useLocalMedia'
 
@@ -244,8 +245,8 @@ export function useCall(code: string, media: LocalMedia) {
     sendMe({ mic: false })
     toast('El anfitrión silenció tu micrófono', 'info')
   })
-  useRealtime('call.removed', (d) => { if (mine(d)) { closeAll(); mediaRef.current.stopAll(); setPhase('removed') } })
-  useRealtime('call.ended', (d) => { if (mine(d)) { closeAll(); mediaRef.current.stopAll(); setPhase('ended') } })
+  useRealtime('call.removed', (d) => { if (mine(d)) { callSounds.exit(); closeAll(); mediaRef.current.stopAll(); setPhase('removed') } })
+  useRealtime('call.ended', (d) => { if (mine(d)) { callSounds.exit(); closeAll(); mediaRef.current.stopAll(); setPhase('ended') } })
   useRealtime('call.error', (d) => {
     if (d.code && d.code !== code) return
     if (phaseRef.current === 'joining' || phaseRef.current === 'waiting') { setError(d.message); setPhase('error') }

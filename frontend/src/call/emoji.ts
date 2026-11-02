@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { REACTIONS } from './api'
 
 /** Todos los emojis que ofrece la ventana de reacciones, por categorías. */
@@ -12,24 +12,34 @@ export const EMOJI_GROUPS: { id: string; label: string; list: string[] }[] = [
   { id: 'travel', label: 'Viajes y deportes', list: '🚗 🚕 🚌 🚲 🛵 ✈️ 🚁 🚢 🏠 🏢 🏖️ ⛰️ 🗽 ⚽ 🏀 🏈 ⚾ 🎾 🏐 🏓 🥊 ⛳ 🏊 🚴 🧘 🌍 🗺️ 🧭'.split(' ') },
 ]
 
-const KEY = 'nora-call-emoji-use'
-const read = (): Record<string, number> => { try { return JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<string, number> } catch { return {} } }
+/** Los de siempre: van a la izquierda de la barra de reacciones y no se mueven nunca. */
+export const DEFAULT_REACTIONS = REACTIONS
+
+const KEY = 'nora-call-emoji-use2'
+const FAVS = 3 // huecos de «los que más usas», a la derecha de los de siempre
+interface Use { n: number; t: number }
+const read = (): Record<string, Use> => { try { return JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<string, Use> } catch { return {} } }
+
+/** Los emojis que no son de los de siempre, de más a menos usados (a igualdad, el más reciente). */
+const rank = (use: Record<string, Use>) => Object.entries(use)
+  .filter(([e, u]) => u.n > 0 && !DEFAULT_REACTIONS.includes(e))
+  .sort((a, b) => b[1].n - a[1].n || b[1].t - a[1].t)
+  .slice(0, FAVS).map(([e]) => e)
 
 /**
- * Los emojis que se ven a mano: los diez de siempre al principio y, con el uso, los que más se mandan van ocupando su lugar.
- * Se recuerdan en este navegador.
+ * «Los que más usas» de la barra de reacciones. Para que nada se mueva bajo el dedo mientras se manda una ráfaga de emojis, la lista se
+ * ordena una sola vez, al abrir la barra; mientras está abierta, un emoji nuevo solo se agrega al final si queda hueco y nunca cambia el orden.
+ * Lo que se usa se recuerda en este navegador y ordena la barra la próxima vez que se abra.
  */
-export function useFrequentEmojis(size = 10) {
-  const [use, setUse] = useState(read)
-  const bump = useCallback((e: string) => {
-    setUse((cur) => {
-      const next = { ...cur, [e]: (cur[e] ?? 0) + 1 }
-      try { localStorage.setItem(KEY, JSON.stringify(next)) } catch { /* sin almacenamiento */ }
-      return next
-    })
+export function useEmojiFavorites() {
+  const counts = useRef<Record<string, Use>>(read())
+  const [fav, setFav] = useState<string[]>(() => rank(counts.current))
+  const open = useCallback(() => { counts.current = read(); setFav(rank(counts.current)) }, [])
+  const used = useCallback((e: string) => {
+    const u = counts.current[e] ?? { n: 0, t: 0 }
+    counts.current = { ...counts.current, [e]: { n: u.n + 1, t: Date.now() } }
+    try { localStorage.setItem(KEY, JSON.stringify(counts.current)) } catch { /* sin almacenamiento */ }
+    if (!DEFAULT_REACTIONS.includes(e)) setFav((cur) => (cur.includes(e) || cur.length >= FAVS ? cur : [...cur, e]))
   }, [])
-  const used = Object.entries(use).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).map(([e]) => e)
-  const seen = new Set<string>()
-  const top = [...used, ...REACTIONS].filter((e) => (seen.has(e) ? false : (seen.add(e), true))).slice(0, size)
-  return { top, bump }
+  return { fav, open, used }
 }

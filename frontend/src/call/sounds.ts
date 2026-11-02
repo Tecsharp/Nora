@@ -25,10 +25,14 @@ function tones(notes: { f: number; at: number; len: number; gain?: number; type?
 }
 
 export const callSounds = {
-  /** Dos notas que suben. */
-  join: () => tones([{ f: 523.25, at: 0, len: 0.16 }, { f: 783.99, at: 0.12, len: 0.24 }]),
-  /** Dos notas que bajan. */
-  leave: () => tones([{ f: 659.25, at: 0, len: 0.16 }, { f: 392, at: 0.12, len: 0.26 }]),
-  /** Un «tin-tin» alegre. */
-  hand: () => tones([{ f: 880, at: 0, len: 0.12, type: 'triangle', gain: 0.14 }, { f: 1174.66, at: 0.11, len: 0.2, type: 'triangle', gain: 0.14 }]),
+  /** Tú entras: un acorde que sube, claro y un poco más largo. */
+  enter: () => tones([{ f: 523.25, at: 0, len: 0.2, gain: 0.14 }, { f: 659.25, at: 0.13, len: 0.2, gain: 0.14 }, { f: 1046.5, at: 0.26, len: 0.38, gain: 0.14 }]),
+  /** Tú sales: lo mismo, pero bajando. */
+  exit: () => tones([{ f: 880, at: 0, len: 0.2, gain: 0.14 }, { f: 659.25, at: 0.13, len: 0.2, gain: 0.14 }, { f: 440, at: 0.26, len: 0.4, gain: 0.14 }]),
+  /** Alguien más entra: dos notas suaves que suben. */
+  join: () => tones([{ f: 587.33, at: 0, len: 0.14, type: 'triangle', gain: 0.1 }, { f: 880, at: 0.11, len: 0.2, type: 'triangle', gain: 0.1 }]),
+  /** Alguien más sale: dos notas suaves que bajan. */
+  leave: () => tones([{ f: 740, at: 0, len: 0.14, type: 'triangle', gain: 0.1 }, { f: 494, at: 0.11, len: 0.22, type: 'triangle', gain: 0.1 }]),
+  /** Alguien levanta la mano: un «tin-tin» alegre. */
+  hand: () => tones([{ f: 880, at: 0, len: 0.12, type: 'square', gain: 0.05 }, { f: 1318.5, at: 0.11, len: 0.22, type: 'square', gain: 0.05 }]),
 }

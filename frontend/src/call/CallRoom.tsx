@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Captions, Check, Hand, Info, LayoutGrid, MessageSquare, Mic, MicOff, Minimize, Maximize, MonitorUp, MonitorOff, MoreVertical, PanelRight, PhoneOff, PictureInPicture2, Settings, Smile, Users, Video, VideoOff, X } from 'lucide-react'
+import { Captions, Check, Hand, Info, LayoutGrid, MessageSquare, Mic, MicOff, Minimize, Maximize, MonitorUp, MonitorOff, MoreVertical, PanelRight, PhoneOff, PictureInPicture2, Plus, Settings, Smile, Users, Video, VideoOff, X } from 'lucide-react'
 import type { User } from '../api'
 import { useRealtime } from '../realtime'
 import { callUrl, type Part } from './api'
-import { EMOJI_GROUPS, useFrequentEmojis } from './emoji'
+import { DEFAULT_REACTIONS, EMOJI_GROUPS, useEmojiFavorites } from './emoji'
 import { callSounds } from './sounds'
 import { captionsSupported, type CallApi } from './useCall'
 import type { LocalMedia } from './useLocalMedia'
@@ -44,7 +44,8 @@ export default function CallRoom({ call, media, user, roomCode }: { call: CallAp
   const [full, setFull] = useState(!!document.fullscreenElement)
   const [activeConn, setActiveConn] = useState<string | null>(null)
   const [emojiGroup, setEmojiGroup] = useState(EMOJI_GROUPS[0]!.id)
-  const freq = useFrequentEmojis()
+  const favs = useEmojiFavorites()
+  const [allEmojis, setAllEmojis] = useState(false)
   const root = useRef<HTMLDivElement>(null)
 
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t) }, [])
@@ -66,7 +67,7 @@ export default function CallRoom({ call, media, user, roomCode }: { call: CallAp
     const hands = new Set(state.parts.filter((p) => p.hand).map((p) => p.conn))
     const prev = seen.current
     seen.current = { conns, hands }
-    if (!prev) return // la primera foto de la llamada: no suena nadie
+    if (!prev) { callSounds.enter(); return } // la primera foto de la llamada: suena que tú entraste, no los demás
     const joined = [...conns].some((c) => !prev.conns.has(c) && c !== me)
     const left = [...prev.conns].some((c) => !conns.has(c) && c !== me)
     const raised = [...hands].some((c) => !prev.hands.has(c) && c !== me)
@@ -211,6 +212,26 @@ export default function CallRoom({ call, media, user, roomCode }: { call: CallAp
         <div className="call-bar-l"><span className="mono">{elapsed(state.startedAt, now)}</span><i /><span className="call-code">{state.code}</span></div>
 
         <div className="call-bar-c">
+          {menu === 'react' && (
+            <div className="react-bar" role="menu" aria-label="Reacciones">
+              {allEmojis && (
+                <div className="react-all">
+                  <div className="emo-tabs" role="tablist" aria-label="Categorías de emojis">
+                    {EMOJI_GROUPS.map((g) => <button key={g.id} role="tab" aria-selected={emojiGroup === g.id} className={emojiGroup === g.id ? 'on' : ''} title={g.label} onClick={() => setEmojiGroup(g.id)}>{g.list[0]}</button>)}
+                  </div>
+                  <div className="emo-grid" role="group" aria-label={EMOJI_GROUPS.find((g) => g.id === emojiGroup)?.label}>
+                    {EMOJI_GROUPS.find((g) => g.id === emojiGroup)?.list.map((e) => <button key={e} role="menuitem" aria-label={`Reaccionar con ${e}`} onClick={() => { call.react(e); favs.used(e) }}>{e}</button>)}
+                  </div>
+                </div>
+              )}
+              <div className="react-row">
+                {DEFAULT_REACTIONS.map((e) => <button key={e} role="menuitem" className="react-emo" aria-label={`Reaccionar con ${e}`} onClick={() => { call.react(e); favs.used(e) }}>{e}</button>)}
+                {favs.fav.length > 0 && <i className="react-sep" aria-hidden />}
+                {favs.fav.map((e) => <button key={e} role="menuitem" className="react-emo fav" title="De los que más usas" aria-label={`Reaccionar con ${e}`} onClick={() => { call.react(e); favs.used(e) }}>{e}</button>)}
+                <button type="button" className={`react-emo more ${allEmojis ? 'on' : ''}`} aria-label="Más emojis" title="Todos los emojis" aria-pressed={allEmojis} onClick={() => setAllEmojis((v) => !v)}><Plus size={18} /></button>
+              </div>
+            </div>
+          )}
           <button className={`cbtn ${media.mic && !companion ? '' : 'off'}`} disabled={companion} onClick={() => void call.toggleMic()} aria-label={media.mic ? 'Silenciar micrófono' : 'Activar micrófono'} title={companion ? 'Modo complementario: sin micrófono' : 'Micrófono (Ctrl+D)'}>
             {media.mic && !companion ? <Mic size={20} /> : <MicOff size={20} />}
           </button>
@@ -220,22 +241,7 @@ export default function CallRoom({ call, media, user, roomCode }: { call: CallAp
           <button className={`cbtn ${call.showCaptions ? 'on' : ''}`} onClick={() => call.toggleCaptions()} aria-pressed={call.showCaptions} aria-label="Subtítulos" title={captionsSupported() ? 'Subtítulos' : 'Subtítulos (este navegador solo puede mostrar los de otras personas)'}>
             <Captions size={20} />
           </button>
-          <div className="cmenu-wrap">
-            <button className={`cbtn ${menu === 'react' ? 'on' : ''}`} onClick={() => setMenu(menu === 'react' ? null : 'react')} aria-label="Reacciones" title="Enviar una reacción"><Smile size={20} /></button>
-            {menu === 'react' && (
-              <div className="cmenu react" role="menu" aria-label="Reacciones">
-                <div className="emo-top">
-                  {freq.top.map((e) => <button key={e} role="menuitem" aria-label={`Reaccionar con ${e}`} onClick={() => { call.react(e); freq.bump(e) }}>{e}</button>)}
-                </div>
-                <div className="emo-tabs" role="tablist" aria-label="Categorías de emojis">
-                  {EMOJI_GROUPS.map((g) => <button key={g.id} role="tab" aria-selected={emojiGroup === g.id} className={emojiGroup === g.id ? 'on' : ''} title={g.label} onClick={() => setEmojiGroup(g.id)}>{g.list[0]}</button>)}
-                </div>
-                <div className="emo-grid" role="group" aria-label={EMOJI_GROUPS.find((g) => g.id === emojiGroup)?.label}>
-                  {EMOJI_GROUPS.find((g) => g.id === emojiGroup)?.list.map((e) => <button key={e} role="menuitem" aria-label={`Reaccionar con ${e}`} onClick={() => { call.react(e); freq.bump(e) }}>{e}</button>)}
-                </div>
-              </div>
-            )}
-          </div>
+          <button className={`cbtn ${menu === 'react' ? 'on' : ''}`} onClick={() => { if (menu !== 'react') { favs.open(); setAllEmojis(false) } setMenu(menu === 'react' ? null : 'react') }} aria-expanded={menu === 'react'} aria-label="Reacciones" title="Enviar una reacción"><Smile size={20} /></button>
           <button className={`cbtn ${call.screen ? 'on' : ''}`} onClick={() => (call.screen ? call.stopScreen() : void call.startScreen())} aria-pressed={!!call.screen} aria-label={call.screen ? 'Dejar de presentar' : 'Presentar pantalla'} title={call.screen ? 'Dejar de presentar' : 'Presentar ahora'}>
             {call.screen ? <MonitorOff size={20} /> : <MonitorUp size={20} />}
           </button>
@@ -294,7 +300,7 @@ export default function CallRoom({ call, media, user, roomCode }: { call: CallAp
               </div>
             )}
           </div>
-          <button className="cbtn hang" onClick={() => call.leave()} aria-label="Salir de la llamada" title="Salir de la llamada"><PhoneOff size={20} /></button>
+          <button className="cbtn hang" onClick={() => { callSounds.exit(); call.leave() }} aria-label="Salir de la llamada" title="Salir de la llamada"><PhoneOff size={20} /></button>
         </div>
 
         <div className="call-bar-r">
