@@ -41,7 +41,7 @@ export default function AssistTool({ room, online }: { room: Room; online: Set<s
     }
   }
 
-  const [more, setMore] = useState(false) // «vincular otro equipo» cuando ya hay uno conectado
+  const [more, setMore] = useState(false) // «vincular otra computadora» cuando ya hay uno conectado
   const [copied, setCopied] = useState(false)
   // La sección del agente solo aparece si hay algo que ofrecer (una descarga) o ya hay uno conectado: no se le pide nada al usuario por gusto.
   const showAgent = available.length > 0 || agent.online
@@ -50,7 +50,7 @@ export default function AssistTool({ room, online }: { room: Room; online: Set<s
 
   return (
     <div className="as-wrap">
-      {!supported && <p className="as-warn">Este navegador no permite compartir la pantalla. Usa Chrome, Edge, Firefox o Safari en un ordenador.</p>}
+      {!supported && <p className="as-warn">Este navegador no permite compartir la pantalla. Usa Chrome, Edge, Firefox o Safari en una computadora.</p>}
 
       <header className="as-hero">
         <span className="as-hero-ico"><MonitorUp size={24} /></span>
@@ -77,7 +77,7 @@ export default function AssistTool({ room, online }: { room: Room; online: Set<s
                   </span>
                   <span className="as-acts">
                     <button className="as-btn" disabled={!on || busy || !supported} onClick={() => ask(person, 'view')} title="Pedirle que te enseñe su pantalla"><Eye size={15} /> Ver</button>
-                    {hasAgent && <button className="as-btn" disabled={!on || busy || !supported} onClick={() => ask(person, 'control')} title="Pedirle ver y controlar su equipo"><Hand size={15} /> Controlar</button>}
+                    {hasAgent && <button className="as-btn" disabled={!on || busy || !supported} onClick={() => ask(person, 'control')} title="Pedirle ver y controlar su computadora"><Hand size={15} /> Controlar</button>}
                     <button className="as-btn ghost" disabled={!on || busy || !supported} onClick={() => void share(person)} title="Enseñarle tu pantalla"><Share2 size={15} /> Compartir la mía</button>
                   </span>
                 </li>
@@ -107,8 +107,8 @@ export default function AssistTool({ room, online }: { room: Room; online: Set<s
           <h3 className="as-h">Que te controlen <span className={`as-state ${agent.online ? 'on' : ''}`}><i /> {agent.online ? `Agente conectado${agent.os ? ` · ${agent.os}` : ''}` : 'Sin agente'}</span></h3>
           {agent.online && !more && (
             <div className="as-ready">
-              <Check size={18} /> <span>Tu equipo está listo: quien te lo pida podrá controlarlo cuando aceptes.</span>
-              <button className="as-link" onClick={() => setMore(true)}>Vincular otro equipo</button>
+              <Check size={18} /> <span>Tu computadora está lista: quien te lo pida podrá controlarlo cuando aceptes.</span>
+              <button className="as-link" onClick={() => setMore(true)}>Vincular otra computadora</button>
             </div>
           )}
           {steps && (

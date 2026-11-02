@@ -252,7 +252,7 @@ function Account({ user, storageUsed }: { user: User; storageUsed: number }) {
     <div className="stack" style={{ gap: 18 }}>
       <section className="card stack tight">
         <h3>Tu cuenta</h3>
-        <p className="muted small">Alta: {fmtDate(user.createdAt)} · Rol: {user.role === 'ADMIN' ? 'Administrador' : 'Usuario'}. Estos límites los fija el administrador.</p>
+        <p className="muted small">Cuenta creada: {fmtDate(user.createdAt)} · Rol: {user.role === 'ADMIN' ? 'Administrador' : 'Usuario'}. Estos límites los fija el administrador.</p>
         <div className="stat-grid">{rows.map(([k, v]) => <div key={k} className="stat"><b>{v}</b><span className="muted small">{k}</span></div>)}</div>
       </section>
       <form className="card stack danger-zone" onSubmit={remove}>
@@ -278,10 +278,10 @@ export default function Settings() {
     <div className="stack" style={{ gap: 18, maxWidth: 760, margin: '0 auto' }}>
       <div><BackButton /></div>
       <div className="hero">
-        <h1 className="row"><Cog size={26} /> Ajustes</h1>
+        <h1 className="row"><Cog size={26} /> Configuración</h1>
         <p>Tu perfil, tu seguridad y tu cuenta.</p>
       </div>
-      <Tabs label="Secciones de ajustes" value={tab} onChange={setTab}
+      <Tabs label="Secciones de configuración" value={tab} onChange={setTab}
         items={[{ id: 'profile', label: <><UserIcon size={15} /> Perfil</> }, { id: 'security', label: <><KeyRound size={15} /> Seguridad</> }, { id: 'account', label: <><ShieldAlert size={15} /> Cuenta</> }]} />
       {tab === 'profile' && <Profile user={user} />}
       {tab === 'security' && <Security user={user} />}

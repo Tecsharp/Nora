@@ -159,7 +159,7 @@ function UserEditor({ row, self, onSaved, onDeleted, onClose }: { row: Row; self
   }
 
   async function revoke() {
-    if (!await dialogs.confirm({ title: `¿Cerrar las sesiones de ${row.user.displayName}?`, message: 'Se le sacará de Nora en todos sus dispositivos y tendrá que volver a iniciar sesión.', confirmLabel: 'Cerrar sesiones', tone: 'warning', icon: 'info' })) return
+    if (!await dialogs.confirm({ title: `¿Cerrar las sesiones de ${row.user.displayName}?`, message: 'Se cerrará su sesión en todos sus dispositivos y tendrá que volver a iniciar sesión.', confirmLabel: 'Cerrar sesiones', tone: 'warning', icon: 'info' })) return
     await api(`/admin/users/${row.user.id}/revoke-sessions`, 'POST').catch((e) => toast(e.message, 'error'))
     toast('Sesiones cerradas', 'success')
   }
@@ -188,7 +188,7 @@ function UserEditor({ row, self, onSaved, onDeleted, onClose }: { row: Row; self
         <Avatar name={row.user.displayName} userId={row.user.id} version={row.user.avatarVersion} size={44} />
         <div>
           <div className="small">{row.user.email}</div>
-          <div className="muted small">Usado: {formatBytes(row.storageUsedBytes)} · Alta: {fmtDate(row.user.createdAt)} · Último acceso: {row.user.lastLoginAt ? fmtShortMonth(row.user.lastLoginAt) : 'nunca'}</div>
+          <div className="muted small">Usado: {formatBytes(row.storageUsedBytes)} · Creada: {fmtDate(row.user.createdAt)} · Último acceso: {row.user.lastLoginAt ? fmtShortMonth(row.user.lastLoginAt) : 'nunca'}</div>
         </div>
       </div>
       <div className="grid-2">
@@ -261,7 +261,7 @@ function NewUser({ onClose, onCreated }: { onClose: () => void; onCreated: (r: R
         <label>Correo<input required type="email" maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} /></label>
         {passwordLogin
           ? <label>Contraseña inicial<input required type="text" autoComplete="off" minLength={10} maxLength={72} value={pw} onChange={(e) => setPw(e.target.value)} />
-              <span className="muted small">La persona puede cambiarla en Ajustes. Mínimo 10 caracteres con mayúscula, minúscula y número.</span></label>
+              <span className="muted small">La persona puede cambiarla en Configuración. Mínimo 10 caracteres con mayúscula, minúscula y número.</span></label>
           : <p className="muted small">Esta cuenta entrará con Google usando el correo que indiques.</p>}
         <label>Rol<select value={role} onChange={(e) => setRole(e.target.value as 'USER' | 'ADMIN')}><option value="USER">Usuario</option><option value="ADMIN">Administrador</option></select></label>
         {error && <p className="error small" role="alert">{error}</p>}
@@ -279,7 +279,7 @@ function Overview() {
   if (!s) return <p className="muted">Cargando…</p>
   const cards: [string, string | number, string][] = [
     ['Cuentas', s.users, `${s.admins} administrador${s.admins === 1 ? '' : 'es'} · ${s.disabled} desactivada${s.disabled === 1 ? '' : 's'}`],
-    ['Altas esta semana', s.newUsers7d, 'últimos 7 días'],
+    ['Cuentas nuevas esta semana', s.newUsers7d, 'últimos 7 días'],
     ['Activas hoy', s.active24h, 'han iniciado sesión en 24 h'],
     ['Sesiones abiertas', s.sessions, 'dispositivos con sesión'],
     ['Salas activas', s.activeRooms, 'sin expirar'],
@@ -304,7 +304,7 @@ function SystemSettings() {
     setBusy(true)
     try {
       setCfg(await api('/admin/settings', 'PUT', cfg))
-      toast('Ajustes guardados', 'success')
+      toast('Configuración guardada', 'success')
     } catch (e) {
       toast(e instanceof Error ? e.message : 'No se pudo guardar', 'error')
     } finally {
@@ -339,7 +339,7 @@ function SystemSettings() {
         {num('maxActiveRooms', 'Salas activas', 'salas')}
         {num('maxParticipants', 'Participantes por sala', 'personas', 2)}
       </div>
-      <div><button className="btn primary" disabled={busy} onClick={() => void save()}>{busy ? 'Guardando…' : 'Guardar ajustes'}</button></div>
+      <div><button className="btn primary" disabled={busy} onClick={() => void save()}>{busy ? 'Guardando…' : 'Guardar configuración'}</button></div>
       <AiStatus />
     </section>
   )
@@ -404,7 +404,7 @@ export default function Admin() {
       <div><BackButton /></div>
       <div className="hero">
         <h1 className="row"><Shield size={26} /> Administración</h1>
-        <p>Cuentas, límites, seguridad y ajustes de todo el sistema.</p>
+        <p>Cuentas, límites, seguridad y configuración de todo el sistema.</p>
       </div>
       <Tabs label="Secciones de administración" value={tab} onChange={setTab}
         items={[

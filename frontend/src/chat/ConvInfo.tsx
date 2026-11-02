@@ -14,7 +14,7 @@ import { PersonPicker } from './ChatBits'
 
 const POLICY: { v: Policy; label: string }[] = [{ v: 'ALL', label: 'Todas las personas' }, { v: 'ADMINS', label: 'Solo administración' }]
 
-/** Ajustes de una conversación: en un grupo, su nombre, color, permisos y miembros; en cualquiera, silenciar y fijar. */
+/** Configuración de una conversación: en un grupo, su nombre, color, permisos y miembros; en cualquiera, silenciar y fijar. */
 export default function ConvInfo({ conv, onClose, onGone }: { conv: Conv; onClose?: () => void; onGone?: () => void }) {
   const { user } = useAuth()
   const toast = useToast()
@@ -39,7 +39,7 @@ export default function ConvInfo({ conv, onClose, onGone }: { conv: Conv; onClos
   const memberAction = async (fn: () => Promise<unknown>, err: string) => { try { await fn(); await refresh() } catch (e) { fail(e, err) } }
 
   const leave = async () => {
-    if (!(await dialogs.confirm({ title: '¿Salir del grupo?', message: 'Dejarás de recibir sus mensajes. Podrás volver si alguien te añade.', confirmLabel: 'Salir', tone: 'danger', icon: 'question' }))) return
+    if (!(await dialogs.confirm({ title: '¿Salir del grupo?', message: 'Dejarás de recibir sus mensajes. Podrás volver si alguien te agrega.', confirmLabel: 'Salir', tone: 'danger', icon: 'question' }))) return
     try { await chatApi.removeMember(room.code, conv.id, user!.id); await refresh(); onGone?.() } catch (e) { fail(e, 'No se pudo salir') }
   }
   const destroy = async () => {
@@ -91,7 +91,7 @@ export default function ConvInfo({ conv, onClose, onGone }: { conv: Conv; onClos
           <label className="field row-field">Quién puede escribir
             <select value={conv.postPolicy} disabled={!admin} onChange={(e) => void save({ postPolicy: e.target.value as Policy })}>{POLICY.map((o) => <option key={o.v} value={o.v}>{o.label}</option>)}</select>
           </label>
-          <label className="field row-field">Quién puede añadir personas
+          <label className="field row-field">Quién puede agregar personas
             <select value={conv.addPolicy} disabled={!admin} onChange={(e) => void save({ addPolicy: e.target.value as Policy })}>{POLICY.map((o) => <option key={o.v} value={o.v}>{o.label}</option>)}</select>
           </label>
         </section>
@@ -99,7 +99,7 @@ export default function ConvInfo({ conv, onClose, onGone }: { conv: Conv; onClos
 
       {isGroup && (
         <section>
-          <div className="cinfo-sec-head"><h4>Miembros · {conv.members.length}</h4>{canAdd && <button className="btn ghost sm" onClick={() => setAdding(true)}><UserPlus size={14} /> Añadir</button>}</div>
+          <div className="cinfo-sec-head"><h4>Miembros · {conv.members.length}</h4>{canAdd && <button className="btn ghost sm" onClick={() => setAdding(true)}><UserPlus size={14} /> Agregar</button>}</div>
           <ul className="cinfo-members">
             {conv.members.map((m) => {
               const p = who.get(m.userId)
@@ -133,7 +133,7 @@ export default function ConvInfo({ conv, onClose, onGone }: { conv: Conv; onClos
 
       {adding && (
         <AddMembers candidates={candidates} onClose={() => setAdding(false)} onAdd={async (ids) => {
-          try { await chatApi.addMembers(room.code, conv.id, ids); await refresh(); setAdding(false) } catch (e) { fail(e, 'No se pudo añadir') }
+          try { await chatApi.addMembers(room.code, conv.id, ids); await refresh(); setAdding(false) } catch (e) { fail(e, 'No se pudo agregar') }
         }} />
       )}
     </div>
@@ -144,10 +144,10 @@ function AddMembers({ candidates, onClose, onAdd }: { candidates: ReturnType<typ
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
   return (
-    <Modal title="Añadir personas" icon={<UserPlus size={20} />} onClose={onClose} className="ai-layer" footer={
+    <Modal title="Agregar personas" icon={<UserPlus size={20} />} onClose={onClose} className="ai-layer" footer={
       <>
         <button className="btn ghost" onClick={onClose}>Cancelar</button>
-        <button className="btn primary" disabled={sel.size === 0 || busy} onClick={() => { setBusy(true); void onAdd([...sel]).finally(() => setBusy(false)) }}>Añadir{sel.size ? ` ${sel.size}` : ''}</button>
+        <button className="btn primary" disabled={sel.size === 0 || busy} onClick={() => { setBusy(true); void onAdd([...sel]).finally(() => setBusy(false)) }}>Agregar{sel.size ? ` ${sel.size}` : ''}</button>
       </>
     }>
       <PersonPicker people={candidates} selected={sel} onToggle={(id) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })} empty="Ya están todas las personas de la sala" />
@@ -158,7 +158,7 @@ function AddMembers({ candidates, onClose, onAdd }: { candidates: ReturnType<typ
 /** Los ajustes en una ventana (se usan desde el dock, donde no hay panel lateral). */
 export function ConvInfoDialog({ conv, onClose }: { conv: Conv; onClose: () => void }) {
   return (
-    <Modal title="Ajustes del chat" onClose={onClose} className="ai-layer">
+    <Modal title="Configuración del chat" onClose={onClose} className="ai-layer">
       <ConvInfo conv={conv} onGone={onClose} />
     </Modal>
   )

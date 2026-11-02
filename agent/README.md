@@ -1,6 +1,6 @@
 # Nora Agent (Asistencia)
 
-Programa pequeño y **visual** de escritorio (Rust, un solo ejecutable para Windows, macOS y Linux) que permite que alguien de tu sala **controle tu equipo con el ratón y el teclado**,
+Programa pequeño y **visual** de escritorio (Rust, un solo ejecutable para Windows, macOS y Linux) que permite que alguien de tu sala **controle tu computadora con el mouse y el teclado**,
 solo cuando tú lo aceptas desde Nora. Un navegador no puede hacerlo por sí solo; por eso existe.
 
 **Ver** la pantalla de otra persona no necesita el agente: va dentro de Nora (WebRTC). El agente solo aplica los clics y las teclas. La imagen la
@@ -10,12 +10,12 @@ comparte tu navegador, no el agente.
 
 1. En Nora: sala → **Asistencia** → «Generar código» (vale 10 minutos y se usa una vez).
 2. Abre **Nora Agent**. La primera vez te pide la dirección de tu Nora y el código; después se recuerda y se conecta solo.
-3. La ventana muestra **Conectado**. Cuando otra persona pida controlar tu equipo verás el aviso rojo en Nora y, si lo aceptas, la ventana del agente se pone al frente con
+3. La ventana muestra **Conectado**. Cuando otra persona pida controlar tu computadora verás el aviso rojo en Nora y, si lo aceptas, la ventana del agente se pone al frente con
    **Control remoto activo** y un botón grande **Detener control** (también se corta desde Nora o cerrando el agente, al instante).
-4. La ventana sigue el tema claro u oscuro de tu sistema y muestra **qué usuario de Nora está conectado** (nombre y correo) y la **versión** del agente. También puedes activar **Iniciar con el sistema** (arranca minimizado al iniciar sesión) y **Desvincular este equipo**.
+4. La ventana sigue el tema claro u oscuro de tu sistema y muestra **qué usuario de Nora está conectado** (nombre y correo) y la **versión** del agente. También puedes activar **Iniciar con el sistema** (arranca minimizado al iniciar sesión) y **Desvincular esta computadora**.
 
 Cerrar la ventana detiene el agente; minimizarla lo deja funcionando. Sin ventana (servidores, SSH): `nora-agent --cli --server https://tu-nora --code ABCD-EFGH`;
-`nora-agent --reset` olvida la vinculación. «Cerrar todas las sesiones» en Ajustes también invalida los agentes.
+`nora-agent --reset` olvida la vinculación. «Cerrar todas las sesiones» en Configuración también invalida los agentes.
 
 ## Seguridad
 
@@ -55,6 +55,6 @@ hay que abrirla con clic derecho → Abrir (o `xattr -dr com.apple.quarantine "N
 | Sistema | Notas |
 | --- | --- |
 | Windows | Funciona. No puede controlar ventanas que se ejecutan como administrador salvo que el agente también lo haga. |
-| macOS | Concede **Accesibilidad** (Ajustes del Sistema → Privacidad y seguridad) a *Nora Agent* la primera vez; la ventana lo avisa y tiene un botón para abrir esos ajustes. Para compartir la pantalla, el navegador necesita el permiso de **Grabación de pantalla**. |
+| macOS | Concede **Accesibilidad** (Configuración del Sistema → Privacidad y seguridad) a *Nora Agent* la primera vez; la ventana lo avisa y tiene un botón para abrir esos ajustes. Para compartir la pantalla, el navegador necesita el permiso de **Grabación de pantalla**. |
 | Todos | Si algo falla, el motivo queda en `nora-agent/agent.log` dentro de la carpeta de configuración (macOS: `~/Library/Application Support`, Linux: `~/.config`, Windows: `%APPDATA%`). |
-| Linux | Sesión **X11**. En Wayland el sistema no permite controlar el equipo desde un programa. |
+| Linux | Sesión **X11**. En Wayland el sistema no permite controlar la computadora desde un programa. |

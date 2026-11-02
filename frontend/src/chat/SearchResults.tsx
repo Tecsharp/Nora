@@ -19,7 +19,7 @@ function Snippet({ text, q }: { text: string; q: string }) {
 
 /**
  * Resultados de buscar en el historial del chat: en una conversación (`conv`) o en todas las que ves. Se piden al servidor (que usa un índice de
- * texto), de más reciente a más antiguo y por páginas, así que sirve igual con miles de mensajes. Pulsar uno lleva a ese mensaje.
+ * texto), de más reciente a más antiguo y por páginas, así que sirve igual con miles de mensajes. Presionar uno lleva a ese mensaje.
  */
 export default function SearchResults({ q, conv, onPick }: { q: string; conv?: string; onPick: (m: Message) => void }) {
   const chat = useChat()

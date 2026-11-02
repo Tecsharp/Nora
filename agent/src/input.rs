@@ -1,4 +1,4 @@
-//! Aplicar al equipo los clics y teclas que llegan de Nora, y solo mientras haya un control concedido.
+//! Aplicar a la computadora los clics y teclas que llegan de Nora, y solo mientras haya un control concedido.
 
 use enigo::{Axis, Button, Coordinate, Direction, Enigo, Key, Keyboard, Mouse, Settings};
 use serde_json::Value;

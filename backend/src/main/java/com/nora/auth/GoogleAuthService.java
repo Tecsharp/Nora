@@ -26,7 +26,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 /**
  * Inicio de sesión con Google (OAuth 2.0, flujo de código con PKCE y OpenID Connect). El navegador va a Google, vuelve a
  * {@code /api/auth/google/callback} con un código, y es el servidor quien lo canjea (con el secreto del cliente) por la identidad:
- * el id_token llega directo de Google por TLS, así que no hace falta comprobar su firma, solo sus datos (emisor, cliente, caducidad, nonce).
+ * el id_token llega directo de Google por TLS, así que no hace falta comprobar su firma, solo sus datos (emisor, cliente, vencimiento, nonce).
  */
 @Service
 public class GoogleAuthService {

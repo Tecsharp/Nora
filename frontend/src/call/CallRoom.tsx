@@ -229,11 +229,11 @@ export default function CallRoom({ call, media, user, roomCode }: { call: CallAp
                 <button role="menuitemcheckbox" aria-checked={companion} onClick={() => { void call.setCompanion(!companion); setMenu(null) }}>
                   <PanelRight size={16} /><span>Modo complementario<small>Sin micrófono ni altavoz, para usar junto a una sala</small></span>{companion && <Check size={15} />}
                 </button>
-                <button role="menuitem" onClick={() => setMenu('settings')}><Settings size={16} /><span>Ajustes</span></button>
+                <button role="menuitem" onClick={() => setMenu('settings')}><Settings size={16} /><span>Configuración</span></button>
               </div>
             )}
             {menu === 'settings' && (
-              <div className="cmenu settings" role="dialog" aria-label="Ajustes">
+              <div className="cmenu settings" role="dialog" aria-label="Configuración">
                 <div className="cmenu-h">Dispositivos y subtítulos</div>
                 <label>Micrófono
                   <select value={media.micId} onChange={(e) => void media.pickMic(e.target.value)}>

@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * Tickets de un solo uso para abrir el WebSocket. El navegador no puede enviar la cabecera Authorization en un
- * WebSocket, y poner el JWT en la URL lo dejaría en logs y proxies: se canjea por un ticket que caduca a los 30 s.
+ * WebSocket, y poner el JWT en la URL lo dejaría en logs y proxies: se canjea por un ticket que vence a los 30 s.
  */
 @Service
 public class WsTicketService {

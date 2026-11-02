@@ -337,7 +337,7 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
     }
   }
 
-  const downloadItems = (): MenuItem[] => [{ heading: 'Descargar al equipo como…' }, ...FORMATS[doc.kind].map((f) => ({ label: f.label, icon: <Download size={16} />, onClick: () => void exportAs(f.id, 'none') }))]
+  const downloadItems = (): MenuItem[] => [{ heading: 'Descargar a la computadora como…' }, ...FORMATS[doc.kind].map((f) => ({ label: f.label, icon: <Download size={16} />, onClick: () => void exportAs(f.id, 'none') }))]
   const moreItems = (): MenuItem[] => [
     ...(doc.kind === 'BOARD' ? [{ heading: 'Importar' } as MenuItem, { label: 'Importar archivo (.excalidraw, imagen)…', icon: <Upload size={16} />, onClick: () => fileInput.current?.click() } as MenuItem, 'separator' as MenuItem] : []),
     { heading: 'Guardar una copia en la sala como…' },
@@ -439,9 +439,9 @@ function EditorShell({ code, doc, canWrite, onClose, onSaved, provider }: Props 
           {importing && board && (
             <div className="seed-overlay" role="alertdialog" aria-label="Importar archivo">
               <strong>Importar «{importing.name}»</strong>
-              <span className="small muted">¿Añadirlo a lo que ya hay en la pizarra o sustituir todo? Podrás deshacerlo.</span>
+              <span className="small muted">¿Agregarlo a lo que ya hay en la pizarra o sustituir todo? Podrás deshacerlo.</span>
               <div className="row">
-                <button className="btn primary" autoFocus onClick={() => void runImport('merge')}>Añadir a la pizarra</button>
+                <button className="btn primary" autoFocus onClick={() => void runImport('merge')}>Agregar a la pizarra</button>
                 <button className="btn" onClick={() => void runImport('replace')}>Reemplazar todo</button>
                 <button className="btn ghost" onClick={() => setImporting(null)}>Cancelar</button>
               </div>
@@ -478,7 +478,7 @@ function FileState({ provider, saved, name, auto }: { provider: CollabProvider; 
   return dirty && auto ? (
     <span className="filestate" title={`«${name}» se guarda solo en cuanto haces una pausa`}><Loader2 size={12} className="spin-icon" /> Guardando en el archivo…</span>
   ) : dirty ? (
-    <span className="filestate dirty" title={`Los cambios están compartidos, pero «${name}» en Archivos aún no los incluye. Pulsa Guardar.`}>● Sin guardar en el archivo</span>
+    <span className="filestate dirty" title={`Los cambios están compartidos, pero «${name}» en Archivos aún no los incluye. Presiona Guardar.`}>● Sin guardar en el archivo</span>
   ) : (
     <span className="filestate" title={`«${name}» en Archivos está al día`}><Check size={13} /> Archivo guardado{saved.at ? ` ${ago(saved.at)}` : ''}{saved.by ? ` · ${saved.by}` : ''}</span>
   )

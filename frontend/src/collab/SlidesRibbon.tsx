@@ -128,8 +128,8 @@ export default function SlidesRibbon({ api: a }: { api: SlidesApi }) {
             </Group>
             {isTable && (
               <Group title="Tabla seleccionada">
-                <TB label="Añadir fila" text="+ Fila" onClick={() => a.tableOp('addRow')} />
-                <TB label="Añadir columna" text="+ Columna" onClick={() => a.tableOp('addCol')} />
+                <TB label="Agregar fila" text="+ Fila" onClick={() => a.tableOp('addRow')} />
+                <TB label="Agregar columna" text="+ Columna" onClick={() => a.tableOp('addCol')} />
                 <TB label="Quitar fila" text="− Fila" onClick={() => a.tableOp('delRow')} />
                 <TB label="Quitar columna" text="− Columna" onClick={() => a.tableOp('delCol')} />
                 <TB label="Primera fila como encabezado" text="Encabezado" active={!!el?.hdr} onClick={() => a.tableOp('header')} />

@@ -65,7 +65,7 @@ case "$(uname -s)" in
   <key>CFBundleVersion</key><string>${VERSION}</string>
   <key>LSMinimumSystemVersion</key><string>11.0</string>
   <key>NSHighResolutionCapable</key><true/>
-  <key>NSAppleEventsUsageDescription</key><string>Nora Agent muestra avisos cuando alguien empieza o deja de controlar tu equipo.</string>
+  <key>NSAppleEventsUsageDescription</key><string>Nora Agent muestra avisos cuando alguien empieza o deja de controlar tu computadora.</string>
 </dict></plist>
 PLIST
     # Firma «ad hoc» (sin cuenta de Apple): hace que el sistema recuerde el permiso de Accesibilidad de esta app

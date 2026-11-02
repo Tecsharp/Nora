@@ -57,7 +57,7 @@ public class AdminController {
         this.accounts = accounts;
     }
 
-    /** Crea una cuenta con la contraseña que indique el administrador (la persona puede cambiarla luego en Ajustes). */
+    /** Crea una cuenta con la contraseña que indique el administrador (la persona puede cambiarla luego en Configuración). */
     @PostMapping
     @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     public AdminUserView create(@Valid @RequestBody CreateUserRequest req) {
@@ -93,7 +93,7 @@ public class AdminController {
     @DeleteMapping("/{id}")
     @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     public void delete(@PathVariable UUID id, @AuthenticationPrincipal AuthPrincipal me) {
-        if (id.equals(me.userId())) throw ApiException.badRequest("Para borrar tu propia cuenta usa Ajustes");
+        if (id.equals(me.userId())) throw ApiException.badRequest("Para borrar tu propia cuenta usa Configuración");
         accounts.deleteAccount(id);
     }
 

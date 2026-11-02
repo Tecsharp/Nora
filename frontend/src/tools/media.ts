@@ -24,7 +24,7 @@ export interface RoomFileLite {
   folderId: string | null
 }
 
-/** Archivos de la sala en vivo (se añaden y quitan solos). */
+/** Archivos de la sala en vivo (se agregan y quitan solos). */
 export function useRoomFiles(code: string) {
   const [files, setFiles] = useState<RoomFileLite[]>([])
   const [loading, setLoading] = useState(true)

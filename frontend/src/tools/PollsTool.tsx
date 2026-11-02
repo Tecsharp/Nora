@@ -184,7 +184,7 @@ export default function PollsTool({ room, focus }: { room: Room; focus?: FocusTa
               <footer>
                 <span><Users size={13} /> {d.total} de {room.participants.length} han votado</span>
                 <span className="muted">· {p.authorName} · {fmtDateTime(p.createdAt)}</span>
-                {!closedNow && mine.length > 0 && <span className="poll-mine"><Check size={13} /> Has votado (pulsa otra vez para cambiarlo)</span>}
+                {!closedNow && mine.length > 0 && <span className="poll-mine"><Check size={13} /> Has votado (presiona otra vez para cambiarlo)</span>}
               </footer>
             </article>
           )
@@ -261,7 +261,7 @@ function PollDialog({ poll, onClose, onSave }: { poll: Poll | null; onClose: () 
             </div>
           ))}
           <div className="row">
-            <button className="btn sm" disabled={options.length >= 10} onClick={() => setOptions([...options, { id: uid(), text: '' }])}><Plus size={14} /> Añadir opción</button>
+            <button className="btn sm" disabled={options.length >= 10} onClick={() => setOptions([...options, { id: uid(), text: '' }])}><Plus size={14} /> Agregar opción</button>
             {!poll && <button className="btn ghost sm" onClick={() => setOptions([{ id: uid(), text: 'Sí' }, { id: uid(), text: 'No' }, { id: uid(), text: 'Me abstengo' }])}>Sí / No / Me abstengo</button>}
           </div>
           {hasVotes && <p className="callout small">Si quitas una opción se borran sus votos.</p>}

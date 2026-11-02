@@ -444,7 +444,7 @@ export default function SheetEditor({ provider, editable }: Props) {
     setSel({ r1: s.r1, c1: s.c1, r2: Math.min((meta?.rows ?? 1) - 1, s.r1 + grid.length - 1), c2: Math.min((meta?.cols ?? 1) - 1, s.c1 + Math.max(...grid.map((g) => g.length)) - 1) })
   }
 
-  // ---- ratón ----
+  // ---- mouse ----
   const cellFromEvent = (e: MouseEvent) => {
     const el = viewport.current!
     const rect = el.getBoundingClientRect()
@@ -798,7 +798,7 @@ export default function SheetEditor({ provider, editable }: Props) {
             </button>
           )
         ))}
-        {editable && <button className="sheet-tab add" aria-label="Añadir hoja" onClick={() => setSheetId(store.addSheet(`Hoja ${ids.length + 1}`))}><Plus size={14} /></button>}
+        {editable && <button className="sheet-tab add" aria-label="Agregar hoja" onClick={() => setSheetId(store.addSheet(`Hoja ${ids.length + 1}`))}><Plus size={14} /></button>}
       </div>
 
       {chartDlg && (

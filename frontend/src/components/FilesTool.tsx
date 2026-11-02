@@ -378,7 +378,7 @@ export default function FilesTool({ room, onEditDoc, focus }: { room: Room; onEd
     })
     setAnchor(id)
   }
-  /** Clic en un archivo: con Ctrl/⌘ o Mayús (o con algo ya seleccionado) selecciona; si no, lo abre. */
+  /** Clic en un archivo: con Ctrl/⌘ o Shift (o con algo ya seleccionado) selecciona; si no, lo abre. */
   function clickFile(f: FileItem, e: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }, open: () => void) {
     if (e.shiftKey && anchor) {
       const ids = shownFiles.map((x) => x.id)

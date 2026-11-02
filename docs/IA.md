@@ -14,12 +14,12 @@ NORA_DEEPSEEK_MODEL=deepseek-chat # o deepseek-reasoner
 NORA_AI_USER_LIMIT_PER_HOUR=60    # usos por persona y hora
 ```
 
-y `docker compose up -d`. En Administración → Ajustes se ve si está activa. Sin clave o con `NORA_AI_ENABLED=false` todo sigue como antes.
+y `docker compose up -d`. En Administración → Configuración se ve si está activa. Sin clave o con `NORA_AI_ENABLED=false` todo sigue como antes.
 
 ## Qué se envía y qué no
 
 - La **clave solo vive en el servidor**; el navegador nunca la ve.
-- Solo se llama a DeepSeek cuando alguien **pulsa un botón de IA**, y se envía únicamente el texto que esa persona decide procesar (la selección, la nota, el chat, la lista de comentarios…). Nada se envía solo.
+- Solo se llama a DeepSeek cuando alguien **presiona un botón de IA**, y se envía únicamente el texto que esa persona decide procesar (la selección, la nota, el chat, la lista de comentarios…). Nada se envía solo.
 - El servidor no guarda ni registra ese contenido. DeepSeek es un servicio externo: quien administra Nora debe tener claro qué se puede enviar fuera.
 - Límites: texto máximo (`NORA_AI_MAX_INPUT_CHARS`, 30 000), respuesta máxima (`NORA_AI_MAX_OUTPUT_TOKENS`), usos por hora por persona y 3 peticiones simultáneas.
 

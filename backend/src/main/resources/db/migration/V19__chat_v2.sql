@@ -9,7 +9,7 @@ CREATE TABLE chat_conversations (
     created_by      UUID         REFERENCES users (id) ON DELETE SET NULL,
     dm_key          VARCHAR(80),                       -- «idMenor:idMayor»: una sola conversación directa por pareja
     post_policy     VARCHAR(8)   NOT NULL DEFAULT 'ALL',    -- ALL | ADMINS: quién puede escribir
-    add_policy      VARCHAR(8)   NOT NULL DEFAULT 'ADMINS', -- ALL | ADMINS: quién puede añadir gente
+    add_policy      VARCHAR(8)   NOT NULL DEFAULT 'ADMINS', -- ALL | ADMINS: quién puede agregar gente
     created_at      TIMESTAMPTZ  NOT NULL,
     updated_at      TIMESTAMPTZ  NOT NULL,
     last_message_at TIMESTAMPTZ  NOT NULL

@@ -29,7 +29,7 @@ export default function Layout() {
         {user && (
           <>
             <NotificationBell />
-            <Link to="/settings" className="btn ghost sm profile-link" title={`${user.email} · Ajustes de la cuenta`} aria-label="Ajustes de la cuenta">
+            <Link to="/settings" className="btn ghost sm profile-link" title={`${user.email} · Configuración de la cuenta`} aria-label="Configuración de la cuenta">
               <Avatar name={user.displayName} userId={user.id} version={user.avatarVersion} size={26} />
               <span className="hide-sm">{user.displayName}</span>
             </Link>

@@ -136,7 +136,7 @@ export function ChatPanel({ call, roomCode, user }: { call: CallApi; roomCode: s
       <div className="cp-body cp-empty">
         <MessageSquarePlus size={34} />
         <h3>Chat de la llamada</h3>
-        <p>Crea un chat para escribiros durante la llamada. Se guarda como un grupo en <strong>Mensajes</strong> con quienes están ahora aquí, y se añade a quien entre después.</p>
+        <p>Crea un chat para escribirse durante la llamada. Se guarda como un grupo en <strong>Mensajes</strong> con quienes están ahora aquí, y se agrega a quien entre después.</p>
         <button className="cp-wide ok" disabled={busy} onClick={() => void create()}>{busy ? 'Creando…' : 'Crear chat de la llamada'}</button>
       </div>
     )

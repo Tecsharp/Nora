@@ -184,7 +184,7 @@ export default function Home() {
 
           {limits && (
             <section>
-              <div className="section-title"><h2>Tu cuenta</h2><Link to="/settings" className="btn ghost sm"><Settings size={15} /> Ajustes</Link></div>
+              <div className="section-title"><h2>Tu cuenta</h2><Link to="/settings" className="btn ghost sm"><Settings size={15} /> Configuración</Link></div>
               <div className="stat-grid stagger">
                 <div className="stat" style={{ ['--i' as string]: 0 }}>
                   <span className="ico tinted tn-blue"><HardDrive size={22} /></span>

@@ -37,7 +37,7 @@ const SHOWN = 5 // conversaciones que se ven por sección antes de «Ver todas»
 const SIZE_KEY = 'nora-nav-chats-h'
 const MIN_H = 72
 
-/** Alto elegido para la lista de conversaciones; null = se ajusta a lo que hay (sin hueco vacío). */
+/** Alto elegido para la lista de conversaciones; null = se ajusta a lo que hay (sin espacio vacío). */
 function useChatsHeight() {
   const [h, setH] = useState<number | null>(() => { try { const v = Number(localStorage.getItem(SIZE_KEY)); return v >= MIN_H ? v : null } catch { return null } })
   const save = (v: number | null) => {

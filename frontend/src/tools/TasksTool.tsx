@@ -186,7 +186,7 @@ export default function TasksTool({ room, focus }: { room: Room; focus?: FocusTa
                 <strong>{c.label}</strong>
                 <span className="kb-count">{list.length}</span>
                 <span className="spacer" />
-                {canWrite && <button className="icon-btn sm" aria-label={`Añadir a ${c.label}`} onClick={() => setAdding(c.id)}><Plus size={16} /></button>}
+                {canWrite && <button className="icon-btn sm" aria-label={`Agregar a ${c.label}`} onClick={() => setAdding(c.id)}><Plus size={16} /></button>}
               </header>
               <div className="kb-cards">
                 {loading && <div className="kb-skel" />}
@@ -218,7 +218,7 @@ export default function TasksTool({ room, focus }: { room: Room; focus?: FocusTa
         onSave={async (data) => { await update(open.id, data) }} onDelete={() => void del(open)} />}
       {aiOpen && <AiTasksDialog room={room} onClose={() => setAiOpen(false)} onCreate={async (list) => {
         for (const d of list) await create(d, Date.now() + Math.random())
-        toast(`${list.length} tarea${list.length > 1 ? 's' : ''} añadida${list.length > 1 ? 's' : ''}`, 'success')
+        toast(`${list.length} tarea${list.length > 1 ? 's' : ''} agregada${list.length > 1 ? 's' : ''}`, 'success')
       }} />}
     </div>
   )
@@ -242,7 +242,7 @@ function QuickAdd({ onAdd, onCancel }: { onAdd: (title: string) => Promise<void>
       <textarea autoFocus rows={2} value={v} maxLength={200} placeholder="Título de la tarea…" onChange={(e) => setV(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onCancel() } else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void submit(e as unknown as FormEvent) } }} />
       <div className="row">
-        <button className="btn primary sm" disabled={!v.trim() || busy}>Añadir</button>
+        <button className="btn primary sm" disabled={!v.trim() || busy}>Agregar</button>
         <button type="button" className="btn ghost sm" onClick={onCancel}>Cerrar</button>
       </div>
     </form>
@@ -363,7 +363,7 @@ function TaskDialog({ t, room, canEdit, canDelete, onClose, onSave, onDelete }: 
           <input className="kb-title-input" value={d.title} readOnly={!canEdit} maxLength={200} aria-label="Título" onChange={(e) => set('title', e.target.value)} />
           <label className="stack tight">
             <span className="small muted">Descripción</span>
-            <textarea rows={5} value={d.description} readOnly={!canEdit} maxLength={5000} placeholder={canEdit ? 'Añade detalles, enlaces, criterios de hecho…' : ''} onChange={(e) => set('description', e.target.value)} />
+            <textarea rows={5} value={d.description} readOnly={!canEdit} maxLength={5000} placeholder={canEdit ? 'Agrega detalles, enlaces, criterios de hecho…' : ''} onChange={(e) => set('description', e.target.value)} />
           </label>
           <div className="stack tight">
             <div className="row spread">
@@ -381,7 +381,7 @@ function TaskDialog({ t, room, canEdit, canDelete, onClose, onSave, onDelete }: 
             </ul>
             {canEdit && (
               <div className="row">
-                <input value={newCheck} maxLength={200} placeholder="Añadir un paso…" onChange={(e) => setNewCheck(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCheck() } }} />
+                <input value={newCheck} maxLength={200} placeholder="Agregar un paso…" onChange={(e) => setNewCheck(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCheck() } }} />
                 <button className="btn sm" onClick={addCheck} disabled={!newCheck.trim()}><Plus size={14} /></button>
               </div>
             )}
@@ -449,11 +449,11 @@ function AiTasksDialog({ room, onClose, onCreate }: { room: Room; onClose: () =>
   return (
     <Modal title="Crear tareas con IA" icon={<Sparkles size={20} />} onClose={onClose} wide
       footer={list
-        ? <><button className="btn ghost" onClick={() => setList(null)}>Volver</button><span className="grow" /><button className="btn primary" disabled={busy || adding.busy() || !list.some((t) => t.on)} onClick={() => void add()}>Añadir {list.filter((t) => t.on).length} tareas</button></>
+        ? <><button className="btn ghost" onClick={() => setList(null)}>Volver</button><span className="grow" /><button className="btn primary" disabled={busy || adding.busy() || !list.some((t) => t.on)} onClick={() => void add()}>Agregar {list.filter((t) => t.on).length} tareas</button></>
         : <><span className="grow" /><button className="btn ghost" onClick={onClose}>Cancelar</button><button className="btn ai" disabled={busy || text.trim().length < 5} onClick={() => void run()}><Sparkles size={15} /> {busy ? 'Analizando…' : 'Extraer tareas'}</button></>}>
       {!list ? (
         <div className="stack">
-          <p className="muted small">Pega notas de una reunión, un correo o una lista de ideas y la IA propondrá tareas con responsable y fecha cuando las mencione. Podrás revisarlas antes de añadirlas.</p>
+          <p className="muted small">Pega notas de una reunión, un correo o una lista de ideas y la IA propondrá tareas con responsable y fecha cuando las mencione. Podrás revisarlas antes de agregarlas.</p>
           <textarea rows={12} autoFocus value={text} maxLength={20000} onChange={(e) => setText(e.target.value)} placeholder="Pega aquí las notas de la reunión…" />
         </div>
       ) : (

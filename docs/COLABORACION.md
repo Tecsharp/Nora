@@ -16,7 +16,7 @@ Este documento explica **qué se eligió y por qué**, cómo encaja todo, el pro
 | Conversión | Un **sidecar** (`converter/`, Node 22 + LibreOffice headless) sin acceso a Internet, solo alcanzable desde el backend con un token. |
 | Archivo ↔ documento | **Todo documento es un archivo de la sala.** «Nuevo» crea el archivo (.docx/.xlsx/.pptx) al instante en la carpeta actual; abrir un archivo de oficina con un clic lo edita entre todos. No hay «guardar para que entre otro»: quien tenga acceso a la sala lo ve en Archivos y entra. |
 | Guardar | **Guardar escribe el contenido compartido en ese archivo** (Ctrl+S). El estado («Archivo guardado hace 2 min · Ana» / «Sin guardar en el archivo») es compartido por todos. Descargar y «guardar una copia» son botones aparte. |
-| Fidelidad | Se importa lo que el editor sabe representar; el archivo original solo cambia cuando alguien pulsa Guardar. |
+| Fidelidad | Se importa lo que el editor sabe representar; el archivo original solo cambia cuando alguien presiona Guardar. |
 | Permisos | Los de la sala (propietario/moderador/miembro/espectador). Solo quien puede escribir en la sala puede enviar `doc.update`; se revalida cada 5 s. |
 
 ---
@@ -61,7 +61,7 @@ El caso más difícil: no existe un editor colaborativo de diapositivas open sou
 
 ### 2.4 Transporte y sincronización
 
-Se reutiliza el **WebSocket `/ws` de Nora** (un solo canal por pestaña) en vez de añadir Socket.IO o `y-websocket`: ya trae ticket de un solo uso, comprobación de origen, límites de tasa y reconexión. Se añadió un presupuesto de mensajes aparte para `doc.*` (1500/10 s) y un búfer de texto de 2 MB.
+Se reutiliza el **WebSocket `/ws` de Nora** (un solo canal por pestaña) en vez de agregar Socket.IO o `y-websocket`: ya trae ticket de un solo uso, comprobación de origen, límites de tasa y reconexión. Se agregó un presupuesto de mensajes aparte para `doc.*` (1500/10 s) y un búfer de texto de 2 MB.
 
 ---
 
@@ -88,7 +88,7 @@ Se reutiliza el **WebSocket `/ws` de Nora** (un solo canal por pestaña) en vez 
 * **Confirmación:** `doc.ack{seq,ref}`. Mientras no llegue, el cliente conserva el cambio y lo reenvía (aplicar un cambio Yjs dos veces es inocuo).
 * **Sin conexión:** los cambios locales quedan en cola y se envían al reconectar tras volver a descargar el estado. El indicador muestra «Sin conexión / Sincronizando / Todos los cambios guardados».
 * **Presencia** (`doc.awareness`): protocolo de awareness de Yjs, solo reenviado, nunca guardado. En documentos: cursor y selección con nombre y color; en hojas: celda seleccionada de cada persona; en diapositivas: elemento seleccionado. `doc.peer.left` limpia los fantasmas.
-* **Siembra del contenido importado:** al abrir un archivo, el backend convierte **una vez** y guarda el resultado en `seed_content`. Exactamente **un** cliente lo escribe en el documento Yjs: `POST /seed/claim` hace una reclamación atómica en SQL (`PENDING→CLAIMED→DONE`, caduca a los 60 s si quien reclamó se cae, idempotente para la misma persona) y solo quien reclamó puede llamar a `/seed/done`. Los demás ven «Preparando el documento…» y reciben el contenido por el canal normal. Así no hay contenido duplicado aunque diez personas abran el mismo archivo a la vez.
+* **Siembra del contenido importado:** al abrir un archivo, el backend convierte **una vez** y guarda el resultado en `seed_content`. Exactamente **un** cliente lo escribe en el documento Yjs: `POST /seed/claim` hace una reclamación atómica en SQL (`PENDING→CLAIMED→DONE`, vence a los 60 s si quien reclamó se cae, idempotente para la misma persona) y solo quien reclamó puede llamar a `/seed/done`. Los demás ven «Preparando el documento…» y reciben el contenido por el canal normal. Así no hay contenido duplicado aunque diez personas abran el mismo archivo a la vez.
 * **Versiones** (`collab_versions`, se conservan 40): automática cada 10 min si hubo cambios (la hace el cliente «líder» = menor `clientID` presente) y manual con nombre. Restaurar **no** borra historial: se reescribe el contenido como un cambio normal de Yjs (y por tanto se puede deshacer).
 * **Deshacer/rehacer:** `Y.UndoManager` (en TipTap vía la extensión de colaboración): cada persona deshace **solo sus cambios**.
 * **Guardado y estado del archivo:** `POST /export?save=file&seq=N` convierte el contenido que envía el cliente y **reemplaza el archivo de la sala** (misma entrada); el servidor anota `saved_seq`, `saved_at` y `saved_by` y avisa a todos con el evento `doc.saved`. Un cliente compara su último cambio recibido con `saved_seq` para saber si el archivo está al día. Si el archivo es de un formato antiguo (`.doc`, `.xls`, `.ppt`, `.rtf`, `.tsv`) se escribe un archivo nuevo en el formato moderno y el documento pasa a usarlo; el original no se toca. `save=new` guarda una copia con otro formato; `save=none` solo descarga.
@@ -153,7 +153,7 @@ API interna del conversor (`converter/`, cabecera `X-Converter-Token`): `POST /v
 | XLSX | exceljs | exceljs | Valores, **fórmulas**, formato (negrita/cursiva/subrayado/tachado, fuente y tamaño, colores, alineación horizontal y vertical, bordes, formatos numéricos), anchos, combinadas, fila fijada, varias hojas; **los gráficos que se crean aquí viajan como imagen** | Los gráficos, imágenes y tablas dinámicas **que ya traía el XLSX original** (exceljs no los lee: se pierden al guardar encima), formato condicional, validación, macros, ajuste de texto |
 | ODS/XLS | LO → XLSX → exceljs | ídem → LO | Lo mismo que XLSX | Lo mismo |
 | CSV | Parser propio (comillas, `;`/`,`) | Primera hoja | Valores | Fórmulas como texto, otras hojas |
-| PPTX | Parser XML propio (herencia de marcadores de posición, colores de tema) | pptxgenjs | **Texto con formato por fragmentos** (negrita, color, tamaño, fuente, listas, alineación), 14 tipos de forma con relleno/contorno/opacidad/giro, líneas, imágenes, **tablas**, **gráficos nativos** (columnas, barras, líneas, áreas, circular, anillo), notas del orador, fondos, orden | Animaciones, transiciones, SmartArt, vídeo/audio, patrones de diapositiva, formas personalizadas (se aproximan a rectángulos), viñetas heredadas del patrón |
+| PPTX | Parser XML propio (herencia de marcadores de posición, colores de tema) | pptxgenjs | **Texto con formato por fragmentos** (negrita, color, tamaño, fuente, listas, alineación), 14 tipos de forma con relleno/contorno/opacidad/giro, líneas, imágenes, **tablas**, **gráficos nativos** (columnas, barras, líneas, áreas, circular, anillo), notas del orador, fondos, orden | Animaciones, transiciones, SmartArt, video/audio, patrones de diapositiva, formas personalizadas (se aproximan a rectángulos), viñetas heredadas del patrón |
 | ODP | LO → PPTX → parser | ídem → LO | Lo mismo que PPTX | Lo mismo |
 | PDF | — | LO | Salida de lectura | — |
 
@@ -211,6 +211,6 @@ Principios:
 
 ```bash
 git fetch && git checkout feature/extensionSupportEdit && git pull
-./setup.sh                      # añade NORA_CONVERTER_TOKEN a .env si falta (en Windows: setup.ps1)
+./setup.sh                      # agrega NORA_CONVERTER_TOKEN a .env si falta (en Windows: setup.ps1)
 docker compose up -d --build    # construye el servicio «converter»; las migraciones V7 y V8 se aplican solas
 ```

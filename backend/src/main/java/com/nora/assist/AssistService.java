@@ -29,10 +29,10 @@ import org.springframework.stereotype.Service;
 /**
  * Asistencia remota entre personas de una sala.
  *
- * <p>Ver la pantalla: el vídeo viaja directo entre los dos navegadores (WebRTC); aquí solo se hace de «teléfono» (señalización) y se
+ * <p>Ver la pantalla: el video viaja directo entre los dos navegadores (WebRTC); aquí solo se hace de «teléfono» (señalización) y se
  * comprueba que ambos estén en la misma sala y que quien comparte lo haya aceptado.
  *
- * <p>Controlar: un navegador no puede mover el ratón de un equipo, así que quien comparte instala el agente de Nora (un programa pequeño
+ * <p>Controlar: un navegador no puede mover el mouse de una computadora, así que quien comparte instala el agente de Nora (un programa pequeño
  * que se empareja con su cuenta). Cuando comparte acepta expresamente el control, el servidor reenvía al agente los clics y las
  * teclas de la otra persona, y solo mientras ese permiso esté activo.
  *
@@ -199,7 +199,7 @@ public class AssistService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(body.getBytes(StandardCharsets.UTF_8)) + "." + hmacBase64(agentKey.getEncoded(), body, "HmacSHA256").replace('+', '-').replace('/', '_').replace("=", "");
     }
 
-    /** Persona dueña del token, si es válido, no ha caducado y la cuenta sigue activa y sin cierre de sesiones posterior. */
+    /** Persona dueña del token, si es válido, no ha vencido y la cuenta sigue activa y sin cierre de sesiones posterior. */
     public Optional<User> userForAgentToken(String token) {
         try {
             if (token == null) return Optional.empty();
@@ -290,7 +290,7 @@ public class AssistService {
         if (to == null || to.equals(from.userId())) { error(from, "Elige a otra persona de la sala"); return; }
         List<Peer> targets = hub.peers(roomId, to);
         if (targets.isEmpty()) { error(from, "Esa persona no está conectada a la sala ahora mismo"); return; }
-        if (mode.equals("control") && !agentOnline(to)) { error(from, "Esa persona no tiene el agente de Nora conectado, así que no se puede controlar su equipo (sí ver su pantalla)"); return; }
+        if (mode.equals("control") && !agentOnline(to)) { error(from, "Esa persona no tiene el agente de Nora conectado, así que no se puede controlar su computadora (sí ver su pantalla)"); return; }
         if (tooMany(from.userId()) || tooMany(to)) { error(from, "Ya hay demasiadas sesiones de asistencia abiertas"); return; }
         Session s = new Session(roomId, from.userId(), to, from.userId(), from.id());
         s.viewerConn = from.id();
