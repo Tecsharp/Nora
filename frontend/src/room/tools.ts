@@ -22,7 +22,7 @@ export const TOOLS: ToolDef[] = [
   { id: 'notes', label: 'Notas', icon: ClipboardList, group: 'work', hint: 'Notas y portapapeles de la sala' },
   { id: 'actions', label: 'Tablero', icon: KanbanSquare, group: 'plan', hint: 'Tareas con estados y responsables' },
   { id: 'calendar', label: 'Calendario', icon: CalendarDays, group: 'plan', hint: 'Citas y recordatorios' },
-  { id: 'polls', label: 'Votaciones', icon: SquareCheckBig, group: 'plan', hint: 'Decidid entre todos' },
+  { id: 'polls', label: 'Votaciones', icon: SquareCheckBig, group: 'plan', hint: 'Decidan entre todos' },
   { id: 'media', label: 'Media Review', icon: Clapperboard, group: 'media', hint: 'Comentarios sobre video, audio e imagen' },
   { id: 'player', label: 'Reproductor', icon: Tv, group: 'media', hint: 'Música y video sincronizados' },
   { id: 'links', label: 'Enlaces', icon: Link2, group: 'media', hint: 'Enlaces útiles con etiquetas' },

@@ -93,7 +93,7 @@ Cada persona puede **unirse al grupo de foco** con una frase de en qué trabaja;
 
 ## Reproductor sincronizado
 
-Escuchad música o mirad un video **a la vez**: una **cola compartida** (YouTube, enlaces directos a audio/video y archivos de la sala) y un solo reproductor cuyo play, pausa, salto, velocidad y siguiente se aplican a todas las personas. Quien llega tarde se pone solo en el punto exacto.
+Escuchen música o vean un video **a la vez**: una **cola compartida** (YouTube, enlaces directos a audio/video y archivos de la sala) y un solo reproductor cuyo play, pausa, salto, velocidad y siguiente se aplican a todas las personas. Quien llega tarde se pone solo en el punto exacto.
 Se puede cerrar la ventana y **sigue sonando** (el Reproductor permanece montado; la insignia de la herramienta muestra que suena).
 
 **Cómo se sincroniza.** El servidor (`LiveService`, en memoria) guarda «qué suena, la posición a la hora X del servidor, si está sonando y la velocidad». Cada navegador calcula dónde debería ir ahora con su desfase de reloj y corrige la deriva cada 1,5 s (si se aleja más de 1,2 s salta);
