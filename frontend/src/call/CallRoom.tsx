@@ -87,6 +87,13 @@ export default function CallRoom({ call, media, user, roomCode }: { call: CallAp
     window.addEventListener('keydown', on)
     return () => window.removeEventListener('keydown', on)
   }, [call])
+  // el buscador de emojis (el «+» de la barra de reacciones) se cierra al presionar fuera; la barra se queda
+  useEffect(() => {
+    if (!allEmojis) return
+    const away = (e: MouseEvent) => { if (!(e.target as Element).closest('.react-all, .react-emo.more')) setAllEmojis(false) }
+    document.addEventListener('mousedown', away)
+    return () => document.removeEventListener('mousedown', away)
+  }, [allEmojis])
   useEffect(() => {
     if (!menu) return
     if (menu === 'react') return // la barra de reacciones solo se cierra con su botón

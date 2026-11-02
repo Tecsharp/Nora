@@ -2339,3 +2339,11 @@ label.qc-check input { width: 16px; height: 16px; flex: none; }
 /* Botón de reaccionar en el chat de la llamada: al lado de la burbuja (a la izquierda en las mías, a la derecha en las de las demás), no encima */
 .cp-bubble-wrap .cp-react-btn, .cp-item.mine .cp-bubble-wrap .cp-react-btn { top: 50%; transform: translateY(-50%); right: calc(100% + 6px); left: auto; }
 .cp-item:not(.mine) .cp-bubble-wrap .cp-react-btn { left: calc(100% + 6px); right: auto; }
+
+/* Chat de la llamada: la burbuja mide lo que mide su texto (la hora arriba a la derecha de ella) y las reacciones van aparte, cinco por fila */
+.cp-main { align-self: flex-start; display: flex; flex-direction: column; gap: 3px; max-width: 100%; min-width: 0; }
+.cp-item.mine .cp-main { align-self: flex-end; }
+.cp-reacts { display: grid; grid-template-columns: repeat(5, max-content); justify-content: start; }
+/* La barra de reacciones va centrada en la pantalla (no en el hueco que deja el panel lateral) y nunca se sale de ella */
+.react-bar { position: fixed; bottom: 92px; left: 50%; transform: translateX(-50%); max-width: calc(100vw - 16px); }
+@media (min-width: 761px) { .call-root.room .call-stage.with-panel ~ .call-bar .react-bar { left: calc((100vw - 360px) / 2); max-width: calc(100vw - 376px); } }

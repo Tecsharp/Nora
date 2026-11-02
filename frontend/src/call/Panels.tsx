@@ -183,6 +183,7 @@ export function ChatPanel({ call, roomCode, user }: { call: CallApi; roomCode: s
           const head = !prev || prev.kind === 'SYSTEM' || prev.authorId !== m.authorId || prev.createdAt.slice(0, 16) !== minute
           return (
             <div key={m.id} className={`cp-item ${mine ? 'mine' : ''} ${head ? 'head' : 'cont'}`}>
+              <div className="cp-main">
               {head && (
                 <div className="cp-meta">
                   {!mine && <strong>{m.authorName}</strong>}
@@ -198,6 +199,7 @@ export function ChatPanel({ call, roomCode, user }: { call: CallApi; roomCode: s
                   <button type="button" aria-label="Reaccionar" title="Reaccionar" onClick={() => setPicking((p) => (p === m.id ? null : m.id))}><SmilePlus size={15} /></button>
                 </span>
                 {picking === m.id && <div className="cp-picker"><ReactionPicker dark quick={REACTIONS} onPick={(e) => react(m, e)} onClose={() => setPicking(null)} /></div>}
+              </div>
               </div>
               {reacts.length > 0 && (
                 <div className="cp-reacts">
