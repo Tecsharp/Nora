@@ -117,6 +117,7 @@ export function ChatPanel({ call, roomCode, user }: { call: CallApi; roomCode: s
   const [picking, setPicking] = useState<string | null>(null)
   const att = useAttachments(roomCode)
   const fileInput = useRef<HTMLInputElement>(null)
+  const pickAnchor = useRef<Element | null>(null)
   const end = useRef<HTMLDivElement>(null)
   const names = useMemo(() => new Map((call.state?.parts ?? []).map((p) => [p.userId, p.name])), [call.state?.parts])
 
@@ -138,7 +139,7 @@ export function ChatPanel({ call, roomCode, user }: { call: CallApi; roomCode: s
   useEffect(() => { end.current?.scrollIntoView({ block: 'end' }) }, [items.length])
   useEffect(() => {
     if (!picking) return
-    const away = (e: MouseEvent) => { if (!(e.target as Element).closest('.cp-picker, .cp-react-btn, .rx-pop')) setPicking(null) }
+    const away = (e: MouseEvent) => { if (!(e.target as Element).closest('.cp-picker, .cp-react-btn, .rx-pop, .rx-row')) setPicking(null) }
     document.addEventListener('mousedown', away)
     return () => document.removeEventListener('mousedown', away)
   }, [picking])
@@ -196,9 +197,9 @@ export function ChatPanel({ call, roomCode, user }: { call: CallApi; roomCode: s
                   <MessageMeta code={roomCode} meta={m.meta} />
                 </div>
                 <span className={`cp-react-btn ${picking === m.id ? 'open' : ''}`}>
-                  <button type="button" aria-label="Reaccionar" title="Reaccionar" onClick={() => setPicking((p) => (p === m.id ? null : m.id))}><SmilePlus size={15} /></button>
+                  <button type="button" aria-label="Reaccionar" title="Reaccionar" onClick={(e) => { pickAnchor.current = e.currentTarget; setPicking((p) => (p === m.id ? null : m.id)) }}><SmilePlus size={15} /></button>
                 </span>
-                {picking === m.id && <div className="cp-picker"><ReactionPicker dark quick={REACTIONS} onPick={(e) => react(m, e)} onClose={() => setPicking(null)} /></div>}
+                {picking === m.id && <div className="cp-picker"><ReactionPicker dark quick={REACTIONS} anchor={() => pickAnchor.current} onPick={(e) => react(m, e)} onClose={() => setPicking(null)} /></div>}
               </div>
               </div>
               {reacts.length > 0 && (
