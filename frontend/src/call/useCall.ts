@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { rt, useRealtime, useRtStatus } from '../realtime'
 import { useToast } from '../toast'
+import { callSounds } from './sounds'
 import { callApi, type CallInfo, type CallState, type Part } from './api'
 import type { LocalMedia } from './useLocalMedia'
 
@@ -234,7 +235,7 @@ export function useCall(code: string, media: LocalMedia) {
   useRealtime('call.reaction', (d) => {
     if (!mine(d)) return
     const id = ++reactionId.current
-    setReactions((l) => [...l.slice(-12), { id, name: d.name, emoji: d.emoji, left: 8 + Math.random() * 80 }])
+    setReactions((l) => [...l.slice(-12), { id, name: d.name, emoji: d.emoji, left: 3 + Math.random() * 12 }])
     setTimeout(() => setReactions((l) => l.filter((x) => x.id !== id)), 3600)
   })
   useRealtime('call.caption', (d) => { if (mine(d)) setCaptions((c) => ({ ...c, [d.from]: { name: d.name, text: d.text, final: !!d.final, at: Date.now() } })) })
@@ -244,8 +245,8 @@ export function useCall(code: string, media: LocalMedia) {
     sendMe({ mic: false })
     toast('El anfitrión silenció tu micrófono', 'info')
   })
-  useRealtime('call.removed', (d) => { if (mine(d)) { closeAll(); mediaRef.current.stopAll(); setPhase('removed') } })
-  useRealtime('call.ended', (d) => { if (mine(d)) { closeAll(); mediaRef.current.stopAll(); setPhase('ended') } })
+  useRealtime('call.removed', (d) => { if (mine(d)) { callSounds.exit(); closeAll(); mediaRef.current.stopAll(); setPhase('removed') } })
+  useRealtime('call.ended', (d) => { if (mine(d)) { callSounds.exit(); closeAll(); mediaRef.current.stopAll(); setPhase('ended') } })
   useRealtime('call.error', (d) => {
     if (d.code && d.code !== code) return
     if (phaseRef.current === 'joining' || phaseRef.current === 'waiting') { setError(d.message); setPhase('error') }

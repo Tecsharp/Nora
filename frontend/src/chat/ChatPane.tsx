@@ -1,6 +1,6 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { ArrowDown, Check, CornerUpLeft, Copy, Pencil, Send, Smile, SmilePlus, Sparkles, Trash2, X } from 'lucide-react'
+import { ArrowDown, Check, CornerUpLeft, Copy, Link2, Paperclip, Pencil, Plus, Send, Smile, SmilePlus, Sparkles, Trash2, Video, X } from 'lucide-react'
 import { useAuth } from '../auth'
 import Avatar from '../components/Avatar'
 import Menu from '../components/Menu'
@@ -9,12 +9,14 @@ import { rt } from '../realtime'
 import { canWrite as canWriteIn, isStaff as isStaffIn } from '../roles'
 import { useToast } from '../toast'
 import { flash } from '../tools/focus'
+import { callApi } from '../call/api'
+import { EmojiPicker, ReactionPicker } from '../components/EmojiPicker'
+import { AttachChips, MessageMeta, useAttachments } from './Attachments'
 import type { Conv, Message } from './chatApi'
 import { useChat } from './ChatProvider'
 import type { MessagesStore } from './useMessages'
 
-const QUICK = ['👍', '❤️', '😂', '🎉', '👀', '🙏']
-const PICKER = ['😀', '😄', '😅', '😂', '🙂', '😉', '😍', '🤔', '😮', '😢', '😡', '🙌', '👏', '💪', '🔥', '✨', '🎉', '✅', '❌', '⚠️', '💡', '📌', '🚀', '☕']
+const QUICK = ['👍', '❤️', '😂', '🎉', '🙏']
 const GROUP_GAP_MS = 5 * 60_000
 
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString()
@@ -71,6 +73,11 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
   const [editing, setEditing] = useState<Message | null>(null)
   const [emojis, setEmojis] = useState(false)
   const [sending, setSending] = useState(false)
+  const att = useAttachments(room.code)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const pickAnchor = useRef<Element | null>(null) // el botón de reaccionar que abrió los rápidos
+  const [calling, setCalling] = useState(false)
+  const [plusOpen, setPlusOpen] = useState(false)
   const [pickFor, setPickFor] = useState<string | null>(null) // mensaje con el selector de reacciones abierto
   const [activeMsg, setActiveMsg] = useState<string | null>(null) // mensaje tocado (en pantallas táctiles no hay «hover»)
   const [unseen, setUnseen] = useState(0)
@@ -291,11 +298,13 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
 
   async function send() {
     const text = draft.trim()
-    if (!text || sending) return
+    const files = editing ? [] : att.files
+    if ((!text && !files.length) || sending || att.uploading > 0) return
     setSending(true)
     try {
       if (editing) await store.edit(editing.id, text)
-      else await store.send(text, replyTo?.id)
+      else await store.send(text, replyTo?.id, { files: files.map((f) => f.id) })
+      att.clear()
       setDraft('')
       setReplyTo(null)
       setEditing(null)
@@ -307,6 +316,26 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
     } finally {
       setSending(false)
       input.current?.focus()
+    }
+  }
+
+  /** Crea una llamada en el momento (sin pasar por el calendario) y manda su enlace a la conversación. */
+  async function startCall(join: boolean) {
+    if (calling) return
+    setCalling(true)
+    setPlusOpen(false)
+    const w = join ? window.open('about:blank', '_blank') : null // la pestaña se abre en el gesto del clic, y después se le pone la dirección
+    try {
+      const c = await callApi.create(room.code, { title: chat.title(conv), access: 'OPEN' })
+      await store.send('', undefined, { call: c.code })
+      requestAnimationFrame(() => toBottom())
+      if (w) w.location.href = `/call/${c.code}`
+      else if (!join) toast('Llamada enviada: entra cuando quieras desde el mensaje', 'success')
+    } catch (e) {
+      w?.close()
+      toast(e instanceof Error ? e.message : 'No se pudo iniciar la llamada', 'error')
+    } finally {
+      setCalling(false)
     }
   }
 
@@ -337,9 +366,24 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
     }
   }
 
+  // el selector de emojis de la caja de escritura se cierra al presionar fuera (o con Esc)
+  useEffect(() => {
+    if (!emojis) return
+    const away = (e: MouseEvent) => { if (!(e.target as Element).closest('.chat-emojis, .chat-smile')) setEmojis(false) }
+    document.addEventListener('mousedown', away)
+    return () => document.removeEventListener('mousedown', away)
+  }, [emojis])
+  useEffect(() => {
+    if (!plusOpen) return
+    const away = (e: MouseEvent) => { if (!(e.target as Element).closest('.chat-plus-wrap')) setPlusOpen(false) }
+    const key = (e: globalThis.KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setPlusOpen(false) } }
+    document.addEventListener('mousedown', away)
+    document.addEventListener('keydown', key, true)
+    return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', key, true) }
+  }, [plusOpen])
   useEffect(() => {
     if (!pickFor) return
-    const away = (e: MouseEvent) => { if (!(e.target as Element).closest('.chat-picker, .chat-act-react')) setPickFor(null) }
+    const away = (e: MouseEvent) => { if (!(e.target as Element).closest('.chat-picker, .chat-act-react, .rx-pop, .rx-row')) setPickFor(null) }
     const key = (e: globalThis.KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); setPickFor(null) } }
     document.addEventListener('mousedown', away)
     document.addEventListener('keydown', key, true)
@@ -390,19 +434,20 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
               {m.replyTo && (quoted
                 ? <button type="button" className="chat-quote" onClick={() => void goTo(quoted.id)}><strong>{quoted.authorName}</strong><span>{quoted.text}</span></button>
                 : <div className="chat-quote gone"><span>Mensaje borrado</span></div>)}
-              <p>{rich(m.text, names, user?.displayName ?? '')}{m.edited && <small className="chat-edited"> (editado)</small>}</p>
+              {m.text && <p>{rich(m.text, names, user?.displayName ?? '')}{m.edited && <small className="chat-edited"> (editado)</small>}</p>}
+              <MessageMeta code={room.code} meta={m.meta} />
             </div>
             <div className="chat-actions" role="toolbar" aria-label="Acciones del mensaje" onClick={(e) => e.stopPropagation()}>
-              <button type="button" className="chat-act chat-act-react" aria-label="Reaccionar" aria-expanded={pickFor === m.id} title="Reaccionar" onClick={() => setPickFor((p) => (p === m.id ? null : m.id))}><SmilePlus size={15} /></button>
+              <button type="button" className="chat-act chat-act-react" aria-label="Reaccionar" aria-expanded={pickFor === m.id} title="Reaccionar" onClick={(e) => { pickAnchor.current = e.currentTarget; setPickFor((p) => (p === m.id ? null : m.id)) }}><SmilePlus size={15} /></button>
               {canWrite && <button type="button" className="chat-act" aria-label="Responder" title="Responder" onClick={() => { setReplyTo(m); setEditing(null); input.current?.focus() }}><CornerUpLeft size={15} /></button>}
               <Menu label="Más acciones" items={[
-                { label: 'Copiar texto', icon: <Copy size={16} />, onClick: () => void navigator.clipboard.writeText(m.text).then(() => toast('Copiado', 'success')) },
-                ...(mine && canWrite ? [{ label: 'Editar', icon: <Pencil size={16} />, onClick: () => startEdit(m) }] : []),
+                ...(m.text ? [{ label: 'Copiar texto', icon: <Copy size={16} />, onClick: () => void navigator.clipboard.writeText(m.text).then(() => toast('Copiado', 'success')) }] : []),
+                ...(mine && canWrite && m.text ? [{ label: 'Editar', icon: <Pencil size={16} />, onClick: () => startEdit(m) }] : []),
                 ...((mine || staff) && canWriteIn(room, user) ? [{ label: 'Borrar', icon: <Trash2 size={16} />, danger: true, onClick: () => void del(m) }] : []),
               ]} />
               {pickFor === m.id && (
-                <div className="chat-picker" role="listbox" aria-label="Elegir reacción">
-                  {QUICK.map((e) => <button key={e} type="button" role="option" aria-selected="false" onClick={() => { setPickFor(null); setActiveMsg(null); void react(m, e) }}>{e}</button>)}
+                <div className="chat-picker">
+                  <ReactionPicker quick={QUICK} anchor={() => pickAnchor.current} onPick={(e) => { setActiveMsg(null); void react(m, e) }} onClose={() => setPickFor(null)} />
                 </div>
               )}
             </div>
@@ -440,7 +485,7 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
             const row = rows[v.index]
             if (!row) return null
             return (
-              <div key={v.key} data-index={v.index} data-rowkey={row.key} ref={virtualizer.measureElement} className={`chat-vrow ${row.type} ${row.head ? 'head' : ''}`} style={{ transform: `translateY(${v.start}px)` }}>
+              <div key={v.key} data-index={v.index} data-rowkey={row.key} ref={virtualizer.measureElement} className={`chat-vrow ${row.type} ${row.head ? 'head' : ''} ${row.m && (pickFor === row.m.id || activeMsg === row.m.id) ? 'raised' : ''}`} style={{ transform: `translateY(${v.start}px)` }}>
                 {renderRow(row)}
               </div>
             )
@@ -471,18 +516,30 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
               ))}
             </ul>
           )}
+          {!editing && <AttachChips files={att.files} uploading={att.uploading} onRemove={att.remove} />}
           <div className="chat-input">
-            <button type="button" className="icon-btn" aria-label="Emojis" aria-pressed={emojis} onClick={() => setEmojis((v) => !v)}><Smile size={19} /></button>
-            <textarea ref={input} rows={1} value={draft} maxLength={4000} placeholder={'Escribe un mensaje…'} aria-label="Mensaje"
-              onChange={(e) => { typed(e.target.value); setCaret(e.target.selectionStart) }} onKeyDown={onKey}
-              onKeyUp={(e) => setCaret(e.currentTarget.selectionStart)} onClick={(e) => setCaret(e.currentTarget.selectionStart)} />
-            <button className="btn primary chat-send" onClick={() => void send()} disabled={!draft.trim() || sending} aria-label={editing ? 'Guardar cambios' : 'Enviar'}>{editing ? <Check size={17} /> : <Send size={17} />}</button>
-          </div>
-          {emojis && (
-            <div className="chat-emojis" role="listbox" aria-label="Emojis">
-              {PICKER.map((e) => <Fragment key={e}><button type="button" onClick={() => insertEmoji(e)}>{e}</button></Fragment>)}
+            {!editing && (
+              <div className="chat-plus-wrap">
+                <button type="button" className="chat-plus" aria-label="Más: adjuntar, llamada" title="Adjuntar archivos o llamar" aria-expanded={plusOpen} onClick={() => { setPlusOpen((v) => !v); setEmojis(false) }}><Plus size={20} /></button>
+                {plusOpen && (
+                  <div className="chat-plusmenu" role="menu">
+                    <button type="button" role="menuitem" onClick={() => { setPlusOpen(false); fileInput.current?.click() }}><Paperclip size={17} /><span>Adjuntar archivos<small>Se guardan en Archivos de la sala</small></span></button>
+                    <button type="button" role="menuitem" disabled={calling} onClick={() => void startCall(false)}><Link2 size={17} /><span>Enviar una llamada<small>Crea la llamada y manda su enlace</small></span></button>
+                    <button type="button" role="menuitem" disabled={calling} onClick={() => void startCall(true)}><Video size={17} /><span>Iniciar videollamada<small>La crea, manda el enlace y entras ahora</small></span></button>
+                  </div>
+                )}
+                <input ref={fileInput} type="file" multiple hidden aria-label="Elegir archivos" onChange={(e) => { const l = e.target.files; if (l) void att.add(l); e.target.value = '' }} />
+              </div>
+            )}
+            <div className="chat-field">
+              <textarea ref={input} rows={1} value={draft} maxLength={4000} placeholder={'Escribe un mensaje…'} aria-label="Mensaje"
+                onChange={(e) => { typed(e.target.value); setCaret(e.target.selectionStart) }} onKeyDown={onKey}
+                onKeyUp={(e) => setCaret(e.currentTarget.selectionStart)} onClick={(e) => setCaret(e.currentTarget.selectionStart)} />
+              <button type="button" className="icon-btn chat-smile" aria-label="Emojis" aria-pressed={emojis} onClick={() => { setEmojis((v) => !v); setPlusOpen(false) }}><Smile size={19} /></button>
             </div>
-          )}
+            <button className="btn primary chat-send" onClick={() => void send()} disabled={(!draft.trim() && !att.files.length) || sending || att.uploading > 0} aria-label={editing ? 'Guardar cambios' : 'Enviar'}>{editing ? <Check size={17} /> : <Send size={17} />}</button>
+          </div>
+          {emojis && <div className="chat-emojis"><EmojiPicker onPick={insertEmoji} /></div>}
         </div>
       ) : <p className="callout small chat-ro">{roLabel}</p>}
     </div>

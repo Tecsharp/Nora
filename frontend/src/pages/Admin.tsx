@@ -12,6 +12,7 @@ import { useToast } from '../toast'
 import AdminLibraries from '../components/AdminLibraries'
 import { fmtDate, fmtShortMonth } from '../dates'
 import { useAi } from '../ai/AiProvider'
+import { useNavigate, useParams } from 'react-router-dom'
 
 interface Row {
   user: User
@@ -360,7 +361,11 @@ function AiStatus() {
 
 export default function Admin() {
   const { user } = useAuth()
-  const [tab, setTab] = useState('overview')
+  // la sección vive en la dirección (/admin/users): al recargar se vuelve a ella
+  const { tab: tabParam } = useParams()
+  const go = useNavigate()
+  const tab = ['overview', 'users', 'system', 'libraries', 'storage'].includes(tabParam ?? '') ? tabParam! : 'overview'
+  const setTab = (t: string) => go(`/admin/${t}`)
   const [data, setData] = useState<Page>({ items: [], total: 0, page: 0, size: 20 })
   const [page, setPage] = useState(0)
   const [size, setSize] = useState(20)

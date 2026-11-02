@@ -124,8 +124,8 @@ export function useMessages(code: string, conv: string) {
   /** Vuelve a los mensajes más recientes. */
   const latest = useCallback(async () => { setLoading(true); await load() }, [load])
 
-  const send = useCallback(async (text: string, replyTo?: string) => {
-    const m = await chatApi.send(code, conv, text, replyTo)
+  const send = useCallback(async (text: string, replyTo?: string, extra?: { files?: string[]; call?: string }) => {
+    const m = await chatApi.send(code, conv, text, replyTo, extra)
     if (newerRef.current) await latest() // se escribe desde una ventana antigua: se vuelve al final para ver lo enviado
     else upsert(m)
     return m

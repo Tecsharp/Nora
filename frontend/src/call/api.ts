@@ -27,6 +27,9 @@ export interface CallState {
   max: number
   parts: Part[]
   lobby: Waiting[]
+  /** Personas invitadas que aún no están dentro (las de la cita del calendario o, si no hay cita, las de la sala). */
+  invited: { userId: string; name: string }[]
+  invitedKind: 'event' | 'room'
 }
 
 export interface CallInfo {

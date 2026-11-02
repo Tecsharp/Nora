@@ -15,6 +15,7 @@ import Tabs from './Tabs'
 import { useMarquee } from '../marquee'
 import { fmtDateTime } from '../dates'
 import { useBusy } from '../useBusy'
+import { useFolderParam } from '../useFolderParam'
 
 interface BoardItem extends DocInfo {
   createdBy: string
@@ -70,7 +71,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
   const dialogs = useDialogs()
   const [boards, setBoards] = useState<BoardItem[] | null>(null)
   const [folders, setFolders] = useState<FolderItem[]>([])
-  const [current, setCurrent] = useState<string | null>(null)
+  const [current, setCurrent] = useFolderParam()
   const [busy, setBusy] = useState('')
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<Sort>('name')

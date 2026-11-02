@@ -40,6 +40,11 @@ public class ChatController {
         return chat.updateGroup(p, code, id, req);
     }
 
+    @PutMapping("/conversations/{id}/name")
+    public ConvDto rename(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable UUID id, @RequestBody Rename req) {
+        return chat.rename(p, code, id, req.name());
+    }
+
     @DeleteMapping("/conversations/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@AuthenticationPrincipal AuthPrincipal p, @PathVariable String code, @PathVariable UUID id) {

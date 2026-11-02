@@ -1,7 +1,7 @@
 import type { FocusTarget } from '../tools/focus'
 import { Suspense, lazy, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { LayoutGrid, Menu as MenuIcon } from 'lucide-react'
+import { LayoutGrid, Menu as MenuIcon, UserCheck, Users as UsersIcon, X as XIcon } from 'lucide-react'
 import { api, ApiError, type JoinRequest, type Room, type RoomStatus } from '../api'
 import ReactivateDialog from '../components/ReactivateDialog'
 import { useAuth } from '../auth'
@@ -9,6 +9,8 @@ import { rt, useRealtime, useRtStatus } from '../realtime'
 import { useToast } from '../toast'
 import { useDialogs } from '../dialogs'
 import ExpiryDialog from '../components/ExpiryDialog'
+import Modal from '../components/Modal'
+import Avatar from '../components/Avatar'
 import RoomSettingsDialog from '../components/RoomSettingsDialog'
 import FilesTool from '../components/FilesTool'
 import BoardsTool from '../components/BoardsTool'
@@ -43,19 +45,37 @@ import { useBusy } from '../useBusy'
 
 const DocEditor = lazy(() => import('../collab/DocEditor'))
 
+/** Direcciones de las herramientas, en inglés y legibles. */
+const SLUG_OF: Record<string, string> = { actions: 'tasks', attendance: 'assistance', [PEOPLE.id]: 'people' }
+const slugOfId = (id: string) => (id === OVERVIEW ? '' : SLUG_OF[id] ?? id)
+const idOfSlug = (slug?: string): string => {
+  if (!slug) return OVERVIEW
+  const hit = Object.entries(SLUG_OF).find(([, s]) => s === slug)?.[0]
+  const id = hit ?? slug
+  return id === PEOPLE.id || TOOLS.some((t) => t.id === id) ? id : OVERVIEW
+}
+
 export default function RoomPage() {
-  const { code = '' } = useParams()
+  const { code = '', tool: toolSlug, sub: subPath } = useParams()
   const { user } = useAuth()
   const navigate = useNavigate()
   const [room, setRoom] = useState<Room | null>(null)
   const [error, setError] = useState('')
-  const [active, setActive] = useState<string>(OVERVIEW)
+  // Dónde se está (resumen, personas o una herramienta) vive en la dirección: /room/ABC/files, /room/ABC/tasks…, así al recargar se vuelve al mismo sitio
+  const active = idOfSlug(toolSlug)
+  const setActive = useCallback((id: string) => {
+    const sp = new URLSearchParams(window.location.search)
+    for (const k of ['tool', 'item', 'file', 'conv', 'msg', 'folder']) sp.delete(k) // lo propio de otra herramienta no viaja
+    const qs = sp.toString()
+    navigate(`/room/${code}${slugOfId(id) ? `/${slugOfId(id)}` : ''}${qs ? `?${qs}` : ''}`)
+  }, [code, navigate])
   const [navOpen, setNavOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [adjusting, setAdjusting] = useState(false)
   const [editingDoc, setEditingDoc] = useState<DocInfo | null>(null)
   const [params, setParams] = useSearchParams()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [requestsOpen, setRequestsOpen] = useState(false) // «Solicitudes de entrada»: lo abre el aviso de alguien que quiere entrar
   const [requests, setRequests] = useState<JoinRequest[]>([])
   const [online, setOnline] = useState<Set<string>>(new Set())
   const [inactive, setInactive] = useState<RoomStatus | null>(null)
@@ -223,7 +243,8 @@ export default function RoomPage() {
     if (!wantedTool || !room) return
     const f: FocusTarget = { tool: wantedTool, item: params.get('item') ?? undefined, file: params.get('file') ?? undefined, conv: params.get('conv') ?? undefined, msg: params.get('msg') ?? undefined, nonce: Date.now() }
     setParams((p) => { for (const k of ['tool', 'item', 'file', 'conv', 'msg']) p.delete(k); return p }, { replace: true })
-    if (wantedTool === 'settings' || wantedTool === 'members') { setSettingsOpen(true); return }
+    if (wantedTool === 'members') { loadRequests(); setRequestsOpen(true); return }
+    if (wantedTool === 'settings') { setSettingsOpen(true); return }
     if (!TOOLS.some((t) => t.id === wantedTool)) return
     setTarget(f)
     setActive(wantedTool)
@@ -346,7 +367,7 @@ export default function RoomPage() {
               {tool.id === 'media' && <MediaReviewTool room={room} focus={target} />}
               {tool.id === 'polls' && <PollsTool room={room} focus={target} />}
               {tool.id === 'actions' && <TasksTool room={room} focus={target} />}
-              {tool.id === 'chat' && <ChatTool focus={target} />}
+              {tool.id === 'chat' && <ChatTool focus={target} urlConv={subPath} onUrlConv={(id) => navigate(`/room/${code}/chat${id ? `/${id}` : ''}${window.location.search}`, { replace: true })} />}
               {tool.id === 'notes' && <NotesTool room={room} kind="NOTE" placeholder="Escribe una nota para la sala…" />}
             </div>
           )}
@@ -361,6 +382,27 @@ export default function RoomPage() {
 
       {launcher && <ToolsLauncher active={active} pinned={pinned} badges={badges} onSelect={openAt} onTogglePin={togglePin} onClose={() => setLauncher(false)} />}
 
+      {requestsOpen && (
+        <Modal title="Solicitudes de entrada" icon={<UsersIcon size={20} />} onClose={() => setRequestsOpen(false)}
+          footer={<><span className="grow" /><button className="btn ghost" onClick={() => { setRequestsOpen(false); setActive(PEOPLE.id) }}>Ver personas</button><button className="btn" onClick={() => setRequestsOpen(false)}>Cerrar</button></>}>
+          {requests.length === 0
+            ? <p className="muted">No hay solicitudes pendientes.</p>
+            : (
+              <ul className="ws-rows">
+                {requests.map((r) => (
+                  <li key={r.userId} className="ws-row">
+                    <Avatar name={r.displayName} size={34} />
+                    <span className="ws-row-main"><b className="truncate">{r.displayName}</b><small>Quiere entrar a la sala</small></span>
+                    <span className="row nowrap">
+                      <button className="btn primary sm" disabled={deciding.busy(`req:${r.userId}`)} onClick={() => void decide(r.userId, true)}><UserCheck size={15} /> Aceptar</button>
+                      <button className="btn ghost sm" disabled={deciding.busy(`req:${r.userId}`)} onClick={() => void decide(r.userId, false)}><XIcon size={15} /> Rechazar</button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+        </Modal>
+      )}
       {settingsOpen && <RoomSettingsDialog room={room} onClose={() => setSettingsOpen(false)} onSaved={(r) => setRoom(r)} />}
 
       {adjusting && (
