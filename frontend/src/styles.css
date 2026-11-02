@@ -2314,3 +2314,16 @@ label.qc-check input { width: 16px; height: 16px; flex: none; }
 .chat.window .chat-field { padding: 1px 3px 1px 10px; border-radius: 18px; }
 .cwin { width: 390px; max-width: calc(100vw - 24px); }
 .cwin.min { width: 240px; }
+
+/* Buscador de emojis: la etiqueta global de formularios es una columna; aquí va en una fila y el campo sin el relleno de los formularios */
+.epk-search { flex-direction: row; align-items: center; gap: 8px; margin: 0; font-weight: 400; font-size: 0.88rem; }
+.epk-search svg { flex: none; }
+.epk-search input { padding: 0; min-height: 0; height: 100%; font-size: 0.88rem; line-height: 1.2; border: 0; border-radius: 0; background: none; box-shadow: none; }
+.epk-search input:focus { background: none; }
+.rx-sep { flex: none; width: 1px; height: 22px; margin: 0 3px; background: var(--hairline, rgba(255, 255, 255, 0.18)); }
+.rx-row button.fav { background: color-mix(in oklab, var(--accent, #7c6af7) 22%, transparent); }
+.rx-row button.fav:hover { background: color-mix(in oklab, var(--accent, #7c6af7) 42%, transparent); }
+
+/* Reacciones de los mensajes del chat: cinco por fila y de ahí a doble fila */
+.chat-reacts { display: grid; grid-template-columns: repeat(5, max-content); gap: 4px; justify-content: start; }
+.chat-msg.mine .chat-reacts { justify-content: end; }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Clock, Plus, Search } from 'lucide-react'
+import { useEmojiFavorites } from './emojiFavorites'
 
 interface Emo { u: string; label: string; group: number; skins: { u: string; tone: number }[]; hay: string }
 interface Data { list: Emo[]; byGroup: Map<number, Emo[]> }
@@ -123,8 +124,13 @@ export function EmojiPicker({ onPick, dark, autoFocus = true }: { onPick: (emoji
  * Reacciones rápidas de un mensaje: los primeros 5 emojis y un «+» que abre el selector completo (con buscador) en una ventana que se
  * coloca dentro de la pantalla. Cierra al elegir o al presionar fuera.
  */
+export const CHAT_EMOJI_KEY = 'nora-chat-emoji-use'
+
 export function ReactionPicker({ quick, onPick, onClose, dark, className }: { quick: string[]; onPick: (e: string) => void; onClose?: () => void; dark?: boolean; className?: string }) {
   const [open, setOpen] = useState(false)
+  const defaults = useMemo(() => quick.slice(0, 5), [quick])
+  const favs = useEmojiFavorites(CHAT_EMOJI_KEY, defaults)
+  const choose = (e: string) => { favs.used(e); onPick(e) }
   const plus = useRef<HTMLButtonElement>(null)
   const pop = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
@@ -151,11 +157,13 @@ export function ReactionPicker({ quick, onPick, onClose, dark, className }: { qu
 
   return (
     <div className={`rx-row ${dark ? 'dark' : ''} ${className ?? ''}`} role="listbox" aria-label="Elegir reacción">
-      {quick.slice(0, 5).map((e) => <button key={e} type="button" role="option" aria-selected="false" onClick={() => { onPick(e); onClose?.() }}>{e}</button>)}
+      {defaults.map((e) => <button key={e} type="button" role="option" aria-selected="false" onClick={() => { choose(e); onClose?.() }}>{e}</button>)}
+      {favs.fav.length > 0 && <i className="rx-sep" aria-hidden />}
+      {favs.fav.map((e) => <button key={e} type="button" role="option" aria-selected="false" className="fav" title="De los que más usas" onClick={() => { choose(e); onClose?.() }}>{e}</button>)}
       <button ref={plus} type="button" className="rx-plus" aria-label="Más emojis" title="Buscar otro emoji" aria-expanded={open} onClick={() => setOpen((v) => !v)}><Plus size={16} /></button>
       {open && createPortal(
         <div ref={pop} className="rx-pop" style={pos ? { left: pos.left, top: pos.top } : { visibility: 'hidden', left: 0, top: 0 }}>
-          <EmojiPicker dark={dark} onPick={(e) => { onPick(e); setOpen(false); onClose?.() }} />
+          <EmojiPicker dark={dark} onPick={(e) => { choose(e); setOpen(false); onClose?.() }} />
         </div>, document.body)}
     </div>
   )

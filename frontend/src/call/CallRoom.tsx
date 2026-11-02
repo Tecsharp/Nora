@@ -4,7 +4,8 @@ import type { User } from '../api'
 import { useRealtime } from '../realtime'
 import { callUrl, type Part } from './api'
 import { EmojiPicker } from '../components/EmojiPicker'
-import { DEFAULT_REACTIONS, useEmojiFavorites } from './emoji'
+import { useEmojiFavorites } from '../components/emojiFavorites'
+import { CALL_EMOJI_KEY, DEFAULT_REACTIONS } from './emoji'
 import { callSounds } from './sounds'
 import { captionsSupported, type CallApi } from './useCall'
 import type { LocalMedia } from './useLocalMedia'
@@ -44,7 +45,7 @@ export default function CallRoom({ call, media, user, roomCode }: { call: CallAp
   const [unread, setUnread] = useState(0)
   const [full, setFull] = useState(!!document.fullscreenElement)
   const [activeConn, setActiveConn] = useState<string | null>(null)
-  const favs = useEmojiFavorites()
+  const favs = useEmojiFavorites(CALL_EMOJI_KEY, DEFAULT_REACTIONS)
   const [allEmojis, setAllEmojis] = useState(false)
   const root = useRef<HTMLDivElement>(null)
 
