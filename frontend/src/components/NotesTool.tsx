@@ -446,7 +446,7 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
 
       <div className="ex-status">
         <span>{shownFolders.length} carpeta{shownFolders.length === 1 ? '' : 's'} · {shown.length} nota{shown.length === 1 ? '' : 's'}</span>
-        <span className="hide-sm">{canWrite ? 'Arrastra con el ratón para seleccionar varias · arrástralas a una carpeta para moverlas' : 'Clic para abrir'}</span>
+        <span className="hide-sm">{canWrite ? 'Selecciona varias con el ratón' : 'Clic para abrir'}</span>
       </div>
 
       {editing && (

@@ -776,7 +776,7 @@ function AiEventDialog({ onClose, onPick }: { onClose: () => void; onPick: (d: P
       footer={<><span className="grow" /><button className="btn ghost" onClick={onClose}>Cancelar</button><button className="btn ai" disabled={busy || text.trim().length < 4} onClick={() => void run()}><Sparkles size={15} /> {busy ? 'Entendiendo…' : 'Crear cita'}</button></>}>
       <div className="stack">
         <p className="muted small">Cuéntalo con tus palabras y podrás revisar la cita antes de guardarla.</p>
-        <textarea autoFocus rows={4} value={text} maxLength={1000} onChange={(e) => setText(e.target.value)} placeholder="Ej.: mañana a las 17:00 reunión de equipo en la sala 2, dura una hora y media" />
+        <textarea autoFocus rows={4} value={text} maxLength={1000} onChange={(e) => setText(e.target.value)} placeholder="Describe la cita" />
       </div>
     </Modal>
   )

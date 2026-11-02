@@ -176,7 +176,7 @@ export default function RoomNav(p: Props) {
         role="separator"
         aria-orientation="horizontal"
         aria-label="Cambiar el tamaño de la lista de conversaciones"
-        title="Arrastra para agrandar o achicar las conversaciones · doble clic para ajustar"
+        title="Cambiar el tamaño de la lista"
         tabIndex={0}
         onPointerDown={startResize}
         onDoubleClick={() => setChatsH(null)}

@@ -271,7 +271,7 @@ export default function MediaReviewTool({ room, focus }: { room: Room; focus?: F
             {canWrite ? (
               <div className="mr-composer">
                 <MessageSquarePlus size={18} />
-                <input ref={composer} value={draft} maxLength={2000} placeholder={kind === 'image' ? (pin ? 'Comentario en el punto marcado…' : 'Escribe un comentario (o marca un punto en la imagen)…') : `Comentar en ${fmtTime(time)}…  (Enter para enviar)`}
+                <input ref={composer} value={draft} maxLength={2000} placeholder={kind === 'image' ? (pin ? 'Comentario en el punto marcado…' : 'Escribe un comentario…') : `Comentar en ${fmtTime(time)}…`}
                   onFocus={() => { if (pauseOnType && kind !== 'image') el.current?.pause() }}
                   onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); void post() } else if (e.key === 'Escape') { e.stopPropagation(); setPin(null); composer.current?.blur() } }} />
                 {kind !== 'image' && <label className="check small" title="Pausa el vídeo al empezar a escribir y sigue al enviar"><input type="checkbox" checked={pauseOnType} onChange={(e) => setPauseOnType(e.target.checked)} /> Pausar</label>}

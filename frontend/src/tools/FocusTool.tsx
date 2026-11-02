@@ -77,12 +77,12 @@ export default function FocusTool({ room, focus }: { room: Room; focus: FocusApi
         {canWrite && (me ? (
           <div className="fc-me">
             <label className="stack tight"><span className="small muted">En qué estás trabajando</span>
-              <input defaultValue={me.task} maxLength={80} placeholder="Escribe y pulsa Enter" onKeyDown={(e) => { if (e.key === 'Enter') void send({ action: 'task', task: (e.target as HTMLInputElement).value }) }} onBlur={(e) => { if (e.target.value !== me.task) void send({ action: 'task', task: e.target.value }) }} /></label>
+              <input defaultValue={me.task} maxLength={80} placeholder="Tarea actual" onKeyDown={(e) => { if (e.key === 'Enter') void send({ action: 'task', task: (e.target as HTMLInputElement).value }) }} onBlur={(e) => { if (e.target.value !== me.task) void send({ action: 'task', task: e.target.value }) }} /></label>
             <button className="btn sm" onClick={() => void send({ action: 'leave' })}>Salir del grupo</button>
           </div>
         ) : (
           <div className="fc-me">
-            <input value={task} maxLength={80} placeholder="¿En qué vas a trabajar? (opcional)" onChange={(e) => setTask(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { void send({ action: 'join', task }); setTask('') } }} />
+            <input value={task} maxLength={80} placeholder="Tarea (opcional)" onChange={(e) => setTask(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { void send({ action: 'join', task }); setTask('') } }} />
             <button className="btn primary sm" onClick={() => { void send({ action: 'join', task }); setTask('') }}><Target size={14} /> Unirme al foco</button>
           </div>
         ))}

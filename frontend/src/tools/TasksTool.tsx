@@ -201,7 +201,7 @@ export default function TasksTool({ room, focus }: { room: Room; focus?: FocusTa
                   </div>
                 ))}
                 {over?.status === c.id && over.index >= list.filter((x) => x.id !== dragId).length && dragId && <div className="kb-drop" />}
-                {!loading && !list.length && adding !== c.id && <div className="kb-empty">{q || mine || prio ? 'Sin resultados' : c.id === 'done' ? 'Lo completado aparecerá aquí' : 'Arrastra tareas hasta aquí'}</div>}
+                {!loading && !list.length && adding !== c.id && <div className="kb-empty">{q || mine || prio ? 'Sin resultados' : c.id === 'done' ? 'Lo completado aparecerá aquí' : 'Sin tareas'}</div>}
                 {adding === c.id && <QuickAdd onCancel={() => setAdding(null)} onAdd={async (title) => { await quickAdd(c.id, title) }} />}
               </div>
             </section>
@@ -244,7 +244,6 @@ function QuickAdd({ onAdd, onCancel }: { onAdd: (title: string) => Promise<void>
       <div className="row">
         <button className="btn primary sm" disabled={!v.trim() || busy}>Añadir</button>
         <button type="button" className="btn ghost sm" onClick={onCancel}>Cerrar</button>
-        <span className="muted small">Enter añade otra</span>
       </div>
     </form>
   )
@@ -404,7 +403,7 @@ function TaskDialog({ t, room, canEdit, canDelete, onClose, onSave, onDelete }: 
           <div className="stack tight">
             <span className="small muted">Etiquetas</span>
             <div className="kb-labels">{d.labels.map((l) => <span key={l} className="kb-label">{l}{canEdit && <button aria-label={`Quitar ${l}`} onClick={() => set('labels', d.labels.filter((x) => x !== l))}><X size={11} /></button>}</span>)}</div>
-            {canEdit && <input value={label} maxLength={24} placeholder="Nueva etiqueta + Enter" onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addLabel() } }} />}
+            {canEdit && <input value={label} maxLength={24} placeholder="Nueva etiqueta" onChange={(e) => setLabel(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addLabel() } }} />}
           </div>
           <p className="muted small">Creada por {t.authorName}{t.authorId && nameOf.has(t.authorId) ? '' : ''} · {fmtDate(t.createdAt)}</p>
         </aside>
@@ -455,7 +454,7 @@ function AiTasksDialog({ room, onClose, onCreate }: { room: Room; onClose: () =>
       {!list ? (
         <div className="stack">
           <p className="muted small">Pega notas de una reunión, un correo o una lista de ideas y la IA propondrá tareas con responsable y fecha cuando las mencione. Podrás revisarlas antes de añadirlas.</p>
-          <textarea rows={12} autoFocus value={text} maxLength={20000} onChange={(e) => setText(e.target.value)} placeholder="Ej.: Ana envía la propuesta al cliente el lunes. Luis revisa el presupuesto antes del viernes…" />
+          <textarea rows={12} autoFocus value={text} maxLength={20000} onChange={(e) => setText(e.target.value)} placeholder="Pega aquí las notas de la reunión…" />
         </div>
       ) : (
         <ul className="kb-suggest">

@@ -502,7 +502,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
           <div className="empty">
             {searching ? <Search size={36} /> : <PenTool size={36} />}
             <strong>{searching ? 'Sin resultados' : current ? 'Esta carpeta está vacía' : 'Todavía no hay pizarras'}</strong>
-            <span className="small">{searching ? 'Prueba con otro nombre.' : canWrite ? 'Crea una pizarra, importa un archivo .excalidraw o arrastra aquí pizarras desde otra carpeta.' : 'Todavía no hay nada que ver.'}</span>
+            <span className="small">{searching ? 'Sin resultados.' : canWrite ? 'Crea o importa una pizarra.' : 'Todavía no hay nada que ver.'}</span>
           </div>
         ) : (
           <>
@@ -520,7 +520,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
 
       <div className="ex-status">
         <span>{shownFolders.length} carpeta{shownFolders.length === 1 ? '' : 's'} · {shownBoards.length} pizarra{shownBoards.length === 1 ? '' : 's'}</span>
-        <span className="hide-sm">{canWrite ? 'Ctrl/⌘ o Mayús + clic para seleccionar varias · arrástralas a una carpeta para moverlas' : 'Clic para abrir'}</span>
+        <span className="hide-sm">{canWrite ? 'Ctrl/⌘ o Mayús + clic para seleccionar varias' : 'Clic para abrir'}</span>
       </div>
     </div>
   )

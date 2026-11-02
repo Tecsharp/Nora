@@ -67,7 +67,7 @@ export default function CallTool({ room }: { room: Room }) {
 
       <form className="calls-join" onSubmit={enter}>
         <LogIn size={16} />
-        <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Unirse con un código (abc-defg-hij)" aria-label="Código de llamada" />
+        <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Código de la llamada" aria-label="Código de llamada" />
         <button className="btn sm" disabled={!normalizeCode(code)}>Unirse</button>
       </form>
 

@@ -110,7 +110,7 @@ function AskDialog({ action, onCancel, onOk }: { action: AiAction; onCancel: () 
           <span className="small">{action.ask === 'language' ? 'Idioma de destino' : '¿Qué quieres que haga con el texto?'}</span>
           {action.ask === 'language'
             ? <input autoFocus value={v} onChange={(e) => setV(e.target.value)} list="ai-langs" maxLength={40} required />
-            : <textarea autoFocus rows={3} value={v} onChange={(e) => setV(e.target.value)} maxLength={1500} required placeholder="Por ejemplo: conviértelo en un correo para el cliente" />}
+            : <textarea autoFocus rows={3} value={v} onChange={(e) => setV(e.target.value)} maxLength={1500} required placeholder="Instrucción" />}
           {action.ask === 'language' && <datalist id="ai-langs">{['inglés', 'español', 'francés', 'alemán', 'italiano', 'portugués', 'chino', 'japonés'].map((l) => <option key={l} value={l} />)}</datalist>}
         </label>
         <div className="row end">

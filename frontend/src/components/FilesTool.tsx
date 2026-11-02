@@ -736,7 +736,7 @@ export default function FilesTool({ room, onEditDoc, focus }: { room: Room; onEd
             <ProgressBar p={i.progress} />
           </div>
         ))}
-        {activeCount > 0 && <p className="muted small" style={{ marginBottom: 8 }}>Puedes cerrar el explorador: las subidas continúan en segundo plano.</p>}
+        {activeCount > 0 && <p className="muted small" style={{ marginBottom: 8 }}>Subidas en curso.</p>}
 
         {Object.values(remotes).map((r) => (
           <div key={r.uploadId} className="upload-item">
@@ -771,7 +771,7 @@ export default function FilesTool({ room, onEditDoc, focus }: { room: Room; onEd
             {searching ? <Search size={36} /> : <Folder size={36} />}
             <strong>{searching ? 'Sin resultados' : current ? 'Esta carpeta está vacía' : 'No hay archivos en esta sala'}</strong>
             <span className="small">
-              {searching ? 'Prueba con otro nombre.' : canWrite ? 'Pulsa «Subir» o arrastra archivos y carpetas aquí.' : 'Todavía no hay nada que ver.'}
+              {searching ? 'Sin resultados.' : canWrite ? 'Sube archivos o carpetas.' : 'Todavía no hay nada que ver.'}
               {!searching && canWrite && ` Máx. por archivo: ${formatBytes(user?.limits.maxFileSizeBytes)}.`}
             </span>
           </div>
@@ -785,7 +785,7 @@ export default function FilesTool({ room, onEditDoc, focus }: { room: Room; onEd
 
       <div className="ex-status">
         <span>{shownFolders.length} carpeta{shownFolders.length === 1 ? '' : 's'} · {shownFiles.length} archivo{shownFiles.length === 1 ? '' : 's'}</span>
-        <span className="hide-sm">Subida reanudable · arrastra con el ratón para seleccionar varios · arrástralos a una carpeta para moverlos</span>
+        <span className="hide-sm">Subida reanudable a una carpeta para moverlos</span>
       </div>
 
       {viewIndex >= 0 && (
