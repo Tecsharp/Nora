@@ -785,7 +785,6 @@ export default function FilesTool({ room, onEditDoc, focus }: { room: Room; onEd
 
       <div className="ex-status">
         <span>{shownFolders.length} carpeta{shownFolders.length === 1 ? '' : 's'} · {shownFiles.length} archivo{shownFiles.length === 1 ? '' : 's'}</span>
-        <span className="hide-sm">Subida reanudable a una carpeta para moverlos</span>
       </div>
 
       {viewIndex >= 0 && (

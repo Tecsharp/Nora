@@ -1,6 +1,6 @@
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { ArrowDown, Check, CornerUpLeft, Copy, Paperclip, Pencil, Send, Smile, SmilePlus, Sparkles, Trash2, Video, X } from 'lucide-react'
+import { ArrowDown, Check, CornerUpLeft, Copy, Link2, Paperclip, Pencil, Plus, Send, Smile, SmilePlus, Sparkles, Trash2, Video, X } from 'lucide-react'
 import { useAuth } from '../auth'
 import Avatar from '../components/Avatar'
 import Menu from '../components/Menu'
@@ -10,13 +10,13 @@ import { canWrite as canWriteIn, isStaff as isStaffIn } from '../roles'
 import { useToast } from '../toast'
 import { flash } from '../tools/focus'
 import { callApi } from '../call/api'
+import { EmojiPicker, ReactionPicker } from '../components/EmojiPicker'
 import { AttachChips, MessageMeta, useAttachments } from './Attachments'
 import type { Conv, Message } from './chatApi'
 import { useChat } from './ChatProvider'
 import type { MessagesStore } from './useMessages'
 
-const QUICK = ['👍', '❤️', '😂', '🎉', '👀', '🙏']
-const PICKER = ['😀', '😄', '😅', '😂', '🙂', '😉', '😍', '🤔', '😮', '😢', '😡', '🙌', '👏', '💪', '🔥', '✨', '🎉', '✅', '❌', '⚠️', '💡', '📌', '🚀', '☕']
+const QUICK = ['👍', '❤️', '😂', '🎉', '🙏']
 const GROUP_GAP_MS = 5 * 60_000
 
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString()
@@ -76,6 +76,7 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
   const att = useAttachments(room.code)
   const fileInput = useRef<HTMLInputElement>(null)
   const [calling, setCalling] = useState(false)
+  const [plusOpen, setPlusOpen] = useState(false)
   const [pickFor, setPickFor] = useState<string | null>(null) // mensaje con el selector de reacciones abierto
   const [activeMsg, setActiveMsg] = useState<string | null>(null) // mensaje tocado (en pantallas táctiles no hay «hover»)
   const [unseen, setUnseen] = useState(0)
@@ -318,15 +319,17 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
   }
 
   /** Crea una llamada en el momento (sin pasar por el calendario) y manda su enlace a la conversación. */
-  async function startCall() {
+  async function startCall(join: boolean) {
     if (calling) return
     setCalling(true)
-    const w = window.open('about:blank', '_blank') // la pestaña se abre en el gesto del clic, y después se le pone la dirección
+    setPlusOpen(false)
+    const w = join ? window.open('about:blank', '_blank') : null // la pestaña se abre en el gesto del clic, y después se le pone la dirección
     try {
       const c = await callApi.create(room.code, { title: chat.title(conv), access: 'OPEN' })
       await store.send('', undefined, { call: c.code })
       requestAnimationFrame(() => toBottom())
       if (w) w.location.href = `/call/${c.code}`
+      else if (!join) toast('Llamada enviada: entra cuando quieras desde el mensaje', 'success')
     } catch (e) {
       w?.close()
       toast(e instanceof Error ? e.message : 'No se pudo iniciar la llamada', 'error')
@@ -363,8 +366,16 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
   }
 
   useEffect(() => {
+    if (!plusOpen) return
+    const away = (e: MouseEvent) => { if (!(e.target as Element).closest('.chat-plus-wrap')) setPlusOpen(false) }
+    const key = (e: globalThis.KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setPlusOpen(false) } }
+    document.addEventListener('mousedown', away)
+    document.addEventListener('keydown', key, true)
+    return () => { document.removeEventListener('mousedown', away); document.removeEventListener('keydown', key, true) }
+  }, [plusOpen])
+  useEffect(() => {
     if (!pickFor) return
-    const away = (e: MouseEvent) => { if (!(e.target as Element).closest('.chat-picker, .chat-act-react')) setPickFor(null) }
+    const away = (e: MouseEvent) => { if (!(e.target as Element).closest('.chat-picker, .chat-act-react, .rx-pop')) setPickFor(null) }
     const key = (e: globalThis.KeyboardEvent) => { if (e.key === "Escape") { e.stopPropagation(); setPickFor(null) } }
     document.addEventListener('mousedown', away)
     document.addEventListener('keydown', key, true)
@@ -427,8 +438,8 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
                 ...((mine || staff) && canWriteIn(room, user) ? [{ label: 'Borrar', icon: <Trash2 size={16} />, danger: true, onClick: () => void del(m) }] : []),
               ]} />
               {pickFor === m.id && (
-                <div className="chat-picker" role="listbox" aria-label="Elegir reacción">
-                  {QUICK.map((e) => <button key={e} type="button" role="option" aria-selected="false" onClick={() => { setPickFor(null); setActiveMsg(null); void react(m, e) }}>{e}</button>)}
+                <div className="chat-picker">
+                  <ReactionPicker quick={QUICK} onPick={(e) => { setActiveMsg(null); void react(m, e) }} onClose={() => setPickFor(null)} />
                 </div>
               )}
             </div>
@@ -499,20 +510,28 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
           )}
           {!editing && <AttachChips files={att.files} uploading={att.uploading} onRemove={att.remove} />}
           <div className="chat-input">
-            <button type="button" className="icon-btn" aria-label="Emojis" aria-pressed={emojis} onClick={() => setEmojis((v) => !v)}><Smile size={19} /></button>
-            {!editing && <button type="button" className="icon-btn" aria-label="Adjuntar archivos" title="Adjuntar archivos" onClick={() => fileInput.current?.click()}><Paperclip size={19} /></button>}
-            {!editing && <button type="button" className="icon-btn" aria-label="Iniciar una llamada" title="Iniciar una llamada" disabled={calling} onClick={() => void startCall()}><Video size={19} /></button>}
-            <input ref={fileInput} type="file" multiple hidden aria-label="Elegir archivos" onChange={(e) => { const l = e.target.files; if (l) void att.add(l); e.target.value = '' }} />
-            <textarea ref={input} rows={1} value={draft} maxLength={4000} placeholder={'Escribe un mensaje…'} aria-label="Mensaje"
-              onChange={(e) => { typed(e.target.value); setCaret(e.target.selectionStart) }} onKeyDown={onKey}
-              onKeyUp={(e) => setCaret(e.currentTarget.selectionStart)} onClick={(e) => setCaret(e.currentTarget.selectionStart)} />
+            {!editing && (
+              <div className="chat-plus-wrap">
+                <button type="button" className="chat-plus" aria-label="Más: adjuntar, llamada" title="Adjuntar archivos o llamar" aria-expanded={plusOpen} onClick={() => { setPlusOpen((v) => !v); setEmojis(false) }}><Plus size={20} /></button>
+                {plusOpen && (
+                  <div className="chat-plusmenu" role="menu">
+                    <button type="button" role="menuitem" onClick={() => { setPlusOpen(false); fileInput.current?.click() }}><Paperclip size={17} /><span>Adjuntar archivos<small>Se guardan en Archivos de la sala</small></span></button>
+                    <button type="button" role="menuitem" disabled={calling} onClick={() => void startCall(false)}><Link2 size={17} /><span>Enviar una llamada<small>Crea la llamada y manda su enlace</small></span></button>
+                    <button type="button" role="menuitem" disabled={calling} onClick={() => void startCall(true)}><Video size={17} /><span>Iniciar videollamada<small>La crea, manda el enlace y entras ahora</small></span></button>
+                  </div>
+                )}
+                <input ref={fileInput} type="file" multiple hidden aria-label="Elegir archivos" onChange={(e) => { const l = e.target.files; if (l) void att.add(l); e.target.value = '' }} />
+              </div>
+            )}
+            <div className="chat-field">
+              <textarea ref={input} rows={1} value={draft} maxLength={4000} placeholder={'Escribe un mensaje…'} aria-label="Mensaje"
+                onChange={(e) => { typed(e.target.value); setCaret(e.target.selectionStart) }} onKeyDown={onKey}
+                onKeyUp={(e) => setCaret(e.currentTarget.selectionStart)} onClick={(e) => setCaret(e.currentTarget.selectionStart)} />
+              <button type="button" className="icon-btn chat-smile" aria-label="Emojis" aria-pressed={emojis} onClick={() => { setEmojis((v) => !v); setPlusOpen(false) }}><Smile size={19} /></button>
+            </div>
             <button className="btn primary chat-send" onClick={() => void send()} disabled={(!draft.trim() && !att.files.length) || sending || att.uploading > 0} aria-label={editing ? 'Guardar cambios' : 'Enviar'}>{editing ? <Check size={17} /> : <Send size={17} />}</button>
           </div>
-          {emojis && (
-            <div className="chat-emojis" role="listbox" aria-label="Emojis">
-              {PICKER.map((e) => <Fragment key={e}><button type="button" onClick={() => insertEmoji(e)}>{e}</button></Fragment>)}
-            </div>
-          )}
+          {emojis && <div className="chat-emojis"><EmojiPicker onPick={insertEmoji} /></div>}
         </div>
       ) : <p className="callout small chat-ro">{roLabel}</p>}
     </div>
