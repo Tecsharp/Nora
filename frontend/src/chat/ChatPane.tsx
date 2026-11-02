@@ -365,6 +365,13 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
     }
   }
 
+  // el selector de emojis de la caja de escritura se cierra al presionar fuera (o con Esc)
+  useEffect(() => {
+    if (!emojis) return
+    const away = (e: MouseEvent) => { if (!(e.target as Element).closest('.chat-emojis, .chat-smile')) setEmojis(false) }
+    document.addEventListener('mousedown', away)
+    return () => document.removeEventListener('mousedown', away)
+  }, [emojis])
   useEffect(() => {
     if (!plusOpen) return
     const away = (e: MouseEvent) => { if (!(e.target as Element).closest('.chat-plus-wrap')) setPlusOpen(false) }

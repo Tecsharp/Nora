@@ -148,7 +148,7 @@ export function ReactionPicker({ quick, onPick, onClose, dark, className }: { qu
   }, [open])
   useEffect(() => {
     if (!open) return
-    const away = (e: MouseEvent) => { const t = e.target as Element; if (!t.closest('.rx-pop') && !t.closest('.rx-plus')) setOpen(false) }
+    const away = (e: MouseEvent) => { const t = e.target as Element; if (!t.closest('.rx-pop') && !t.closest('.rx-plus')) { setOpen(false); onClose?.() } } // fuera de la ventana: se cierra todo, también la barra de rápidos
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(false) } }
     document.addEventListener('mousedown', away)
     document.addEventListener('keydown', key, true)
