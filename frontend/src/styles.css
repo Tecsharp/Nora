@@ -2335,3 +2335,7 @@ label.qc-check input { width: 16px; height: 16px; flex: none; }
 .chat-reacts { display: grid; grid-template-columns: repeat(5, max-content); gap: 4px; justify-content: start; }
 .chat-msg.mine .chat-reacts { justify-content: end; }
 .cp-react-btn.open { opacity: 1; }
+
+/* Botón de reaccionar en el chat de la llamada: al lado de la burbuja (a la izquierda en las mías, a la derecha en las de las demás), no encima */
+.cp-bubble-wrap .cp-react-btn, .cp-item.mine .cp-bubble-wrap .cp-react-btn { top: 50%; transform: translateY(-50%); right: calc(100% + 6px); left: auto; }
+.cp-item:not(.mine) .cp-bubble-wrap .cp-react-btn { left: calc(100% + 6px); right: auto; }
