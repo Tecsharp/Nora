@@ -138,14 +138,35 @@ async function fail(res: Response): Promise<never> {
   throw new ApiError(res.status, message, fields)
 }
 
-export async function api<T = unknown>(path: string, method = 'GET', body?: unknown): Promise<T> {
-  const res = await raw(path, {
-    method,
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  })
-  if (!res.ok) return fail(res)
-  return res.status === 204 ? (undefined as T) : res.json()
+export interface ApiOptions {
+  /** false = la petición se manda aunque ya haya otra igual en vuelo (p. ej. un ticket de un solo uso). */
+  dedupe?: boolean
+}
+
+/**
+ * Peticiones que cambian algo (crear, borrar, cambiar…) y siguen en vuelo, por método + ruta + cuerpo. Un doble clic, un Enter repetido
+ * o dos botones que disparan lo mismo antes de que la pantalla se actualice reciben la misma respuesta en vez de mandar un duplicado.
+ */
+const inFlight = new Map<string, Promise<unknown>>()
+
+export function api<T = unknown>(path: string, method = 'GET', body?: unknown, opts: ApiOptions = {}): Promise<T> {
+  const json = body !== undefined ? JSON.stringify(body) : undefined
+  const send = async (): Promise<T> => {
+    const res = await raw(path, {
+      method,
+      headers: json !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+      body: json,
+    })
+    if (!res.ok) return fail(res)
+    return res.status === 204 ? (undefined as T) : res.json()
+  }
+  if (method === 'GET' || opts.dedupe === false) return send()
+  const key = `${method} ${path} ${json ?? ''}`
+  const pending = inFlight.get(key)
+  if (pending) return pending as Promise<T>
+  const p = send().finally(() => inFlight.delete(key))
+  inFlight.set(key, p)
+  return p
 }
 
 export async function download(path: string, filename: string) {

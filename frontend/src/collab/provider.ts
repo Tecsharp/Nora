@@ -308,7 +308,7 @@ export class CollabProvider {
   // ---- siembra del contenido inicial ----
   /** Devuelve el contenido inicial si este cliente es el elegido para escribirlo en el documento. */
   async claimSeed(): Promise<string | null> {
-    const r = await api<{ granted: boolean; content: string | null }>(`/rooms/${this.code}/docs/${this.docId}/seed/claim`, 'POST')
+    const r = await api<{ granted: boolean; content: string | null }>(`/rooms/${this.code}/docs/${this.docId}/seed/claim`, 'POST', undefined, { dedupe: false })
     return r.granted ? r.content : null
   }
 

@@ -12,6 +12,7 @@ import { canWrite as canWriteIn, isStaff as isStaffIn } from '../roles'
 import { aiNow, useAi } from '../ai/AiProvider'
 import { fmtDate } from '../dates'
 import { useItems, type Item } from './useItems'
+import { useBusy } from '../useBusy'
 
 type Status = 'todo' | 'doing' | 'review' | 'done'
 type Priority = 'low' | 'medium' | 'high'
@@ -225,15 +226,16 @@ export default function TasksTool({ room, focus }: { room: Room; focus?: FocusTa
 
 function QuickAdd({ onAdd, onCancel }: { onAdd: (title: string) => Promise<void>; onCancel: () => void }) {
   const [v, setV] = useState('')
-  const [busy, setBusy] = useState(false)
+  const { run, busy: isBusy } = useBusy()
+  const busy = isBusy()
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     const title = v.trim()
-    if (!title || busy) return
-    setBusy(true)
-    await onAdd(title)
-    setV('')
-    setBusy(false)
+    if (!title) return
+    await run('add', async () => {
+      await onAdd(title)
+      setV('')
+    })
   }
   return (
     <form className="kb-quick" onSubmit={submit}>
@@ -434,22 +436,21 @@ function AiTasksDialog({ room, onClose, onCreate }: { room: Room; onClose: () =>
     }
   }
   const person = (name: string | null) => (name ? room.participants.find((p) => p.displayName.toLowerCase() === name.toLowerCase() || p.displayName.toLowerCase().split(' ')[0] === name.toLowerCase())?.userId ?? null : null)
-  const add = async () => {
+  const adding = useBusy()
+  const add = () => adding.run('add', async () => {
     const chosen = (list ?? []).filter((t) => t.on)
-    setBusy(true)
     try {
       await onCreate(chosen.map((t) => ({ title: t.title, description: t.description, status: 'todo' as const, priority: t.priority, assignee: person(t.assignee), due: t.due, labels: [], checklist: [] })))
       onClose()
     } catch (e) {
       toast(e instanceof Error ? e.message : 'No se pudieron crear', 'error')
-      setBusy(false)
     }
-  }
+  })
 
   return (
     <Modal title="Crear tareas con IA" icon={<Sparkles size={20} />} onClose={onClose} wide
       footer={list
-        ? <><button className="btn ghost" onClick={() => setList(null)}>Volver</button><span className="grow" /><button className="btn primary" disabled={busy || !list.some((t) => t.on)} onClick={() => void add()}>Añadir {list.filter((t) => t.on).length} tareas</button></>
+        ? <><button className="btn ghost" onClick={() => setList(null)}>Volver</button><span className="grow" /><button className="btn primary" disabled={busy || adding.busy() || !list.some((t) => t.on)} onClick={() => void add()}>Añadir {list.filter((t) => t.on).length} tareas</button></>
         : <><span className="grow" /><button className="btn ghost" onClick={onClose}>Cancelar</button><button className="btn ai" disabled={busy || text.trim().length < 5} onClick={() => void run()}><Sparkles size={15} /> {busy ? 'Analizando…' : 'Extraer tareas'}</button></>}>
       {!list ? (
         <div className="stack">

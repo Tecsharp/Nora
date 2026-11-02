@@ -24,6 +24,7 @@ import Modal from './Modal'
 import Tabs from './Tabs'
 import ProgressBar from './ProgressBar'
 import { fmtDateTime } from '../dates'
+import { useBusy } from '../useBusy'
 
 interface FileItem {
   id: string
@@ -105,6 +106,7 @@ export default function FilesTool({ room, onEditDoc, focus }: { room: Room; onEd
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<Sort>('name')
   const [creating, setCreating] = useState(false)
+  const { run, busy } = useBusy()
   const [folderName, setFolderName] = useState('')
   const [renaming, setRenaming] = useState<{ kind: 'file' | 'folder'; id: string; name: string } | null>(null)
   const [moving, setMoving] = useState<FileItem | null>(null)
@@ -311,15 +313,17 @@ export default function FilesTool({ room, onEditDoc, focus }: { room: Room; onEd
 
   async function createFolder(e: FormEvent) {
     e.preventDefault()
-    setError('')
-    try {
-      const f = await api<FolderItem>(`/rooms/${room.code}/folders?kind=FILE`, 'POST', { name: folderName, parentId: current })
-      setFolders((all) => (all.some((x) => x.id === f.id) ? all : [...all, f]))
-      setCreating(false)
-      setFolderName('')
-    } catch (err) {
-      fail(err)
-    }
+    await run('folder', async () => {
+      setError('')
+      try {
+        const f = await api<FolderItem>(`/rooms/${room.code}/folders?kind=FILE`, 'POST', { name: folderName, parentId: current })
+        setFolders((all) => (all.some((x) => x.id === f.id) ? all : [...all, f]))
+        setCreating(false)
+        setFolderName('')
+      } catch (err) {
+        fail(err)
+      }
+    })
   }
 
   async function rename(e: FormEvent) {
@@ -659,7 +663,7 @@ export default function FilesTool({ room, onEditDoc, focus }: { room: Room; onEd
       {creating && (
         <form className="inline-form" onSubmit={createFolder}>
           <input autoFocus required maxLength={60} placeholder="Nombre de la carpeta" aria-label="Nombre de la carpeta" value={folderName} onChange={(e) => setFolderName(e.target.value)} />
-          <button className="btn primary sm" disabled={!folderName.trim()}>Crear</button>
+          <button className="btn primary sm" disabled={!folderName.trim() || busy('folder')}>Crear</button>
           <button type="button" className="btn ghost sm" onClick={() => setCreating(false)}>Cancelar</button>
         </form>
       )}
