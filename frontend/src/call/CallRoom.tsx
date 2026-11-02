@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Captions, Check, Hand, Info, LayoutGrid, MessageSquare, Mic, MicOff, Minimize, Maximize, MonitorUp, MonitorOff, MoreVertical, PanelRight, PhoneOff, PictureInPicture2, Settings, Smile, Users, Video, VideoOff, X } from 'lucide-react'
 import type { User } from '../api'
 import { useRealtime } from '../realtime'
-import { REACTIONS, callUrl, type Part } from './api'
+import { callUrl, type Part } from './api'
+import { EMOJI_GROUPS, useFrequentEmojis } from './emoji'
+import { callSounds } from './sounds'
 import { captionsSupported, type CallApi } from './useCall'
 import type { LocalMedia } from './useLocalMedia'
 import { useSpeaking } from './useSpeaking'
@@ -11,7 +13,7 @@ import { ChatPanel, InfoPanel, PeoplePanel } from './Panels'
 
 type Panel = 'info' | 'people' | 'chat' | null
 type Layout = 'auto' | 'tiles' | 'spotlight' | 'sidebar'
-type Menu = 'react' | 'more' | 'leave' | 'settings' | null
+type Menu = 'react' | 'more' | 'settings' | null
 
 const LAYOUTS: { id: Layout; label: string; hint: string }[] = [
   { id: 'auto', label: 'Automático', hint: 'Se adapta a lo que pasa' },
@@ -41,6 +43,8 @@ export default function CallRoom({ call, media, user, roomCode }: { call: CallAp
   const [unread, setUnread] = useState(0)
   const [full, setFull] = useState(!!document.fullscreenElement)
   const [activeConn, setActiveConn] = useState<string | null>(null)
+  const [emojiGroup, setEmojiGroup] = useState(EMOJI_GROUPS[0]!.id)
+  const freq = useFrequentEmojis()
   const root = useRef<HTMLDivElement>(null)
 
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t) }, [])
@@ -53,6 +57,23 @@ export default function CallRoom({ call, media, user, roomCode }: { call: CallAp
   useRealtime('chat.message', (d: { conv: string; message: { authorId: string | null; kind: string } }) => {
     if (state?.conversationId && d.conv === state.conversationId && panel !== 'chat' && d.message.authorId !== user.id && d.message.kind !== 'SYSTEM') setUnread((n) => n + 1)
   })
+
+  // sonidos: alguien entra, alguien sale, alguien levanta la mano (lo propio no suena)
+  const seen = useRef<{ conns: Set<string>; hands: Set<string> } | null>(null)
+  useEffect(() => {
+    if (!state) return
+    const conns = new Set(state.parts.map((p) => p.conn))
+    const hands = new Set(state.parts.filter((p) => p.hand).map((p) => p.conn))
+    const prev = seen.current
+    seen.current = { conns, hands }
+    if (!prev) return // la primera foto de la llamada: no suena nadie
+    const joined = [...conns].some((c) => !prev.conns.has(c) && c !== me)
+    const left = [...prev.conns].some((c) => !conns.has(c) && c !== me)
+    const raised = [...hands].some((c) => !prev.hands.has(c) && c !== me)
+    if (joined) callSounds.join()
+    else if (left) callSounds.leave()
+    if (raised) setTimeout(() => callSounds.hand(), joined || left ? 450 : 0)
+  }, [state, me])
 
   // atajos como los de Meet: Ctrl+D micrófono, Ctrl+E cámara
   useEffect(() => {
@@ -127,7 +148,7 @@ export default function CallRoom({ call, media, user, roomCode }: { call: CallAp
     setMenu(null)
   }
 
-  const toggle = (p: Exclude<Panel, null>) => setPanel((cur) => (cur === p ? null : p))
+  const toggle = (p: Exclude<Panel, null>) => { setMenu(null); setPanel((cur) => (cur === p ? null : p)) }
   const lobby = state?.lobby ?? []
   const hands = parts.filter((p) => p.hand).length
 
@@ -202,8 +223,16 @@ export default function CallRoom({ call, media, user, roomCode }: { call: CallAp
           <div className="cmenu-wrap">
             <button className={`cbtn ${menu === 'react' ? 'on' : ''}`} onClick={() => setMenu(menu === 'react' ? null : 'react')} aria-label="Reacciones" title="Enviar una reacción"><Smile size={20} /></button>
             {menu === 'react' && (
-              <div className="cmenu react" role="menu">
-                {REACTIONS.map((e) => <button key={e} role="menuitem" onClick={() => { call.react(e); setMenu(null) }}>{e}</button>)}
+              <div className="cmenu react" role="menu" aria-label="Reacciones">
+                <div className="emo-top">
+                  {freq.top.map((e) => <button key={e} role="menuitem" aria-label={`Reaccionar con ${e}`} onClick={() => { call.react(e); freq.bump(e) }}>{e}</button>)}
+                </div>
+                <div className="emo-tabs" role="tablist" aria-label="Categorías de emojis">
+                  {EMOJI_GROUPS.map((g) => <button key={g.id} role="tab" aria-selected={emojiGroup === g.id} className={emojiGroup === g.id ? 'on' : ''} title={g.label} onClick={() => setEmojiGroup(g.id)}>{g.list[0]}</button>)}
+                </div>
+                <div className="emo-grid" role="group" aria-label={EMOJI_GROUPS.find((g) => g.id === emojiGroup)?.label}>
+                  {EMOJI_GROUPS.find((g) => g.id === emojiGroup)?.list.map((e) => <button key={e} role="menuitem" aria-label={`Reaccionar con ${e}`} onClick={() => { call.react(e); freq.bump(e) }}>{e}</button>)}
+                </div>
               </div>
             )}
           </div>
@@ -265,15 +294,7 @@ export default function CallRoom({ call, media, user, roomCode }: { call: CallAp
               </div>
             )}
           </div>
-          <div className="cmenu-wrap">
-            <button className="cbtn hang" onClick={() => (isHost && parts.length > 1 ? setMenu(menu === 'leave' ? null : 'leave') : call.leave())} aria-label="Salir de la llamada" title="Salir de la llamada"><PhoneOff size={20} /></button>
-            {menu === 'leave' && (
-              <div className="cmenu leave" role="menu">
-                <button role="menuitem" onClick={() => call.leave()}>Salir de la llamada</button>
-                <button role="menuitem" className="bad" onClick={() => call.host('end')}>Terminar para todos</button>
-              </div>
-            )}
-          </div>
+          <button className="cbtn hang" onClick={() => call.leave()} aria-label="Salir de la llamada" title="Salir de la llamada"><PhoneOff size={20} /></button>
         </div>
 
         <div className="call-bar-r">

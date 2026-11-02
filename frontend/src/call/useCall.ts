@@ -234,7 +234,7 @@ export function useCall(code: string, media: LocalMedia) {
   useRealtime('call.reaction', (d) => {
     if (!mine(d)) return
     const id = ++reactionId.current
-    setReactions((l) => [...l.slice(-12), { id, name: d.name, emoji: d.emoji, left: 8 + Math.random() * 80 }])
+    setReactions((l) => [...l.slice(-12), { id, name: d.name, emoji: d.emoji, left: 3 + Math.random() * 12 }])
     setTimeout(() => setReactions((l) => l.filter((x) => x.id !== id)), 3600)
   })
   useRealtime('call.caption', (d) => { if (mine(d)) setCaptions((c) => ({ ...c, [d.from]: { name: d.name, text: d.text, final: !!d.final, at: Date.now() } })) })

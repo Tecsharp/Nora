@@ -56,7 +56,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class CallService {
 
     private static final String CODE_ALPHABET = "abcdefghjkmnpqrstuvwxyz";
-    private static final Set<String> REACTIONS = Set.of("👍", "👏", "❤️", "🎉", "😂", "😮", "😢", "🤔", "🔥", "🙏");
+    /** Cualquier emoji sirve como reacción (la ventana de reacciones los ofrece todos): sin letras, números, espacios ni signos de marcado. */
+    private static boolean isEmoji(String s) {
+        if (s == null || s.isEmpty() || s.length() > 24) return false;
+        return s.codePoints().noneMatch(cp -> Character.isLetterOrDigit(cp) || Character.isWhitespace(cp) || Character.isISOControl(cp) || cp == '<' || cp == '>' || cp == '&' || cp == '"' || cp == '\'');
+    }
     private static final int MAX_OPEN_PER_ROOM = 5;
 
     /** Una persona (pestaña) dentro de la llamada. */
@@ -110,7 +114,7 @@ public class CallService {
     private volatile AssistService.Hub hub;
 
     public CallService(CallRepository calls, @Lazy RoomService rooms, @Lazy ChatService chat, NotificationService notifications, ApplicationEventPublisher events,
-                       @Value("${NORA_CALL_MAX_PARTICIPANTS:8}") int maxParticipants, @Value("${NORA_CALL_EMPTY_MINUTES:5}") int emptyMinutes) {
+                       @Value("${NORA_CALL_MAX_PARTICIPANTS:8}") int maxParticipants, @Value("${NORA_CALL_EMPTY_MINUTES:10}") int emptyMinutes) {
         this.calls = calls;
         this.rooms = rooms;
         this.chat = chat;
@@ -335,7 +339,7 @@ public class CallService {
         Live l = live.get(code);
         Part p = l == null ? null : find(l, from.id());
         String emoji = msg.path("emoji").asText("");
-        if (p == null || !REACTIONS.contains(emoji)) return;
+        if (p == null || !isEmoji(emoji)) return;
         sendAll(l, "call.reaction", Map.of("code", code, "from", from.id(), "name", p.name, "emoji", emoji));
     }
 

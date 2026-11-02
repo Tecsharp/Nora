@@ -2145,6 +2145,78 @@ label.qc-check input { width: 16px; height: 16px; flex: none; }
 .qc-avail { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .qc[hidden] { display: none; }
 
+/* ───────── Panel lateral de la llamada: negro, a juego con el tema de Nora ───────── */
+.call-panel { background: #0c0c0e; color: #ececf0; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 18px 40px rgba(0, 0, 0, 0.5); }
+.call-panel > header { padding: 16px 14px 10px 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
+.call-panel > header h2 { font-weight: 650; letter-spacing: -0.01em; }
+.call-panel > header button { color: #a5a5b0; }
+.call-panel > header button:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.cp-sec h3 { color: #8f8f9c; }
+.cp-muted, .cp-name small, .cp-empty { color: #9a9aa6; }
+.cp-empty h3 { color: #f3f3f6; }
+.cp-ico { color: #9a9aa6; } .cp-ico.dim { color: #f28b82; } .cp-ico.hand { color: #fdd663; }
+.cp-mini { border-color: rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.05); color: var(--accent-text, #b9aefc); }
+.cp-mini:hover { background: rgba(255, 255, 255, 0.1); }
+.cp-mini.ok { background: var(--accent, #7c6af7); border-color: var(--accent, #7c6af7); color: #fff; }
+.cp-mini.bad { color: #f28b82; }
+.cp-wide { border-color: rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.05); color: var(--accent-text, #b9aefc); }
+.cp-wide:hover { background: rgba(255, 255, 255, 0.1); }
+.cp-wide.ok { background: var(--accent, #7c6af7); border-color: var(--accent, #7c6af7); color: #fff; }
+.cp-wide.bad { color: #f28b82; }
+.cp-code { background: rgba(255, 255, 255, 0.06); }
+.cp-seg { background: rgba(255, 255, 255, 0.07); }
+.cp-seg button { color: #a5a5b0; }
+.cp-seg button.on { background: var(--accent, #7c6af7); color: #fff; box-shadow: none; }
+.cp-chat { background: #0c0c0e; }
+.cp-msgs { padding: 12px 14px; gap: 10px; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.18) transparent; }
+.cp-msg { position: relative; max-width: 88%; padding: 8px 12px 6px; border-radius: 16px 16px 16px 5px; background: #1a1a1f; color: #f1f1f4; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05); }
+.cp-msg strong { color: var(--accent-text, #b9aefc); font-weight: 650; }
+.cp-msg time { color: #8d8d99; }
+.cp-msg.mine { background: var(--accent, #7c6af7); color: #fff; border-radius: 16px 16px 5px 16px; box-shadow: none; }
+.cp-msg.mine time { color: rgba(255, 255, 255, 0.72); }
+.cp-msg > span { white-space: pre-wrap; }
+.cp-sys { background: rgba(255, 255, 255, 0.06); color: #9a9aa6; }
+.cp-compose { border-top: 1px solid rgba(255, 255, 255, 0.07); padding: 10px 12px 12px; align-items: center; }
+.cp-compose input[type='text'], .cp-compose input:not([type]) { background: #17171b; color: #f1f1f4; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07); }
+.cp-compose input::placeholder { color: #7f7f8b; }
+.cp-compose input:focus { outline: 0; box-shadow: inset 0 0 0 1.5px var(--accent, #7c6af7); }
+.cp-compose button { background: var(--accent, #7c6af7); }
+.cp-compose button:disabled { background: #2a2a31; color: #6d6d78; }
+.cp-compose .cp-clip { background: transparent; color: #a5a5b0; width: 36px; height: 36px; }
+.cp-compose .cp-clip:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.cp-react-btn { position: absolute; top: -12px; right: 6px; opacity: 0; transition: opacity 0.12s; display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: #26262c; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
+.cp-msg.mine .cp-react-btn { right: auto; left: 6px; }
+.cp-msg:hover .cp-react-btn, .cp-msg:focus-within .cp-react-btn, .cp-react-btn.open { opacity: 1; }
+.cp-react-btn button { width: 26px; height: 26px; border: 0; border-radius: 50%; background: none; color: inherit; font-size: 0.95rem; cursor: pointer; display: grid; place-items: center; padding: 0; }
+.cp-react-btn button:hover { background: rgba(255, 255, 255, 0.12); }
+.cp-reacts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+.cp-react { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 999px; border: 0; background: rgba(255, 255, 255, 0.1); color: inherit; font-size: 0.8rem; cursor: pointer; }
+.cp-react.on { background: color-mix(in oklab, var(--accent, #7c6af7) 45%, transparent); box-shadow: inset 0 0 0 1px var(--accent, #7c6af7); }
+.cp-react span { font-size: 0.7rem; font-weight: 700; }
+.cp-msg .chat-meta-box { margin-top: 2px; }
+.cp-msg .chat-file, .cp-msg .chat-call { background: rgba(255, 255, 255, 0.08); color: inherit; }
+.cp-picker { position: absolute; z-index: 5; top: 16px; right: 0; display: flex; flex-wrap: wrap; width: 214px; gap: 2px; padding: 6px; border-radius: 14px; background: #26262c; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
+.cp-msg.mine .cp-picker { right: auto; left: 0; }
+.cp-picker button { width: 32px; height: 32px; border: 0; border-radius: 8px; background: none; font-size: 1.1rem; cursor: pointer; padding: 0; }
+.cp-picker button:hover { background: rgba(255, 255, 255, 0.12); }
+
+/* Ventana de reacciones: se queda abierta, con los más usados a mano y todos los emojis por categorías */
+.cmenu.react { flex-direction: column; width: 336px; max-width: calc(100vw - 24px); padding: 10px; gap: 8px; background: #17171b; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
+.cmenu.react button { width: auto; height: auto; padding: 0; }
+.emo-top { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.emo-top button { height: 48px !important; font-size: 1.7rem; justify-content: center; border-radius: 12px !important; background: rgba(255, 255, 255, 0.05) !important; }
+.emo-top button:hover { background: rgba(255, 255, 255, 0.14) !important; transform: scale(1.06); }
+.emo-tabs { display: flex; gap: 2px; padding-top: 6px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.emo-tabs button { flex: 1; height: 34px !important; justify-content: center; font-size: 1.15rem; border-radius: 8px !important; opacity: 0.6; }
+.emo-tabs button.on { opacity: 1; background: rgba(255, 255, 255, 0.12) !important; box-shadow: inset 0 -2px 0 var(--accent, #7c6af7); }
+.emo-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; max-height: 188px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.2) transparent; }
+.emo-grid button { height: 38px !important; font-size: 1.35rem; justify-content: center; border-radius: 8px !important; }
+.emo-grid button:hover { background: rgba(255, 255, 255, 0.14) !important; }
+@media (max-width: 760px) { .cmenu.react { right: -20px; left: auto; } }
+
+/* Las reacciones salen por el lado izquierdo de la pantalla */
+.call-react { align-items: flex-start; }
+
 /* Adjuntos y llamadas en el chat */
 .chat-attach { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 2px 6px; }
 .chat-achip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 4px 6px 4px 9px; border-radius: 999px; background: var(--surface-2, #1c1c20); color: var(--text, #eee); font-size: 0.78rem; box-shadow: inset 0 0 0 1px var(--hairline, rgba(255, 255, 255, 0.08)); }
