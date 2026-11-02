@@ -1998,7 +1998,13 @@ body:has(.room-shell) .topbar-in { max-width: none; }
 @media (max-width: 640px) { .av-head, .av-row { grid-template-columns: 64px minmax(0, 1fr); } .av-who b { display: none; } }
 
 /* ───────── Barra lateral: conversaciones arriba, cuatro herramientas abajo ───────── */
-.ws-chats { padding-top: 6px; }
+.ws-chats { padding-top: 6px; flex: 0 1 auto; max-height: 45%; min-height: 72px; padding-bottom: 6px; }
+.ws-chats.sized { max-height: none; }
+/* barra encima de Resumen y Personas: arrastrar para agrandar la lista de conversaciones; el espacio libre queda abajo, sin hueco entre secciones */
+.ws-resize { flex: none; position: relative; height: 9px; margin: 0; border-top: 1px solid var(--hairline); cursor: row-resize; touch-action: none; display: grid; place-items: center; outline: none; }
+.ws-resize i { width: 36px; height: 4px; border-radius: 4px; background: var(--border-strong); opacity: 0.6; transition: opacity 0.12s, background 0.12s; }
+.ws-resize:hover i, .ws-resize:focus-visible i, .ws-resize:active i { opacity: 1; background: var(--accent); }
+.ws-foot { margin-top: auto; }
 .ws-chats-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 2px 2px 2px 4px; }
 .ws-chats-title { display: inline-flex; align-items: center; gap: 8px; padding: 6px 8px; border: 0; border-radius: 8px; background: none; color: var(--text); font: inherit; font-size: 0.9rem; font-weight: 650; cursor: pointer; }
 .ws-chats-title:hover, .ws-chats-title.on { background: var(--surface-2); }
@@ -2015,7 +2021,7 @@ body:has(.room-shell) .topbar-in { max-width: none; }
 .ws-more:hover { color: var(--text); background: var(--surface-2); }
 .ws-empty { margin: 14px 10px; color: var(--subtle); font-size: 0.82rem; line-height: 1.45; }
 .ws-empty button { border: 0; background: none; color: var(--accent-text); font: inherit; cursor: pointer; padding: 0; text-decoration: underline; }
-.ws-tools { flex: none; padding: 8px 8px 8px; border-top: 1px solid var(--hairline); display: flex; flex-direction: column; gap: 6px; }
+.ws-tools { flex: none; padding: 4px 8px 8px; display: flex; flex-direction: column; gap: 6px; }
 .ws-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .ws-mini { display: flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 8px; border: 0; border-radius: 8px; background: var(--surface-2); color: var(--muted); font: inherit; font-size: 0.8rem; cursor: pointer; white-space: nowrap; }
 .ws-mini:hover { color: var(--text); background: var(--surface-3); }
