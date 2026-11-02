@@ -34,7 +34,7 @@ public class AdminController {
     public record CreateUserRequest(
             @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Email @jakarta.validation.constraints.Size(max = 254) String email,
             @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(min = 2, max = 60) String displayName,
-            @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 72) String password,
+            @jakarta.validation.constraints.Size(max = 72) String password,
             Role role) {}
 
     public record ProfileRequest(@jakarta.validation.constraints.Size(max = 60) String displayName, @jakarta.validation.constraints.Size(max = 254) String email) {}
@@ -46,8 +46,10 @@ public class AdminController {
     private final ApplicationEventPublisher events;
     private final AuthService auth;
     private final AccountService accounts;
+    private final com.nora.config.SettingsService settings;
 
-    public AdminController(UserRepository users, FileService files, ApplicationEventPublisher events, AuthService auth, AccountService accounts) {
+    public AdminController(UserRepository users, FileService files, ApplicationEventPublisher events, AuthService auth, AccountService accounts, com.nora.config.SettingsService settings) {
+        this.settings = settings;
         this.users = users;
         this.files = files;
         this.events = events;
@@ -59,8 +61,10 @@ public class AdminController {
     @PostMapping
     @org.springframework.web.bind.annotation.ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     public AdminUserView create(@Valid @RequestBody CreateUserRequest req) {
-        AuthService.checkPassword(req.password());
-        User u = auth.createUser(req.email(), req.displayName(), req.password(), req.role() == null ? Role.USER : req.role());
+        boolean blank = req.password() == null || req.password().isBlank();
+        // con acceso solo por Google la cuenta se crea sin contraseña: la persona entra con el correo que se indique aquí
+        if (!blank || settings.passwordLogin()) AuthService.checkPassword(req.password());
+        User u = auth.createUser(req.email(), req.displayName(), blank ? null : req.password(), req.role() == null ? Role.USER : req.role());
         return new AdminUserView(UserDto.of(u), 0);
     }
 

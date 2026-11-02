@@ -1,5 +1,6 @@
 package com.nora.config;
 
+import com.nora.common.ApiException;
 import java.util.HashMap;
 import java.util.Map;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -34,6 +35,41 @@ public class SettingsService {
         return v != null ? v.equals("true") : props.allowRegistration();
     }
 
+    /** Cómo se puede entrar. */
+    public enum AuthMode {
+        PASSWORD, GOOGLE, BOTH;
+
+        static AuthMode parse(String v, AuthMode fallback) {
+            if (v == null) return fallback;
+            return switch (v.trim().toLowerCase(java.util.Locale.ROOT)) {
+                case "password" -> PASSWORD;
+                case "google" -> GOOGLE;
+                case "both" -> BOTH;
+                default -> fallback;
+            };
+        }
+    }
+
+    public boolean googleConfigured() {
+        return props.google() != null && props.google().configured();
+    }
+
+    /** Lo que eligió el administrador (o el .env), sin tener en cuenta si Google está configurado. */
+    public AuthMode authModeSetting() {
+        AuthMode env = AuthMode.parse(props.authMode(), AuthMode.PASSWORD);
+        return AuthMode.parse(get("authMode"), env);
+    }
+
+    /** Lo que de verdad rige: sin Google configurado solo hay contraseña, para no dejar a nadie fuera. */
+    public AuthMode authMode() {
+        AuthMode m = authModeSetting();
+        return googleConfigured() ? m : AuthMode.PASSWORD;
+    }
+
+    public boolean passwordLogin() { return authMode() != AuthMode.GOOGLE; }
+
+    public boolean googleLogin() { return authMode() != AuthMode.PASSWORD; }
+
     private long num(String key, long fallback) {
         try {
             String v = get(key);
@@ -54,6 +90,8 @@ public class SettingsService {
         var d = defaults();
         Map<String, Object> m = new HashMap<>();
         m.put("registrationEnabled", registrationEnabled());
+        m.put("authMode", authModeSetting().name().toLowerCase(java.util.Locale.ROOT));
+        m.put("googleConfigured", googleConfigured());
         m.put("storageQuotaMb", d.storageQuotaMb());
         m.put("maxFileMb", d.maxFileMb());
         m.put("maxRoomMinutes", d.maxRoomMinutes());
@@ -62,10 +100,16 @@ public class SettingsService {
         return m;
     }
 
-    public record Update(Boolean registrationEnabled, Long storageQuotaMb, Long maxFileMb, Integer maxRoomMinutes, Integer maxActiveRooms, Integer maxParticipants) {}
+    public record Update(Boolean registrationEnabled, String authMode, Long storageQuotaMb, Long maxFileMb, Integer maxRoomMinutes, Integer maxActiveRooms, Integer maxParticipants) {}
 
     public Map<String, Object> update(Update u) {
         if (u.registrationEnabled() != null) put("registration", String.valueOf(u.registrationEnabled()));
+        if (u.authMode() != null) {
+            AuthMode m = AuthMode.parse(u.authMode(), null);
+            if (m == null) throw ApiException.badRequest("Modo de acceso no válido");
+            if (m != AuthMode.PASSWORD && !googleConfigured()) throw ApiException.badRequest("Google no está configurado: define NORA_GOOGLE_CLIENT_ID y NORA_GOOGLE_CLIENT_SECRET en .env");
+            put("authMode", m.name().toLowerCase(java.util.Locale.ROOT));
+        }
         if (u.storageQuotaMb() != null) put("storageQuotaMb", String.valueOf(Math.max(1, u.storageQuotaMb())));
         if (u.maxFileMb() != null) put("maxFileMb", String.valueOf(Math.max(1, u.maxFileMb())));
         if (u.maxRoomMinutes() != null) put("maxRoomMinutes", String.valueOf(Math.max(1, u.maxRoomMinutes())));

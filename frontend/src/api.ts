@@ -19,6 +19,9 @@ export interface User {
   /** 0 = sin foto; sube con cada cambio de foto (sirve para refrescarla). */
   avatarVersion: number
   lastLoginAt: string | null
+  /** false = la cuenta entra con Google y aún no eligió contraseña. */
+  hasPassword: boolean
+  googleLinked: boolean
 }
 
 export interface Participant {

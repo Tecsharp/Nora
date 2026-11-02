@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Activity, ChevronLeft, ChevronRight, Copy, Cog, HardDrive, KeyRound, Library, LogOut, Plus, RefreshCw, Search, Shield, Trash2, Users } from 'lucide-react'
 import { api, ApiError, formatBytes, type Limits, type User } from '../api'
 import { useAuth } from '../auth'
+import { useAuthConfig } from '../authConfig'
 import Avatar from '../components/Avatar'
 import Modal from '../components/Modal'
 import BackButton from '../components/BackButton'
@@ -108,6 +109,7 @@ function LimitField({ label, value, onChange, unit, min = 0 }: { label: string; 
 function UserEditor({ row, self, onSaved, onDeleted, onClose }: { row: Row; self: boolean; onSaved: (r: Row) => void; onDeleted: (id: string) => void; onClose: () => void }) {
   const toast = useToast()
   const dialogs = useDialogs()
+  const authCfg = useAuthConfig()
   const [role, setRole] = useState(row.user.role)
   const [enabled, setEnabled] = useState(row.user.enabled)
   const [storageMb, setStorageMb] = useState<number | null>(toMb(row.user.limits.storageQuotaBytes))
@@ -215,7 +217,7 @@ function UserEditor({ row, self, onSaved, onDeleted, onClose }: { row: Row; self
       </div>
       {self && <p className="muted small">No puedes cambiar tu propio rol ni desactivarte.</p>}
       <div className="admin-actions">
-        <button className="btn sm" onClick={() => void resetLink()}><KeyRound size={15} /> Enlace para cambiar la contraseña</button>
+        {authCfg?.passwordLogin !== false && <button className="btn sm" onClick={() => void resetLink()}><KeyRound size={15} /> Enlace para cambiar la contraseña</button>}
         {!self && <button className="btn sm" onClick={() => void revoke()}><LogOut size={15} /> Cerrar sus sesiones</button>}
         {!self && <button className="btn sm danger" onClick={() => void remove()}><Trash2 size={15} /> Borrar cuenta</button>}
       </div>
@@ -231,6 +233,8 @@ function UserEditor({ row, self, onSaved, onDeleted, onClose }: { row: Row; self
 }
 
 function NewUser({ onClose, onCreated }: { onClose: () => void; onCreated: (r: Row) => void }) {
+  const authCfg = useAuthConfig()
+  const passwordLogin = authCfg?.passwordLogin !== false
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [pw, setPw] = useState('')
@@ -242,7 +246,7 @@ function NewUser({ onClose, onCreated }: { onClose: () => void; onCreated: (r: R
     setBusy(true)
     setError('')
     try {
-      onCreated(await api<Row>('/admin/users', 'POST', { email, displayName: name, password: pw, role }))
+      onCreated(await api<Row>('/admin/users', 'POST', { email, displayName: name, password: passwordLogin ? pw : undefined, role }))
       onClose()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo crear')
@@ -255,8 +259,10 @@ function NewUser({ onClose, onCreated }: { onClose: () => void; onCreated: (r: R
       <form className="stack" onSubmit={submit}>
         <label>Nombre<input required minLength={2} maxLength={60} value={name} onChange={(e) => setName(e.target.value)} /></label>
         <label>Correo<input required type="email" maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} /></label>
-        <label>Contraseña inicial<input required type="text" autoComplete="off" minLength={10} maxLength={72} value={pw} onChange={(e) => setPw(e.target.value)} />
-          <span className="muted small">La persona puede cambiarla en Ajustes. Mínimo 10 caracteres con mayúscula, minúscula y número.</span></label>
+        {passwordLogin
+          ? <label>Contraseña inicial<input required type="text" autoComplete="off" minLength={10} maxLength={72} value={pw} onChange={(e) => setPw(e.target.value)} />
+              <span className="muted small">La persona puede cambiarla en Ajustes. Mínimo 10 caracteres con mayúscula, minúscula y número.</span></label>
+          : <p className="muted small">Esta cuenta entrará con Google usando el correo que indiques.</p>}
         <label>Rol<select value={role} onChange={(e) => setRole(e.target.value as 'USER' | 'ADMIN')}><option value="USER">Usuario</option><option value="ADMIN">Administrador</option></select></label>
         {error && <p className="error small" role="alert">{error}</p>}
         <div className="row" style={{ justifyContent: 'flex-end' }}><button type="button" className="btn ghost" onClick={onClose}>Cancelar</button><button className="btn primary" disabled={busy}>{busy ? 'Creando…' : 'Crear usuario'}</button></div>
@@ -286,9 +292,9 @@ function Overview() {
 
 function SystemSettings() {
   const toast = useToast()
-  const [cfg, setCfg] = useState<Record<string, number | boolean> | null>(null)
+  const [cfg, setCfg] = useState<Record<string, number | boolean | string> | null>(null)
   const [busy, setBusy] = useState(false)
-  useEffect(() => void api<Record<string, number | boolean>>('/admin/settings').then(setCfg).catch(() => undefined), [])
+  useEffect(() => void api<Record<string, number | boolean | string>>('/admin/settings').then(setCfg).catch(() => undefined), [])
   if (!cfg) return <p className="muted">Cargando…</p>
   const num = (k: string, label: string, unit: string, min = 0) => (
     <label key={k}>{label} <span className="muted small">({unit})</span>
@@ -307,6 +313,21 @@ function SystemSettings() {
   }
   return (
     <section className="card stack">
+      <h3>Cómo se entra</h3>
+      <div className="stack tight" role="radiogroup" aria-label="Cómo se entra">
+        {([
+          ['password', 'Solo con correo y contraseña', false],
+          ['google', 'Solo con Google', true],
+          ['both', 'Con Google o con correo y contraseña', true],
+        ] as const).map(([v, label, needsGoogle]) => (
+          <label key={v} className="check">
+            <input type="radio" name="authMode" checked={cfg.authMode === v} disabled={needsGoogle && !cfg.googleConfigured} onChange={() => setCfg({ ...cfg, authMode: v })} /> {label}
+          </label>
+        ))}
+      </div>
+      {cfg.googleConfigured
+        ? <p className="muted small">Con Google, quien ya tenía cuenta con su correo entra con ella sin más, y quien no la tenía la crea al entrar (si el registro está abierto). Antes de dejar «Solo con Google» entra tú una vez con Google usando «Con Google o con correo y contraseña», para no quedarte fuera.</p>
+        : <p className="muted small">Google no está configurado. Pon <code>NORA_GOOGLE_CLIENT_ID</code> y <code>NORA_GOOGLE_CLIENT_SECRET</code> en el <code>.env</code> (credenciales OAuth de Google Cloud, con la redirección autorizada <code>{window.location.origin}/api/auth/google/callback</code>) y ejecuta <code>docker compose up -d</code>.</p>}
       <h3>Registro</h3>
       <label className="check"><input type="checkbox" checked={!!cfg.registrationEnabled} onChange={(e) => setCfg({ ...cfg, registrationEnabled: e.target.checked })} /> Permitir que cualquiera cree una cuenta (si no, solo las crea un administrador)</label>
       <h3>Límites de las cuentas nuevas</h3>

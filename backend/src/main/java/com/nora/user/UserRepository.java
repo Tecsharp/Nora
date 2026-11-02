@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByEmail(String email);
     boolean existsByEmail(String email);
+    Optional<User> findByGoogleSub(String googleSub);
     long countByRole(Role role);
 
     @org.springframework.data.jpa.repository.Query("""

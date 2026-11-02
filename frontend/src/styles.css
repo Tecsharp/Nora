@@ -2106,3 +2106,9 @@ label.qc-check { flex-direction: row !important; align-items: center; }
 label.qc-check input { width: 16px; height: 16px; flex: none; }
 .qc-me small { display: block; }
 @media (max-width: 640px) { .qc-line { flex-wrap: wrap; } }
+
+/* ───────── Entrar con Google ───────── */
+.google-btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; text-decoration: none; background: #fff; color: #1f1f1f; border: 1px solid #dadce0; font-weight: 600; }
+.google-btn:hover { background: #f6f8fb; color: #1f1f1f; }
+.auth-or { display: flex; align-items: center; gap: 12px; color: var(--subtle); font-size: 0.78rem; }
+.auth-or::before, .auth-or::after { content: ''; flex: 1; height: 1px; background: var(--hairline); }

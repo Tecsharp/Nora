@@ -173,6 +173,18 @@ El gateway respeta `X-Forwarded-Proto` y `X-Forwarded-Host`, por lo que el login
 
 ### Administración
 
+### Cómo se entra: correo y contraseña, Google o ambos
+
+Nora no envía correos, así que no hay «recuperar contraseña» por email; por eso se puede entrar también con **Google**. Hay tres modos: **solo correo y contraseña** (el de siempre), **solo Google** y **ambos**. Se elige en el `.env` con `NORA_AUTH_MODE=password|google|both` o en **Admin → Sistema → Cómo se entra** (lo del panel manda sobre el `.env`). Si Google no está configurado, siempre rige correo y contraseña, para no dejar a nadie fuera.
+
+**Configurar Google.** En [Google Cloud Console](https://console.cloud.google.com) → *APIs y servicios* → *Credenciales* → *Crear credenciales* → *ID de cliente de OAuth* → tipo *Aplicación web*. En *URI de redirección autorizados* pon `<dirección pública de Nora>/api/auth/google/callback` (por ejemplo `https://nora.tudominio.com/api/auth/google/callback`; en local, `http://localhost:29817/api/auth/google/callback`). Copia el ID y el secreto a `NORA_GOOGLE_CLIENT_ID` y `NORA_GOOGLE_CLIENT_SECRET` y ejecuta `docker compose up -d`. Si Nora está detrás de un proxy o túnel con otra dirección, fíjala con `NORA_PUBLIC_URL`; tiene que coincidir con la registrada en Google.
+
+**Cómo se enlazan las cuentas.** Al entrar con Google se reconoce a la persona por su identificador de Google; la primera vez, por su **correo verificado por Google**: quien ya tenía cuenta con contraseña queda enlazada y puede entrar de las dos formas (en modo «ambos»). Quien no tenía cuenta la crea al entrar, si el registro está abierto (si no, solo entra quien ya tiene cuenta). Las cuentas creadas con Google no tienen contraseña hasta que la crean en **Ajustes → Seguridad**; mientras tanto no se les pide para cambiar el correo ni para borrar la cuenta.
+
+**Solo Google.** Se cierran el formulario de contraseña, el registro y los enlaces de cambio de contraseña, y el administrador crea cuentas solo con el correo. Para que el administrador no se quede fuera, el panel no deja pasar a «solo Google» hasta que él haya entrado una vez con Google (usa «ambos» antes). Si aun así te quedas sin acceso: `docker compose exec db psql -U nora -d nora -c "delete from app_settings where key='authMode'"` devuelve el control al `.env`.
+
+El flujo es el estándar de OAuth 2.0 con PKCE: `GET /api/auth/google/start` manda a Google y `GET /api/auth/google/callback` canjea el código en el servidor (con el secreto), comprueba emisor, cliente, caducidad, `nonce` y correo verificado, y abre la sesión con la misma cookie de siempre. La pantalla de acceso lee `GET /api/auth/config` (`passwordLogin`, `googleLogin`, `registrationEnabled`).
+
 El administrador inicial se crea con `NORA_ADMIN_EMAIL` / `NORA_ADMIN_PASSWORD`. En **Admin** hay una tabla paginada con búsqueda por nombre o correo y filtro por rol (`GET /api/admin/users?page&size&q&role`); al abrir una fila puede, por usuario, activar/desactivar la cuenta, cambiar el rol y fijar o poner **infinito (∞)** en: espacio total, tamaño máximo de archivo, duración máxima de sala (y salas sin expiración), salas activas y participantes por sala. Los valores por defecto de usuarios nuevos se configuran en `.env`.
 
 ## Desarrollo

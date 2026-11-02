@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { api, ApiError } from '../api'
+import { useAuthConfig } from '../authConfig'
+import GoogleButton from '../components/GoogleButton'
 import { useAuth } from '../auth'
 import Brand from '../components/Brand'
 import LegalLinks from '../components/LegalLinks'
@@ -24,8 +26,11 @@ export default function Register() {
   const [fields, setFields] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [accepted, setAccepted] = useState(false)
+  const cfg = useAuthConfig()
 
   if (user) return <Navigate to="/" replace />
+  // sin contraseñas (solo Google) no hay formulario de alta: la cuenta se crea al entrar con Google
+  if (cfg && !cfg.passwordLogin) return <Navigate to="/login" replace />
 
   const valid = rules.every((r) => r.ok(password)) && password === confirm && accepted
 
@@ -59,6 +64,11 @@ export default function Register() {
           <h2>Crear cuenta</h2>
           <p className="muted small">Solo necesitas un nombre, un correo y una contraseña.</p>
         </div>
+        {cfg?.googleLogin && <>
+          <GoogleButton label="Registrarme con Google" />
+          <p className="muted small center-text">Al continuar aceptas los <Link to="/terms" target="_blank">Términos de uso</Link> y la <Link to="/privacy" target="_blank">Política de privacidad</Link>.</p>
+          <div className="auth-or">o con tu correo</div>
+        </>}
         <label>
           Nombre
           <input required minLength={2} maxLength={60} autoComplete="nickname" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />

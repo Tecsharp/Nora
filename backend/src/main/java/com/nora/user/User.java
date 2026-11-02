@@ -59,6 +59,14 @@ public class User {
     @Column(name = "tokens_valid_after")
     private Instant tokensValidAfter;
 
+    /** Identificador estable de la cuenta de Google enlazada (null = no enlazada). */
+    @Column(name = "google_sub")
+    private String googleSub;
+
+    /** false = la cuenta se creó con Google y aún no eligió contraseña (la guardada es aleatoria e inservible). */
+    @Column(name = "password_set", nullable = false)
+    private boolean passwordSet = true;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -98,6 +106,10 @@ public class User {
     public void setEmail(String email) { this.email = email; }
     public void setDisplayName(String displayName) { this.displayName = displayName; }
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+    public String getGoogleSub() { return googleSub; }
+    public void setGoogleSub(String googleSub) { this.googleSub = googleSub; }
+    public boolean isPasswordSet() { return passwordSet; }
+    public void setPasswordSet(boolean passwordSet) { this.passwordSet = passwordSet; }
     public int getAvatarVersion() { return avatarVersion; }
     public void setAvatarVersion(int avatarVersion) { this.avatarVersion = avatarVersion; }
     public Instant getLastLoginAt() { return lastLoginAt; }
