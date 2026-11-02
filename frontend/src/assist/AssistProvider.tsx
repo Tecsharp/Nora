@@ -126,7 +126,7 @@ export function AssistProvider({ code, children }: { code: string; children: Rea
       shared.current = s
     }
     if (needMonitor && (s.getVideoTracks()[0]?.getSettings() as { displaySurface?: string }).displaySurface !== 'monitor') {
-      toast('Para que alguien pueda controlar tu equipo comparte la pantalla completa (no una ventana ni una pestaña).', 'warning')
+      toast('Para que alguien pueda controlar tu computadora comparte la pantalla completa (no una ventana ni una pestaña).', 'warning')
       if (!sessionsRef.current.some((x) => x.role === 'sharer')) stopShared()
       return null
     }
@@ -226,7 +226,7 @@ export function AssistProvider({ code, children }: { code: string; children: Rea
       if (s) setIncoming((l) => [...l, { id: d.session, kind: 'control', from: s.peer, mode: 'control' }])
     } else if (d.action === 'granted') {
       patch(d.session, { control: 'granted', controller: d.controller ?? s?.peer.name ?? '' })
-      if (s?.role === 'viewer') toast('Ya puedes controlar su equipo. Haz clic en la pantalla para empezar.', 'success')
+      if (s?.role === 'viewer') toast('Ya puedes controlar su computadora. Haz clic en la pantalla para empezar.', 'success')
     } else if (d.action === 'denied') {
       patch(d.session, { control: 'none' })
       toast(`${s?.peer.name ?? 'La otra persona'} no permitió el control`, 'warning')

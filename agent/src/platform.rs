@@ -50,7 +50,7 @@ pub fn open_accessibility_settings() {
     let _ = Command::new("open").arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility").status();
 }
 
-/// En Linux con Wayland el sistema no deja que un programa controle el equipo.
+/// En Linux con Wayland el sistema no deja que un programa controle la computadora.
 pub fn wayland_session() -> bool {
     cfg!(target_os = "linux") && std::env::var("XDG_SESSION_TYPE").map(|v| v.eq_ignore_ascii_case("wayland")).unwrap_or(false)
 }

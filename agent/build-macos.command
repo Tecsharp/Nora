@@ -4,5 +4,5 @@
 cd "$(dirname "$0")"
 ./build.sh
 echo
-echo "Pulsa Enter para cerrar."
+echo "Presiona Enter para cerrar."
 read _

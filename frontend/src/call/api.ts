@@ -1,7 +1,7 @@
 import { api } from '../api'
 
 export interface Part {
-  /** Identifica la pestaña dentro de la llamada (una misma persona puede estar con el portátil y, de complemento, con el móvil). */
+  /** Identifica la pestaña dentro de la llamada (una misma persona puede estar con la laptop y, de complemento, con el celular). */
   conn: string
   userId: string
   name: string

@@ -66,7 +66,7 @@ export default function LinksTool({ room, focus }: { room: Room; focus?: FocusTa
       await create({ url, title: host(url), description: '', tags: [], pinned: false })
       setQuick('')
     } catch (er) {
-      fail(er, 'No se pudo añadir el enlace')
+      fail(er, 'No se pudo agregar el enlace')
     } finally {
       setAdding(false)
     }
@@ -84,7 +84,7 @@ export default function LinksTool({ room, focus }: { room: Room; focus?: FocusTa
         {canWrite && (
           <form className="lk-quick" onSubmit={quickAdd}>
             <Link2 size={16} />
-            <input value={quick} onChange={(e) => setQuick(e.target.value)} placeholder="Pegar enlace…" aria-label="Añadir enlace" disabled={adding}
+            <input value={quick} onChange={(e) => setQuick(e.target.value)} placeholder="Pegar enlace…" aria-label="Agregar enlace" disabled={adding}
               onPaste={(e) => { const t = e.clipboardData.getData('text'); if (normalize(t) && !quick) { e.preventDefault(); setQuick(t.trim()) } }} />
             <button className="btn primary sm" disabled={!quick.trim() || adding}><Plus size={14} /> Guardar</button>
             <button type="button" className="btn ghost sm" onClick={() => setEditing('new')}>Con detalles…</button>
@@ -180,7 +180,7 @@ function LinkDialog({ link, known, onClose, onSave }: { link: Lnk | null; known:
           <div className="kb-labels">{tags.map((t) => <span key={t} className="kb-label">{t}<button aria-label={`Quitar ${t}`} onClick={() => setTags(tags.filter((x) => x !== t))}><X size={11} /></button></span>)}</div>
           <input value={tag} maxLength={24} list="lk-known" placeholder="Etiqueta" onChange={(e) => setTag(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }} />
           <datalist id="lk-known">{known.filter((t) => !tags.includes(t)).map((t) => <option key={t} value={t} />)}</datalist>
-          {tag.trim() && <button className="btn sm ghost" style={{ alignSelf: 'flex-start' }} onClick={() => addTag()}><Check size={13} /> Añadir «{tag.trim()}»</button>}
+          {tag.trim() && <button className="btn sm ghost" style={{ alignSelf: 'flex-start' }} onClick={() => addTag()}><Check size={13} /> Agregar «{tag.trim()}»</button>}
         </div>
       </div>
     </Modal>

@@ -44,7 +44,7 @@ const LANG_KEY = 'nora-call-cc-lang'
 
 /**
  * Una llamada vista desde este navegador. Hace de puente entre el WebSocket de Nora (quién está, quién espera, mano levantada…) y las conexiones
- * WebRTC directas con cada persona (audio, vídeo y pantalla). Es una malla: cada participante abre una conexión con todos los demás, con la
+ * WebRTC directas con cada persona (audio, video y pantalla). Es una malla: cada participante abre una conexión con todos los demás, con la
  * «negociación perfecta» de WebRTC para que dos personas que se llaman a la vez no se pisen.
  */
 export function useCall(code: string, media: LocalMedia) {

@@ -100,7 +100,7 @@ export default function PlayerTool({ room, onPlaying }: { room: Room; onPlaying?
         api<{ title: string }>(`${base}/player/title?url=${encodeURIComponent(data.url)}`).then(async (r) => { if (r.title) await update(it.id, { ...it.data, title: r.title }) }).catch(() => undefined)
       }
     } catch (er) {
-      toast(er instanceof Error ? er.message : 'No se pudo añadir', 'error')
+      toast(er instanceof Error ? er.message : 'No se pudo agregar', 'error')
     } finally {
       setAdding(false)
     }
@@ -120,7 +120,7 @@ export default function PlayerTool({ room, onPlaying }: { room: Room; onPlaying?
           <div className="pl-empty">
             <Tv size={40} />
             <strong>Escuchad o mirad algo juntos</strong>
-            <span className="small">Añade a la cola un vídeo de YouTube, un enlace directo (mp3, mp4…) o un audio/vídeo de la sala. Lo que reproduzca alguien suena a la vez para todas las personas.</span>
+            <span className="small">Agrega a la cola un video de YouTube, un enlace directo (mp3, mp4…) o un audio/video de la sala. Lo que reproduzca alguien suena a la vez para todas las personas.</span>
           </div>
         ) : (
           <>
@@ -142,16 +142,16 @@ export default function PlayerTool({ room, onPlaying }: { room: Room; onPlaying?
         <h4><ListMusic size={16} /> Cola <span className="badge">{queue.length}</span></h4>
         {canWrite && (
           <form className="pl-add" onSubmit={(e) => void add(e)}>
-            <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Pega un enlace de YouTube o de un audio/vídeo…" aria-label="Enlace" />
+            <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Pega un enlace de YouTube o de un audio/video…" aria-label="Enlace" />
             {url.trim() && <input value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} placeholder="Título (opcional)" aria-label="Título" />}
-            <button className="btn primary sm" disabled={!url.trim() || adding}><Plus size={14} /> Añadir a la cola</button>
+            <button className="btn primary sm" disabled={!url.trim() || adding}><Plus size={14} /> Agregar a la cola</button>
             {files.some((f) => mediaKind(f.name) === 'audio' || mediaKind(f.name) === 'video') && (
               <div className="row">
                 <select value={fileId} onChange={(e) => setFileId(e.target.value)} aria-label="Archivo de la sala">
                   <option value="">…o un archivo de la sala</option>
                   {files.filter((f) => mediaKind(f.name) === 'audio' || mediaKind(f.name) === 'video').map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
                 </select>
-                <button type="button" className="btn sm" disabled={!fileId || adding} onClick={() => void add(undefined, { kind: 'file', fileId, title: fileName(fileId) })}>Añadir</button>
+                <button type="button" className="btn sm" disabled={!fileId || adding} onClick={() => void add(undefined, { kind: 'file', fileId, title: fileName(fileId) })}>Agregar</button>
               </div>
             )}
           </form>
@@ -226,7 +226,7 @@ function Stage({ item, room, files, sync, adapter, onTitle }: { item: PlayerItem
   if (!src) return <div className="pl-err">Preparando…</div>
   return src.audio
     ? <div className="pl-audio"><AudioLines size={64} /><audio key={src.url} ref={media as React.RefObject<HTMLAudioElement>} src={src.url} preload="auto" onError={() => setError('No se pudo reproducir este audio.')} /></div>
-    : <video key={src.url} ref={media as React.RefObject<HTMLVideoElement>} className="pl-video" src={src.url} playsInline preload="auto" onError={() => setError('No se pudo reproducir este vídeo (formato, dirección o bloqueo del servidor de origen).')} />
+    : <video key={src.url} ref={media as React.RefObject<HTMLVideoElement>} className="pl-video" src={src.url} playsInline preload="auto" onError={() => setError('No se pudo reproducir este video (formato, dirección o bloqueo del servidor de origen).')} />
 }
 
 function Transport({ state, adapter, sync, canWrite, send, title, onPrev, onNext, hasPrev }: {
@@ -266,7 +266,7 @@ function Transport({ state, adapter, sync, canWrite, send, title, onPrev, onNext
         <button className="icon-btn" aria-label="Siguiente" disabled={!canWrite} onClick={onNext}><SkipForward size={18} /></button>
         <select value={state.rate} disabled={!canWrite} aria-label="Velocidad" onChange={(e) => void send({ action: 'rate', rate: Number(e.target.value) })}>{RATES.map((r) => <option key={r} value={r}>{r}×</option>)}</select>
         <span className="spacer" />
-        <button className="icon-btn" aria-label={muted ? 'Activar sonido' : 'Silenciar'} title="Solo afecta a tu equipo" onClick={() => { setMuted(!muted); volume(vol, !muted) }}>{muted ? <VolumeX size={18} /> : <Volume2 size={18} />}</button>
+        <button className="icon-btn" aria-label={muted ? 'Activar sonido' : 'Silenciar'} title="Solo afecta a tu dispositivo" onClick={() => { setMuted(!muted); volume(vol, !muted) }}>{muted ? <VolumeX size={18} /> : <Volume2 size={18} />}</button>
         <input className="pl-vol rng" style={{ ['--p' as string]: `${(muted ? 0 : vol) * 100}%` }} type="range" min={0} max={1} step={0.05} value={muted ? 0 : vol} aria-label="Volumen (solo tú)" onChange={(e) => { const v = Number(e.target.value); setVol(v); setMuted(v === 0); volume(v, v === 0) }} />
         <button className="icon-btn" aria-label="Resincronizar" title="Volver a ponerme al ritmo del grupo" onClick={() => { sync.apply(true) }}><RefreshCw size={17} /></button>
       </div>

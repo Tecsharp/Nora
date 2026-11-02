@@ -316,15 +316,15 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
 
   return (
     <div className={`explorer ${sel.size > 0 ? 'sel-active' : ''}`}>
-      {!canWrite && <p className="callout small" style={{ margin: '12px 16px 0' }}>Tu rol en esta sala es de <strong>lector</strong>: puedes ver y copiar, pero no añadir ni modificar.</p>}
+      {!canWrite && <p className="callout small" style={{ margin: '12px 16px 0' }}>Tu rol en esta sala es de <strong>lector</strong>: puedes ver y copiar, pero no agregar ni modificar.</p>}
       {canWrite && (
         <form className="composer" onSubmit={add}>
           <textarea ref={composerRef} rows={3} maxLength={20000} required placeholder={placeholder} aria-label="Contenido" value={text} onChange={(e) => setText(e.target.value)} />
           <div className="row spread">
-            <span className="muted small">Se añadirá en «{where(current)}»</span>
+            <span className="muted small">Se agregará en «{where(current)}»</span>
             <span className="row">
               <AiAssist actions={NOTE_ACTIONS} getText={composerAi.getText} onApply={composerAi.onApply} disabled={!text.trim()} />
-              <button className="btn primary sm" disabled={!text.trim() || busy('add')}><Plus size={15} /> Añadir</button>
+              <button className="btn primary sm" disabled={!text.trim() || busy('add')}><Plus size={15} /> Agregar</button>
             </span>
           </div>
         </form>
@@ -381,7 +381,7 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
           <div className="empty">
             {searching ? <Search size={36} /> : <StickyNote size={36} />}
             <strong>{searching ? 'Sin resultados' : current ? 'Esta carpeta está vacía' : 'Aquí no hay nada todavía'}</strong>
-            <span className="small">{searching ? 'Prueba con otra búsqueda.' : 'Escribe arriba para añadir la primera nota, o crea una carpeta para ordenarlas.'}</span>
+            <span className="small">{searching ? 'Prueba con otra búsqueda.' : 'Escribe arriba para agregar la primera nota, o crea una carpeta para ordenarlas.'}</span>
           </div>
         ) : (
           <>
@@ -446,7 +446,7 @@ export default function NotesTool({ room, kind, placeholder, copyable }: Props) 
 
       <div className="ex-status">
         <span>{shownFolders.length} carpeta{shownFolders.length === 1 ? '' : 's'} · {shown.length} nota{shown.length === 1 ? '' : 's'}</span>
-        <span className="hide-sm">{canWrite ? 'Selecciona varias con el ratón' : 'Clic para abrir'}</span>
+        <span className="hide-sm">{canWrite ? 'Selecciona varias con el mouse' : 'Clic para abrir'}</span>
       </div>
 
       {editing && (

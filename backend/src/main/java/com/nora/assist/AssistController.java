@@ -56,7 +56,7 @@ public class AssistController {
     /** Lo llama el agente (no el navegador): canjea el código por su token. Sin sesión, con límite de intentos. */
     @PostMapping("/agent/pair")
     public Map<String, Object> pair(@RequestBody PairRequest req) {
-        String token = assist.pair(req.code()).orElseThrow(() -> ApiException.badRequest("Código no válido o caducado"));
+        String token = assist.pair(req.code()).orElseThrow(() -> ApiException.badRequest("Código no válido o vencido"));
         return Map.of("token", token);
     }
 

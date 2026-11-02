@@ -30,9 +30,9 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 /**
- * Reproducción de audio y vídeo de los archivos de la sala. Un reproductor del navegador no puede enviar la cabecera Authorization, así que
+ * Reproducción de audio y video de los archivos de la sala. Un reproductor del navegador no puede enviar la cabecera Authorization, así que
  * quien participa pide una dirección firmada y de vida corta ({@code POST …/files/{id}/stream}) y la reproduce; el servidor atiende
- * peticiones por tramos (Range) para poder saltar dentro del vídeo. Solo se sirven tipos de audio/vídeo conocidos, nunca algo ejecutable.
+ * peticiones por tramos (Range) para poder saltar dentro del video. Solo se sirven tipos de audio/video conocidos, nunca algo ejecutable.
  */
 @RestController
 public class MediaController {
@@ -68,7 +68,7 @@ public class MediaController {
         Room room = rooms.requireMember(p.userId(), code);
         RoomFile f = files.meta(room.getId(), fileId);
         String type = TYPES.get(ext(f.getOriginalName()));
-        if (type == null) throw new ApiException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Ese archivo no es de audio, vídeo o imagen que el navegador pueda mostrar");
+        if (type == null) throw new ApiException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Ese archivo no es de audio, video o imagen que el navegador pueda mostrar");
         long exp = Instant.now().getEpochSecond() + TTL_SECONDS;
         String body = room.getId() + "." + fileId + "." + exp;
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(body.getBytes(StandardCharsets.UTF_8)) + "." + sign(body);
@@ -84,7 +84,7 @@ public class MediaController {
             String body = new String(Base64.getUrlDecoder().decode(token.substring(0, dot)), StandardCharsets.UTF_8);
             if (!MessageDigest.isEqual(sign(body).getBytes(StandardCharsets.UTF_8), token.substring(dot + 1).getBytes(StandardCharsets.UTF_8))) throw new IllegalArgumentException();
             String[] parts = body.split("\\.");
-            if (Long.parseLong(parts[2]) < Instant.now().getEpochSecond()) throw ApiException.forbidden("El enlace de reproducción caducó");
+            if (Long.parseLong(parts[2]) < Instant.now().getEpochSecond()) throw ApiException.forbidden("El enlace de reproducción venció");
             roomId = UUID.fromString(parts[0]);
             fileId = UUID.fromString(parts[1]);
         } catch (ApiException e) {

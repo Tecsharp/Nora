@@ -390,10 +390,10 @@ function AvailView({ room, cursor, meId, canWrite, onCreate, onOpen }: { room: R
       {loading ? <p className="muted small">Cargando…</p> : (
         <AvailabilityGrid users={users} ids={ids} meId={meId} day={day} onPick={canWrite ? (d, m) => create(d, m, m + dur) : undefined} onOpenEvent={onOpen} />
       )}
-      {canWrite && <p className="av-hint small muted">Pulsa un hueco libre para proponer una reunión a esa hora con las personas elegidas.</p>}
+      {canWrite && <p className="av-hint small muted">Presiona un horario libre para proponer una reunión a esa hora con las personas elegidas.</p>}
       <section className="av-best">
         <h4><Wand2 size={14} /> Mejores momentos para {ids.length === all.length ? 'todas las personas' : 'las personas elegidas'}</h4>
-        {!slots.length && !loading && <p className="muted small">No hay un hueco de {dur} min libre para todas en los próximos 7 días laborables (de 8:00 a 19:00).</p>}
+        {!slots.length && !loading && <p className="muted small">No hay un horario de {dur} min libre para todas en los próximos 7 días laborables (de 8:00 a 19:00).</p>}
         <div className="av-slots">
           {slots.map((sl) => (
             <button key={sl.day + sl.start} type="button" className="av-slot" disabled={!canWrite} onClick={() => create(sl.day, sl.start, sl.end)}>
@@ -468,7 +468,7 @@ function QuickCreate({ room, draft, anchor, meId, meName, meVersion, onClose, on
   const clashes = !d.allDay && d.start && d.end ? avail.users.filter((u) => group.includes(u.userId) && u.busy.some((b) => b.start < d.end && b.end > d.start)) : []
   const suggest = () => {
     const sl = findSlots(avail.users, group, startDay, 7, dur, 1)[0]
-    if (!sl) return toast('No hay un hueco libre para todas las personas en los próximos días laborables', 'info')
+    if (!sl) return toast('No hay un horario libre para todas las personas en los próximos días laborables', 'info')
     setD((x) => ({ ...x, start: isoAt(sl.day, sl.start), end: isoAt(sl.day, sl.end) }))
   }
 
@@ -646,7 +646,7 @@ function EventDialog({ ev, draft, startEditing, room, people, meId, canEdit, onC
   const clashes = !d.allDay && d.start && d.end ? avail.users.filter((u) => group.includes(u.userId) && u.busy.some((b) => b.eventId !== (ev?.id ?? null) && b.start < d.end && b.end > d.start)) : []
   const suggest = () => {
     const s = findSlots(avail.users, group, startDay, 7, dur, 1)[0]
-    if (!s) return toast('No hay un hueco libre para todas las personas en los próximos días laborables', 'info')
+    if (!s) return toast('No hay un horario libre para todas las personas en los próximos días laborables', 'info')
     setD((x) => ({ ...x, start: isoAt(s.day, s.start), end: isoAt(s.day, s.end) }))
   }
 
@@ -689,14 +689,14 @@ function EventDialog({ ev, draft, startEditing, room, people, meId, canEdit, onC
           )}
 
           <div className="cal-opts">
-            <label className="check"><input type="checkbox" checked={!!d.withCall} onChange={(e) => set('withCall', e.target.checked)} /> <Video size={15} /> <span><b>Añadir llamada</b><small>Se crea un código de llamada y las personas invitadas reciben el enlace y un aviso 10 minutos antes.</small></span></label>
+            <label className="check"><input type="checkbox" checked={!!d.withCall} onChange={(e) => set('withCall', e.target.checked)} /> <Video size={15} /> <span><b>Agregar llamada</b><small>Se crea un código de llamada y las personas invitadas reciben el enlace y un aviso 10 minutos antes.</small></span></label>
             {d.withCall && (
               <div className="seg" role="radiogroup" aria-label="Quién entra a la llamada">
                 <button type="button" role="radio" aria-checked={d.callAccess !== 'HOST'} className={d.callAccess !== 'HOST' ? 'on' : ''} onClick={() => set('callAccess', 'OPEN')}><ShieldCheck size={13} /> Entran directamente</button>
                 <button type="button" role="radio" aria-checked={d.callAccess === 'HOST'} className={d.callAccess === 'HOST' ? 'on' : ''} onClick={() => set('callAccess', 'HOST')}><Lock size={13} /> Yo admito a cada persona</button>
               </div>
             )}
-            <label className="check"><input type="checkbox" checked={!!d.private} onChange={(e) => set('private', e.target.checked)} /> <Lock size={15} /> <span><b>Cita personal</b><small>Solo tú y quien invites veréis los detalles. El resto de la sala solo verá que estás «Ocupado».</small></span></label>
+            <label className="check"><input type="checkbox" checked={!!d.private} onChange={(e) => set('private', e.target.checked)} /> <Lock size={15} /> <span><b>Cita personal</b><small>Solo tú y quien invites verán los detalles. El resto de la sala solo verá que estás «Ocupado».</small></span></label>
           </div>
 
           <label className="stack tight"><span className="small muted">Lugar o enlace de la reunión</span><input value={d.location} maxLength={200} placeholder="Sala 2, o https://…" onChange={(e) => set('location', e.target.value)} /></label>
@@ -710,7 +710,7 @@ function EventDialog({ ev, draft, startEditing, room, people, meId, canEdit, onC
   const invited = (d.invitees ?? []).map((u) => ({ u, p: people.get(u) }))
   return (
     <Modal title="Cita" icon={<CalendarDays size={20} />} onClose={onClose}
-      footer={<>{ev && <button className="btn ghost" onClick={() => download(`${d.title}.ics`, ics([ev], room.name))}><Download size={15} /> Añadir a mi calendario</button>}<span className="grow" />{canEdit && <button className="btn" onClick={() => setEdit(true)}><Pencil size={15} /> Editar</button>}<button className="btn ghost" onClick={onClose}>Cerrar</button></>}>
+      footer={<>{ev && <button className="btn ghost" onClick={() => download(`${d.title}.ics`, ics([ev], room.name))}><Download size={15} /> Agregar a mi calendario</button>}<span className="grow" />{canEdit && <button className="btn" onClick={() => setEdit(true)}><Pencil size={15} /> Editar</button>}<button className="btn ghost" onClick={onClose}>Cerrar</button></>}>
       <div className="cal-view" style={{ ['--c' as string]: d.color ?? COLORS[0] }}>
         <h3><i />{d.title}</h3>
         {d.private && <p className="cal-private small"><Lock size={13} /> Cita personal: solo la ven quien la creó y sus invitados.</p>}

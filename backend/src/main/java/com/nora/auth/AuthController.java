@@ -119,7 +119,7 @@ public class AuthController {
         return ResponseEntity.noContent().header(HttpHeaders.SET_COOKIE, cookie("", Duration.ZERO, http).toString()).build();
     }
 
-    /** Datos del enlace para cambiar la contraseña (a quién pertenece y cuándo caduca). */
+    /** Datos del enlace para cambiar la contraseña (a quién pertenece y cuándo vence). */
     @GetMapping("/reset/{token}")
     public Map<String, Object> resetInfo(@PathVariable String token) {
         return auth.resetInfo(token);

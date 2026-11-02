@@ -224,7 +224,7 @@ export function ChartDialog({ initial, onOk, onCancel }: { initial?: ChartSpec; 
                       <th key={si}><input aria-label={`Nombre de la serie ${si + 1}`} value={s.name} onChange={(e) => setSpec((p) => ({ ...p, series: p.series.map((x, j) => (j === si ? { ...x, name: e.target.value } : x)) }))} />
                         {spec.series.length > 1 && <button className="icon-btn sm" aria-label="Quitar serie" onClick={() => delSeries(si)}><Trash2 size={12} /></button>}</th>
                     ))}
-                    <th><button className="icon-btn sm" aria-label="Añadir serie" title="Añadir serie" onClick={addSeries}><Plus size={14} /></button></th>
+                    <th><button className="icon-btn sm" aria-label="Agregar serie" title="Agregar serie" onClick={addSeries}><Plus size={14} /></button></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -238,7 +238,7 @@ export function ChartDialog({ initial, onOk, onCancel }: { initial?: ChartSpec; 
                 </tbody>
               </table>
             </div>
-            <button className="btn sm" onClick={addRow}><Plus size={14} /> Añadir fila</button>
+            <button className="btn sm" onClick={addRow}><Plus size={14} /> Agregar fila</button>
           </div>
           <div className="stack">
             <strong>Vista previa</strong>

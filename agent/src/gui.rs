@@ -1,5 +1,5 @@
 //! La ventana de Nora Agent: pequeña, nativa y sin adornos. Sigue el tema claro u oscuro del sistema, dice a qué usuario de Nora está
-//! vinculado el equipo y su versión, y deja a mano lo único importante: detener el control remoto.
+//! vinculado la computadora y su versión, y deja a mano lo único importante: detener el control remoto.
 
 use crate::core::{host_label, Command, Shared, State, Status, Worker, VERSION};
 use crate::{icon, platform};
@@ -290,7 +290,7 @@ impl App {
         let busy = st.status == Status::Pairing;
         self.header(ui, p, |_| {});
         ui.add_space(6.0);
-        ui.label(RichText::new("Vincula este equipo").size(17.0));
+        ui.label(RichText::new("Vincula esta computadora").size(17.0));
         ui.label(muted(p, "Así alguien de tu sala podrá ayudarte desde Nora. No se aplica nada sin que tú lo aceptes."));
         ui.add_space(6.0);
         let hint = |t: &str| RichText::new(t).color(p.muted.gamma_multiply(0.7));
@@ -342,12 +342,12 @@ impl App {
             ui.add_space(12.0);
         });
 
-        // ---- lo que impide controlar el equipo ----
+        // ---- lo que impide controlar la computadora ----
         if !st.blocked.is_empty() {
             ui.add_space(4.0);
             egui::Frame::new().fill(tint(p.yellow, 28)).stroke(Stroke::new(1.0_f32, tint(p.yellow, 90))).corner_radius(10).inner_margin(egui::Margin::same(12)).show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                ui.label(RichText::new("No se puede controlar este equipo todavía").color(p.yellow));
+                ui.label(RichText::new("No se puede controlar esta computadora todavía").color(p.yellow));
                 ui.label(RichText::new(&st.blocked).size(13.0));
                 if cfg!(target_os = "macos") && !self.ax_ok && ui.button("Abrir los ajustes de Accesibilidad").clicked() {
                     platform::open_accessibility_settings();
@@ -363,7 +363,7 @@ impl App {
                     ui.set_width(ui.available_width());
                     ui.horizontal(|ui| { dot(ui, p.red); ui.label(RichText::new("Control remoto activo").color(p.red)); });
                     ui.label(RichText::new(who).size(16.0));
-                    ui.label(muted(p, "Puede mover el ratón y escribir en tu equipo. Tú ves todo lo que hace."));
+                    ui.label(muted(p, "Puede mover el mouse y escribir en tu computadora. Tú ves todo lo que hace."));
                     ui.add_space(4.0);
                     if primary(ui, "Detener control", p.red, true).clicked() {
                         self.send(Command::StopControl);
@@ -371,7 +371,7 @@ impl App {
                 });
             }
             None => {
-                ui.label(muted(p, "Nadie controla tu equipo. Si alguien lo pide desde Nora, te avisaremos aquí y podrás aceptar o detenerlo."));
+                ui.label(muted(p, "Nadie controla tu computadora. Si alguien lo pide desde Nora, te avisaremos aquí y podrás aceptar o detenerlo."));
             }
         }
 
@@ -381,8 +381,8 @@ impl App {
             line(ui, p, true, "Servidor", |ui| value(ui, p, &host_label(&st.server)));
         });
 
-        // ---- este equipo ----
-        section(ui, p, "Este equipo");
+        // ---- esta computadora ----
+        section(ui, p, "Esta computadora");
         group(ui, p, |ui| {
             line(ui, p, true, "Sistema", |ui| value(ui, p, &platform::os_label()));
             if st.screen.0 > 0 {
@@ -405,7 +405,7 @@ impl App {
         if self.confirm_reset {
             egui::Frame::new().fill(p.group).stroke(Stroke::new(1.0_f32, p.hairline)).corner_radius(10).inner_margin(egui::Margin::same(12)).show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                ui.label("¿Desvincular este equipo de tu cuenta? Tendrás que generar un código nuevo para volver a usarlo.");
+                ui.label("¿Desvincular esta computadora de tu cuenta? Tendrás que generar un código nuevo para volver a usarlo.");
                 ui.horizontal(|ui| {
                     if ui.add(egui::Button::new(RichText::new("Desvincular").color(Color32::WHITE)).fill(p.red)).clicked() {
                         self.confirm_reset = false;
@@ -414,7 +414,7 @@ impl App {
                     if ui.button("Cancelar").clicked() { self.confirm_reset = false; }
                 });
             });
-        } else if ui.add(egui::Button::new(RichText::new("Desvincular este equipo").size(13.0).color(p.red)).frame(false)).clicked() {
+        } else if ui.add(egui::Button::new(RichText::new("Desvincular esta computadora").size(13.0).color(p.red)).frame(false)).clicked() {
             self.confirm_reset = true;
         }
         self.footer(ui, p, true);
@@ -431,7 +431,7 @@ impl App {
                 }
             });
             if platform::wayland_session() {
-                ui.label(RichText::new("Sesión Wayland detectada: no permite controlar el equipo.").size(12.0).color(p.yellow));
+                ui.label(RichText::new("Sesión Wayland detectada: no permite controlar la computadora.").size(12.0).color(p.yellow));
             }
         });
     }

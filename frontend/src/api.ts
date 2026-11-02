@@ -255,7 +255,7 @@ export function fetchBlob(path: string, onProgress: (loaded: number, total: numb
   }
 }
 
-/** Descarga con progreso y guarda el archivo en el equipo. */
+/** Descarga con progreso y guarda el archivo en el dispositivo. */
 export function downloadWithProgress(path: string, filename: string, onProgress: (loaded: number, total: number) => void): DownloadHandle {
   const h = fetchBlob(path, onProgress)
   return {

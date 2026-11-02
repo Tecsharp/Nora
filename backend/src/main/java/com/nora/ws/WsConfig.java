@@ -36,7 +36,7 @@ public class WsConfig implements WebSocketConfigurer {
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         List<String> origins = props.allowedOrigins() == null ? List.of()
                 : props.allowedOrigins().stream().map(String::trim).filter(s -> !s.isEmpty()).toList();
-        // El mismo origen (el del gateway) siempre se acepta; NORA_ALLOWED_ORIGINS añade otros.
+        // El mismo origen (el del gateway) siempre se acepta; NORA_ALLOWED_ORIGINS agrega otros.
         registry.addHandler(handler, "/ws")
                 .addInterceptors(new WsHandshakeInterceptor(tickets, users))
                 .setAllowedOrigins(origins.toArray(String[]::new));

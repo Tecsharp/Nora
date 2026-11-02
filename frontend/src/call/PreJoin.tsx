@@ -44,7 +44,7 @@ export default function PreJoin({ call, media, user }: { call: CallApi; media: L
             {preview && !companion ? <PreviewVideo stream={preview} /> : (
               <div className="cj-novideo">
                 <Avatar name={user.displayName} userId={user.id} version={user.avatarVersion} size={96} />
-                <span>{companion ? 'Modo complementario: sin audio ni vídeo' : media.camError || 'La cámara está apagada'}</span>
+                <span>{companion ? 'Modo complementario: sin audio ni video' : media.camError || 'La cámara está apagada'}</span>
               </div>
             )}
             <div className="cj-ctl">

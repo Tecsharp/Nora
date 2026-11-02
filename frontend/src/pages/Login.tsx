@@ -20,7 +20,7 @@ const read = (k: string) => {
 /** Lo que pasó al volver de Google (el servidor manda un código, nunca un texto). */
 const GOOGLE_ERRORS: Record<string, string> = {
   cancelled: 'Cancelaste el acceso con Google.',
-  state: 'La sesión de acceso caducó. Inténtalo de nuevo.',
+  state: 'La sesión de acceso venció. Inténtalo de nuevo.',
   failed: 'No se pudo entrar con Google. Inténtalo de nuevo.',
   unverified: 'Google no tiene verificado ese correo.',
   registration_disabled: 'No hay una cuenta con ese correo y el registro está cerrado. Pide a un administrador que la cree.',
@@ -91,7 +91,7 @@ export default function Login() {
           <input type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
         </label>
         <div className="stack tight" style={{ gap: 6 }}>
-          <label className="check"><input type="checkbox" checked={rememberEmail} onChange={(e) => setRememberEmail(e.target.checked)} /> Recordar mi correo en este equipo</label>
+          <label className="check"><input type="checkbox" checked={rememberEmail} onChange={(e) => setRememberEmail(e.target.checked)} /> Recordar mi correo en este dispositivo</label>
           <label className="check"><input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> Mantener la sesión iniciada durante un mes</label>
           {!remember && <span className="muted small">La sesión se cerrará al cerrar el navegador (o tras unos días sin usar Nora).</span>}
         </div>

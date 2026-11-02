@@ -20,18 +20,18 @@ if (-not (Test-Path .env)) {
   Write-Host "Administrador: admin@nora.local / $admin"
 }
 
-# Si ya existía un .env de una versión anterior, se añaden solo las variables que falten.
+# Si ya existía un .env de una versión anterior, se agregan solo las variables que falten.
 function Ensure-Var([string]$name, [string]$value) {
   if (Select-String -Path .env -Pattern "^$name=.+" -Quiet) { return }
   $lines = @(Get-Content .env | Where-Object { $_ -notmatch "^$name=" })
   $lines += "$name=$value"
   Set-Content .env $lines
-  Write-Host "Añadido $name a .env"
+  Write-Host "Agregado $name a .env"
 }
 Ensure-Var 'NORA_GARAGE_RPC_SECRET' (-join ((1..64) | ForEach-Object { '{0:x}' -f (Get-Random -Maximum 16) }))
 Ensure-Var 'NORA_GARAGE_ADMIN_TOKEN' (New-Secret 48)
 Ensure-Var 'NORA_CONVERTER_TOKEN' (New-Secret 40)
-# Cualquier variable de .env.example que falte en tu .env (DeepSeek, descargas del agente, etc.) se añade vacía o con su valor por defecto,
+# Cualquier variable de .env.example que falte en tu .env (DeepSeek, descargas del agente, etc.) se agrega vacía o con su valor por defecto,
 # con sus comentarios, para que solo tengas que rellenarla. Nunca se toca lo que ya tienes.
 $have = @{}
 Get-Content .env | ForEach-Object { if ($_ -match '^([A-Za-z_][A-Za-z0-9_]*)=') { $have[$Matches[1]] = $true } }
@@ -46,9 +46,9 @@ foreach ($line in Get-Content .env.example) {
 }
 if ($out.Count -gt 0) {
   Add-Content .env ''
-  Add-Content .env '# --- Añadido por setup.ps1: variables nuevas de esta versión ---'
+  Add-Content .env '# --- Agregado por setup.ps1: variables nuevas de esta versión ---'
   Add-Content .env $out
-  Write-Host ("Añadido a .env: " + ($names -join ' '))
+  Write-Host ("Agregado a .env: " + ($names -join ' '))
 }
 
 # El repositorio de GitHub (para ofrecer el agente de Asistencia) se toma solo de este clon, si no lo has puesto tú.

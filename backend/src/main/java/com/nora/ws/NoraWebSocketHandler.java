@@ -38,7 +38,7 @@ public class NoraWebSocketHandler extends TextWebSocketHandler implements Assist
     private static final int MAX_SESSIONS_PER_USER = 10;
     private static final int MAX_MESSAGES_PER_10S = 60;
     private static final int MAX_DOC_MESSAGES_PER_10S = 1500;
-    private static final int MAX_ASSIST_MESSAGES_PER_10S = 3000; // señalización y, sobre todo, el movimiento del ratón al controlar
+    private static final int MAX_ASSIST_MESSAGES_PER_10S = 3000; // señalización y, sobre todo, el movimiento del mouse al controlar
 
     static final class Conn implements CollabWs.Peer {
         final WebSocketSession session;

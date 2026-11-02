@@ -73,7 +73,7 @@ public class NoteController {
                           @RequestParam(defaultValue = "NOTE") RoomNote.Kind kind, @Valid @RequestBody NoteRequest req) {
         Room room = rooms.requireWriter(p.userId(), p.role(), code);
         if (notes.countByRoomIdAndKind(room.getId(), kind) >= MAX_ITEMS_PER_KIND) {
-            throw ApiException.conflict("Has alcanzado el máximo de elementos; borra alguno antes de añadir más");
+            throw ApiException.conflict("Has alcanzado el máximo de elementos; borra alguno antes de agregar más");
         }
         folders.requireIn(room.getId(), RoomFolder.Kind.valueOf(kind.name()), req.folderId());
         RoomNote created = new RoomNote(room.getId(), p.userId(), kind, req.content());

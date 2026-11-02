@@ -69,7 +69,7 @@ interface GridProps {
   proposal?: { start: string; end: string } | null
   from?: number
   to?: number
-  /** Pulsar un hueco vacío propone una reunión a esa hora. */
+  /** Presionar un espacio vacío propone una reunión a esa hora. */
   onPick?: (day: string, minute: number) => void
   onOpenEvent?: (id: string) => void
 }

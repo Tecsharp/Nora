@@ -2,7 +2,7 @@ import { fetchBlob, type BlobHandle } from './api'
 
 /**
  * Caché en memoria de los archivos que se previsualizan (imágenes, PDF, texto). Volver a abrir lo que ya se vio es instantáneo y no gasta
- * red. Vive solo mientras la pestaña está abierta y se vacía al cerrar sesión: no deja copias de archivos privados en el disco del equipo.
+ * red. Vive solo mientras la pestaña está abierta y se vacía al cerrar sesión: no deja copias de archivos privados en el disco de la computadora.
  */
 const MAX_BYTES = 200 * 1024 * 1024
 const cache = new Map<string, { blob: Blob; size: number }>() // el orden de inserción hace de LRU
@@ -55,7 +55,7 @@ export function prefetchFile(code: string, fileId: string, sizeBytes: number, mi
   loadFile(code, fileId, () => {}, mime).promise.catch(() => {})
 }
 
-// Direcciones firmadas de reproducción (audio/vídeo): se reutilizan mientras sean válidas, así el navegador reaprovecha lo que ya descargó
+// Direcciones firmadas de reproducción (audio/video): se reutilizan mientras sean válidas, así el navegador reaprovecha lo que ya descargó
 const urls = new Map<string, { at: number; value: unknown }>()
 const URL_TTL = 5 * 60 * 60 * 1000 // el servidor las firma por 6 h
 

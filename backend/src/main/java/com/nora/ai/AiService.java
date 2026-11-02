@@ -27,7 +27,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * Asistente de IA con DeepSeek (API compatible con OpenAI: /chat/completions con streaming). La clave vive solo en el servidor (.env);
- * el navegador nunca la ve. Solo se llama a DeepSeek cuando una persona pulsa un botón de IA y envía únicamente el texto que esa persona
+ * el navegador nunca la ve. Solo se llama a DeepSeek cuando una persona presiona un botón de IA y envía únicamente el texto que esa persona
  * decide procesar. No se guarda ni se registra el contenido.
  *
  * <p>Las «tareas» (resumir, corregir, traducir, extraer tareas…) llevan su instrucción aquí, no en el navegador, para que el texto del

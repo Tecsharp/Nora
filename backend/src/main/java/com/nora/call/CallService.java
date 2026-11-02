@@ -35,10 +35,10 @@ import org.springframework.transaction.annotation.Transactional;
  * Llamadas y videollamadas de una sala, al estilo de Google Meet: un código que se comparte, un anfitrión que decide quién entra,
  * mosaico, presentar pantalla, reacciones, mano levantada, subtítulos, modo complementario y un chat que queda en Mensajes.
  *
- * <p>El audio y el vídeo viajan <b>directo entre navegadores</b> (WebRTC en malla, por eso hay un máximo de personas por llamada); aquí solo se
+ * <p>El audio y el video viajan <b>directo entre navegadores</b> (WebRTC en malla, por eso hay un máximo de personas por llamada); aquí solo se
  * hace de «teléfono» (señalización por el WebSocket), se comprueba que quien entra es de la sala y se guarda el estado compartido (quién está,
  * quién tiene la mano levantada, quién espera). Cada pestaña es un participante (su id es el de la conexión WebSocket): así una misma persona
- * puede entrar con el portátil y, como complemento, con el móvil.
+ * puede entrar con la laptop y, como complemento, con el celular.
  *
  * <pre>
  * cliente → servidor                                    servidor → cliente

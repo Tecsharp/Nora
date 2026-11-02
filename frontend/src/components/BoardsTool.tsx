@@ -272,7 +272,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
         try {
           data = await loadFromBlob(file, null, null)
         } catch {
-          throw new Error('Esa imagen no lleva una pizarra incrustada. Para añadir una imagen, ábrela desde dentro de una pizarra (menú ⋯ → Importar).')
+          throw new Error('Esa imagen no lleva una pizarra incrustada. Para agregar una imagen, ábrela desde dentro de una pizarra (menú ⋯ → Importar).')
         }
         blob = new Blob([serializeAsJSON(data.elements, data.appState, data.files ?? {}, 'local')], { type: 'application/json' })
       } else {
@@ -520,7 +520,7 @@ export default function BoardsTool({ room, onOpen }: { room: Room; onOpen: (d: D
 
       <div className="ex-status">
         <span>{shownFolders.length} carpeta{shownFolders.length === 1 ? '' : 's'} · {shownBoards.length} pizarra{shownBoards.length === 1 ? '' : 's'}</span>
-        <span className="hide-sm">{canWrite ? 'Ctrl/⌘ o Mayús + clic para seleccionar varias' : 'Clic para abrir'}</span>
+        <span className="hide-sm">{canWrite ? 'Ctrl/⌘ o Shift + clic para seleccionar varias' : 'Clic para abrir'}</span>
       </div>
     </div>
   )

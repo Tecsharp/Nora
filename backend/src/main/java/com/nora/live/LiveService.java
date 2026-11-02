@@ -202,7 +202,7 @@ public class LiveService {
         return m;
     }
 
-    /** Título de un vídeo de YouTube (oEmbed público). El servidor solo consulta youtube.com; la dirección va como parámetro, nunca como destino. */
+    /** Título de un video de YouTube (oEmbed público). El servidor solo consulta youtube.com; la dirección va como parámetro, nunca como destino. */
     public String youtubeTitle(String url) {
         try {
             java.net.URI u = java.net.URI.create(url);
