@@ -64,7 +64,7 @@ export default function MediaReviewTool({ room, focus }: { room: Room; focus?: F
     if (c) flash(`#mr-c-${c.id}`)
   })
 
-  // al elegir el archivo: las imágenes salen de la caché (o se descargan una vez, con progreso); el audio y el vídeo usan su dirección firmada
+  // al elegir el archivo: las imágenes salen de la caché (o se descargan una vez, con progreso); el audio y el video usan su dirección firmada
   useEffect(() => {
     if (!file) return
     let alive = true
@@ -114,7 +114,7 @@ export default function MediaReviewTool({ room, focus }: { room: Room; focus?: F
     else m.pause()
   }, [])
 
-  // con el vídeo en marcha dos clics seguidos llevan distinto segundo: el candado evita dos comentarios iguales
+  // con el video en marcha dos clics seguidos llevan distinto segundo: el candado evita dos comentarios iguales
   const posting = useBusy()
   const post = () => posting.run('post', async () => {
     const text = draft.trim()
@@ -185,7 +185,7 @@ export default function MediaReviewTool({ room, focus }: { room: Room; focus?: F
       <div className="mr-empty">
         <Clapperboard size={34} />
         <strong>Todavía no hay nada que revisar</strong>
-        <span className="small">Sube un <b>vídeo, audio o imagen</b> a Archivos y aparecerá aquí para comentarlo en un momento exacto (o en un punto de la imagen) y marcar lo ya resuelto.</span>
+        <span className="small">Sube un <b>video, audio o imagen</b> a Archivos y aparecerá aquí para comentarlo en un momento exacto (o en un punto de la imagen) y marcar lo ya resuelto.</span>
       </div>
     )
   }
@@ -224,7 +224,7 @@ export default function MediaReviewTool({ room, focus }: { room: Room; focus?: F
                 <video key={src.url} ref={el} src={src.url} controls playsInline preload="metadata"
                   onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)} onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
                   onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}
-                  onError={() => setSrc((s) => ({ ...s, error: 'El navegador no puede reproducir este vídeo (formato o códec). Descárgalo desde Archivos.' }))} />
+                  onError={() => setSrc((s) => ({ ...s, error: 'El navegador no puede reproducir este video (formato o códec). Descárgalo desde Archivos.' }))} />
               )}
               {src.url && kind === 'audio' && (
                 <div className="mr-audio">
@@ -274,7 +274,7 @@ export default function MediaReviewTool({ room, focus }: { room: Room; focus?: F
                 <input ref={composer} value={draft} maxLength={2000} placeholder={kind === 'image' ? (pin ? 'Comentario en el punto marcado…' : 'Escribe un comentario…') : `Comentar en ${fmtTime(time)}…`}
                   onFocus={() => { if (pauseOnType && kind !== 'image') el.current?.pause() }}
                   onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); void post() } else if (e.key === 'Escape') { e.stopPropagation(); setPin(null); composer.current?.blur() } }} />
-                {kind !== 'image' && <label className="check small" title="Pausa el vídeo al empezar a escribir y sigue al enviar"><input type="checkbox" checked={pauseOnType} onChange={(e) => setPauseOnType(e.target.checked)} /> Pausar</label>}
+                {kind !== 'image' && <label className="check small" title="Pausa el video al empezar a escribir y sigue al enviar"><input type="checkbox" checked={pauseOnType} onChange={(e) => setPauseOnType(e.target.checked)} /> Pausar</label>}
                 <button className="btn primary sm" disabled={!draft.trim() || posting.busy()} onClick={() => void post()}>Comentar</button>
               </div>
             ) : <p className="callout small mr-ro">Tu rol en esta sala es de <strong>lector</strong>: puedes ver y reproducir, pero no comentar.</p>}
@@ -319,7 +319,7 @@ export default function MediaReviewTool({ room, focus }: { room: Room; focus?: F
               </li>
             )
           })}
-          {!shown.length && <li className="mr-nocomments">{mine.length ? 'Nada con este filtro' : canWrite ? 'Sin comentarios todavía. Escribe el primero debajo del vídeo.' : 'Sin comentarios todavía.'}</li>}
+          {!shown.length && <li className="mr-nocomments">{mine.length ? 'Nada con este filtro' : canWrite ? 'Sin comentarios todavía. Escribe el primero debajo del video.' : 'Sin comentarios todavía.'}</li>}
         </ul>
       </aside>
     </div>

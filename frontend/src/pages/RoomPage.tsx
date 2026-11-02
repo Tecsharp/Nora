@@ -194,7 +194,7 @@ export default function RoomPage() {
     if (isOwnerLike) loadRequests()
   }, [isOwnerLike, loadRequests])
 
-  // una sola respuesta por solicitud: pulsar «Aprobar» y «Rechazar» seguidos no manda dos
+  // una sola respuesta por solicitud: presionar «Aprobar» y «Rechazar» seguidos no manda dos
   const deciding = useBusy()
   const decide = (userId: string, approve: boolean) => deciding.run(`req:${userId}`, async () => {
     try {

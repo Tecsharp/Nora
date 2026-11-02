@@ -8,7 +8,7 @@ const PAGE = 50
  * Mensajes de una conversación en vivo. Trabaja con una ventana de la historia: normalmente los últimos mensajes (hasta el final), pero
  * también puede ser una ventana centrada en un mensaje antiguo (ir a un resultado de búsqueda o a una cita) sin cargar todo lo de en medio.
  * Se pagina hacia atrás (`older`) y hacia delante (`newer`); `latest` vuelve al final.
- * Lo que llega por el WebSocket mientras se carga se guarda y se aplica al terminar, y si la ventana no llega al final no se añade nada
+ * Lo que llega por el WebSocket mientras se carga se guarda y se aplica al terminar, y si la ventana no llega al final no se agrega nada
  * nuevo (se dejaría un hueco): avisa con `atLatest = false`.
  */
 export function useMessages(code: string, conv: string) {

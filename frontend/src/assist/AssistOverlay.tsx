@@ -21,7 +21,7 @@ export default function AssistOverlay() {
               <div className="assist-ask-body">
                 {i.kind === 'request' && <><strong>{i.from.name}</strong> quiere {i.mode === 'control' ? 'ver y controlar' : 'ver'} tu pantalla.<small>Después elegirás qué pantalla compartir{i.mode === 'control' ? ' (completa, para poder controlarla)' : ''}. Puedes terminarlo cuando quieras.</small></>}
                 {i.kind === 'invite' && <><strong>{i.from.name}</strong> quiere compartir su pantalla contigo.</>}
-                {i.kind === 'control' && <><strong>{i.from.name}</strong> pide controlar tu equipo con el ratón y el teclado.<small>Verá lo que hagas y podrá hacer clic y escribir como si fuera tú. Solo mientras lo permitas.</small></>}
+                {i.kind === 'control' && <><strong>{i.from.name}</strong> pide controlar tu computadora con el mouse y el teclado.<small>Verá lo que hagas y podrá hacer clic y escribir como si fuera tú. Solo mientras lo permitas.</small></>}
                 <div className="assist-ask-actions">
                   <button className={`btn sm ${i.kind === 'control' ? 'danger' : 'primary'}`} disabled={busy === i.id}
                     onClick={async () => { setBusy(i.id); await accept(i); setBusy(null) }}>
@@ -40,7 +40,7 @@ export default function AssistOverlay() {
           {sharing.map((s) => (
             <div key={s.id} className={`assist-pill ${s.control === 'granted' ? 'red' : ''}`}>
               {s.control === 'granted' ? <Hand size={15} /> : <MonitorUp size={15} />}
-              <span>{s.control === 'granted' ? <><strong>{s.peer.name}</strong> está controlando tu equipo</> : <>Compartes tu pantalla con <strong>{s.peer.name}</strong></>}</span>
+              <span>{s.control === 'granted' ? <><strong>{s.peer.name}</strong> está controlando tu computadora</> : <>Compartes tu pantalla con <strong>{s.peer.name}</strong></>}</span>
               {s.control === 'granted' && <button className="btn sm danger" onClick={() => revokeControl(s.id)}>Detener control</button>}
               <button className="btn sm ghost" onClick={() => end(s.id)}><MonitorOff size={14} /> Dejar de compartir</button>
             </div>
@@ -68,7 +68,7 @@ function ViewerPanel({ s, index }: { s: AssistSession; index: number }) {
     if (video.current) video.current.srcObject = s.stream
   }, [s.stream])
 
-  /** Posición del puntero dentro de la imagen de la pantalla (0–1), descontando las franjas que deja el ajuste del vídeo. */
+  /** Posición del puntero dentro de la imagen de la pantalla (0–1), descontando las franjas que deja el ajuste del video. */
   const norm = (e: { clientX: number; clientY: number }) => {
     const v = video.current
     if (!v || !v.videoWidth) return null
@@ -124,7 +124,7 @@ function ViewerPanel({ s, index }: { s: AssistSession; index: number }) {
         <span className="spacer" />
         {controlling
           ? <button className="btn sm danger" onClick={() => revokeControl(s.id)}>Dejar de controlar</button>
-          : <button className="btn sm" disabled={s.control === 'asked' || !agents.has(s.peer.id)} onClick={() => requestControl(s.id)} title={agents.has(s.peer.id) ? 'Pide permiso para usar su ratón y teclado' : `${s.peer.name} no tiene el agente de Nora conectado: sin él solo se puede ver su pantalla`}><MousePointer2 size={14} /> Controlar</button>}
+          : <button className="btn sm" disabled={s.control === 'asked' || !agents.has(s.peer.id)} onClick={() => requestControl(s.id)} title={agents.has(s.peer.id) ? 'Pide permiso para usar su mouse y teclado' : `${s.peer.name} no tiene el agente de Nora conectado: sin él solo se puede ver su pantalla`}><MousePointer2 size={14} /> Controlar</button>}
         <button className="icon-btn" onClick={() => setBig((b) => !b)} aria-label={big ? 'Reducir' : 'Ampliar'} title={big ? 'Reducir' : 'Ampliar'}>{big ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button>
         <button className="icon-btn" onClick={() => end(s.id)} aria-label="Terminar" title="Terminar la asistencia"><X size={16} /></button>
       </div>
@@ -141,7 +141,7 @@ function ViewerPanel({ s, index }: { s: AssistSession; index: number }) {
       >
         <video ref={video} autoPlay playsInline muted />
         {!s.stream && <span className="assist-wait">Esperando la pantalla…</span>}
-        {controlling && <span className="assist-hint">Haz clic aquí para usar el ratón y el teclado en su equipo</span>}
+        {controlling && <span className="assist-hint">Haz clic aquí para usar el mouse y el teclado en su computadora</span>}
       </div>
     </div>
   )

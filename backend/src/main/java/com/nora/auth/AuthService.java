@@ -299,7 +299,7 @@ public class AuthService {
         if (rows.isEmpty()) throw ApiException.notFound("Este enlace no es válido");
         ResetRow row = rows.get(0);
         if (row.used()) throw new ApiException(HttpStatus.GONE, "Este enlace ya se usó o fue sustituido por otro");
-        if (row.expiresAt().isBefore(Instant.now())) throw new ApiException(HttpStatus.GONE, "Este enlace ha caducado. Pide uno nuevo al administrador");
+        if (row.expiresAt().isBefore(Instant.now())) throw new ApiException(HttpStatus.GONE, "Este enlace ha vencido. Pide uno nuevo al administrador");
         return row;
     }
 

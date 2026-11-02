@@ -1,4 +1,4 @@
-//! Nora Agent: programa de escritorio (macOS, Windows y Linux) que permite que alguien de tu sala controle tu equipo con el ratón y el teclado,
+//! Nora Agent: programa de escritorio (macOS, Windows y Linux) que permite que alguien de tu sala controle tu computadora con el mouse y el teclado,
 //! solo cuando tú lo aceptas desde Nora. Un navegador no puede hacerlo por sí solo; por eso existe. La pantalla la comparte tu navegador;
 //! este programa solo aplica los clics y las teclas autorizados.
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]

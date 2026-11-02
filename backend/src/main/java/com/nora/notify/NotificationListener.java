@@ -41,7 +41,7 @@ public class NotificationListener {
             case "room.expiring" -> rooms.findById(e.roomId()).ifPresent(room -> {
                 if (!(e.data() instanceof Map<?, ?> m)) return;
                 notifications.notify(room.getOwnerId(), room, "room", "La sala expira en " + m.get("minutesLeft") + " min",
-                        "Puedes ampliarla o dejarla «mantenida» desde sus ajustes.", Map.of("tool", "settings"), "expiring:" + room.getCode());
+                        "Puedes ampliarla o dejarla «mantenida» desde su configuración.", Map.of("tool", "settings"), "expiring:" + room.getCode());
             });
             case "room.inactive" -> rooms.findById(e.roomId()).ifPresent(room ->
                     notifications.notifyRoom(room, null, "room", "La sala quedó inactiva", "Nada se borró. Quien la creó puede reactivarla.", Map.of(), "inactive"));

@@ -10,7 +10,7 @@ export const newId = () => {
 type AnyEl = Record<string, unknown> & { id: string }
 
 /**
- * Da ids nuevos a unos elementos importados (para poder añadirlos a una pizarra que ya tiene contenido sin que choquen con
+ * Da ids nuevos a unos elementos importados (para poder agregarlos a una pizarra que ya tiene contenido sin que choquen con
  * los suyos) y recoloca las referencias entre ellos: contenedores, flechas ligadas, grupos y marcos.
  */
 export function reidElements<T extends AnyEl>(elements: readonly T[]): T[] {

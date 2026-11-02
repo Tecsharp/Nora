@@ -18,7 +18,7 @@ function Terms() {
         <li>Debes facilitar datos veraces y mantener tu contraseña en secreto. Eres responsable de la actividad de tu cuenta.</li>
         <li>Tras varios intentos fallidos de acceso la cuenta se bloquea temporalmente por seguridad.</li>
         <li>Un administrador puede modificar tus límites o desactivar tu cuenta si incumples estos términos.</li>
-        <li><strong>Puedes borrar tu cuenta cuando quieras</strong> desde Ajustes → Cuenta. Al hacerlo se eliminan de forma definitiva y completa tus datos (ver «Manejo de datos»). No se puede deshacer.</li>
+        <li><strong>Puedes borrar tu cuenta cuando quieras</strong> desde Configuración → Cuenta. Al hacerlo se eliminan de forma definitiva y completa tus datos (ver «Manejo de datos»). No se puede deshacer.</li>
       </ul>
       <h2>3. Salas temporales: tu contenido no es permanente</h2>
       <p>Cada sala tiene una duración. Cuando expira, o cuando se cierra, se eliminan de forma definitiva sus archivos, carpetas, notas, documentos y pizarras. <strong>Descarga lo que quieras conservar antes de que termine la sala.</strong> Nora no es un servicio de copia de seguridad.</p>
@@ -78,7 +78,7 @@ function Privacy() {
         <li>El operador de esta instancia, que administra el servidor y las cuentas. El contenido <strong>no está cifrado de extremo a extremo</strong>, así que el operador puede técnicamente acceder al almacenamiento.</li>
       </ul>
       <h2>Tus derechos</h2>
-      <p>Puedes <strong>modificar tus datos</strong> (nombre, correo, foto y contraseña) y <strong>eliminar tu cuenta y todos tus datos</strong> tú mismo en cualquier momento desde Ajustes, sin intermediarios. También puedes pedir acceso o oponerte a su tratamiento contactando con el administrador de esta instancia, y borrar tus archivos y notas desde la sala cuando quieras.</p>
+      <p>Puedes <strong>modificar tus datos</strong> (nombre, correo, foto y contraseña) y <strong>eliminar tu cuenta y todos tus datos</strong> tú mismo en cualquier momento desde Configuración, sin intermediarios. También puedes pedir acceso o oponerte a su tratamiento contactando con el administrador de esta instancia, y borrar tus archivos y notas desde la sala cuando quieras.</p>
       <h2>Menores</h2>
       <p>Nora no está dirigido a menores de 14 años.</p>
     </>
@@ -110,7 +110,7 @@ function DataHandling() {
         <li><strong>Archivos individuales y carpetas:</strong> hasta que alguien con permiso los borra. Al borrar una carpeta se elimina todo su contenido.</li>
         <li><strong>Subidas incompletas:</strong> se descartan automáticamente tras 24 horas sin actividad.</li>
         <li><strong>Salas sin expiración:</strong> algunas cuentas pueden tener salas sin límite de tiempo; permanecen hasta que se cierran.</li>
-        <li><strong>Datos de cuenta:</strong> mientras la cuenta exista. Al borrarla (Ajustes → Cuenta, o a petición tuya al administrador) se eliminan de forma definitiva: tu perfil y foto, tus sesiones, las salas de las que eres propietario con todo su contenido, los archivos, notas, documentos y pizarras que creaste en otras salas, tus bibliotecas y tu pertenencia a salas. Los archivos también se borran del almacenamiento de objetos. Nada se conserva «por si acaso» ni se anonimiza para guardarlo: no hay copias de seguridad.</li>
+        <li><strong>Datos de cuenta:</strong> mientras la cuenta exista. Al borrarla (Configuración → Cuenta, o a petición tuya al administrador) se eliminan de forma definitiva: tu perfil y foto, tus sesiones, las salas de las que eres propietario con todo su contenido, los archivos, notas, documentos y pizarras que creaste en otras salas, tus bibliotecas y tu pertenencia a salas. Los archivos también se borran del almacenamiento de objetos. Nada se conserva «por si acaso» ni se anonimiza para guardarlo: no hay copias de seguridad.</li>
       </ul>
       <h2>Copias de seguridad</h2>
       <p>Nora no realiza copias de seguridad del contenido de las salas: lo que se borra no se puede recuperar.</p>

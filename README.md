@@ -139,7 +139,7 @@ docker compose up -d --build
 
 ```bash
 git pull
-./setup.sh               # añade al .env las variables nuevas y reconstruye
+./setup.sh               # agrega al .env las variables nuevas y reconstruye
 ```
 Las migraciones de la base de datos (Flyway) se aplican solas al arrancar.
 </details>
@@ -177,7 +177,7 @@ flowchart LR
     BE --> S3
     BE --> CV
     BE -.-> AI
-    B <-.->|"audio y vídeo (WebRTC)"| P
+    B <-.->|"audio y video (WebRTC)"| P
 ```
 
 | Servicio | Tecnología | Notas |
@@ -196,11 +196,11 @@ flowchart LR
 2. Comparte el **código** (`abc-defg-hij`) o el enlace: solo entran personas de la sala.
 3. Dentro: **Mosaico / Destacado / Barra lateral**, presentar pantalla, reacciones, mano levantada, subtítulos y **Chat de la llamada**, que queda como grupo en *Mensajes*.
 
-El audio y el vídeo van **directos entre navegadores** (WebRTC en malla): Nora solo señaliza y nunca ve el contenido. Por eso el límite por defecto son **8 personas** (`NORA_CALL_MAX_PARTICIPANTS`). Detalles, subtítulos, límites y protocolo en [docs/LLAMADAS.md](docs/LLAMADAS.md).
+El audio y el video van **directos entre navegadores** (WebRTC en malla): Nora solo señaliza y nunca ve el contenido. Por eso el límite por defecto son **8 personas** (`NORA_CALL_MAX_PARTICIPANTS`). Detalles, subtítulos, límites y protocolo en [docs/LLAMADAS.md](docs/LLAMADAS.md).
 
 ## 🖥️ Agente de escritorio
 
-Un navegador no puede mover el ratón de otro equipo, así que la asistencia con control usa un **programa pequeño** para **Windows, macOS y Linux**: se vincula con tu cuenta con un código de un solo uso, sigue el tema claro u oscuro del sistema, muestra qué usuario está conectado y su versión, y **solo aplica clics y teclas mientras tú lo permites**.
+Un navegador no puede mover el mouse de otra computadora, así que la asistencia con control usa un **programa pequeño** para **Windows, macOS y Linux**: se vincula con tu cuenta con un código de un solo uso, sigue el tema claro u oscuro del sistema, muestra qué usuario está conectado y su versión, y **solo aplica clics y teclas mientras tú lo permites**.
 
 Se descarga desde la propia herramienta *Asistencia* (releases de GitHub) o se compila con `agent/build.sh` · `agent/build.ps1`. Más en [agent/README.md](agent/README.md).
 
@@ -245,7 +245,7 @@ cd backend && mvn spring-boot:run
 cd frontend && npm install && npm run dev
 ```
 
-Cada `push` ejecuta **GitHub Actions** (`CI`: backend, frontend, agente y `docker-compose.yml`) y los cambios de `develop`/`main` se analizan con **SonarQube/SonarCloud**. Cómo enlazarlo sin Jenkins, y cómo añadir **Coverity**, en [docs/CALIDAD.md](docs/CALIDAD.md).
+Cada `push` ejecuta **GitHub Actions** (`CI`: backend, frontend, agente y `docker-compose.yml`) y los cambios de `develop`/`main` se analizan con **SonarQube/SonarCloud**. Cómo enlazarlo sin Jenkins, y cómo agregar **Coverity**, en [docs/CALIDAD.md](docs/CALIDAD.md).
 
 Los mensajes de commit siguen el formato `[TICKET] Descripción`, y las funciones nuevas se desarrollan en ramas `feature/*` que se integran en `develop` con *pull request*.
 

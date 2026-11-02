@@ -7,7 +7,7 @@ Esta guía explica cómo pasar Nora por **SonarQube** y **Coverity** y cómo mos
 | Archivo | Para qué |
 |---|---|
 | `.github/workflows/ci.yml` | **CI**: compila el backend (Maven), el frontend (TypeScript + Vite), comprueba el agente (Rust) y valida `docker-compose.yml`. Es el que da la insignia **CI passing**. |
-| `.github/workflows/sonar.yml` | Análisis de **SonarQube / SonarCloud**. Se salta solo (sin fallar) hasta que añadas el secreto `SONAR_TOKEN`. |
+| `.github/workflows/sonar.yml` | Análisis de **SonarQube / SonarCloud**. Se salta solo (sin fallar) hasta que agregues el secreto `SONAR_TOKEN`. |
 | `sonar-project.properties` | Qué carpetas analiza Sonar (backend, frontend y agente) y qué excluye. |
 
 ## Cuándo se ejecuta
@@ -17,7 +17,7 @@ Esta guía explica cómo pasar Nora por **SonarQube** y **Coverity** y cómo mos
 | **CI** | En **cada `git push`** (cualquier rama), en cada pull request y a mano. No hay que configurar nada: GitHub lo ejecuta al subir el archivo `.github/workflows/ci.yml`. |
 | **Calidad (SonarQube)** | En cada push a **`develop` o `main`**, en pull requests (solo SonarCloud) y a mano. En ramas `feature/*` no se lanza a propósito: SonarQube Community solo analiza la rama principal y una rama de trabajo la pisaría. |
 
-Dónde verlo: pestaña **Actions** del repositorio en GitHub (verde = bien, rojo = falló; pulsa la ejecución para ver el registro). Para lanzarlo sin hacer push: **Actions → elige el flujo → Run workflow**.
+Dónde verlo: pestaña **Actions** del repositorio en GitHub (verde = bien, rojo = falló; presiona la ejecución para ver el registro). Para lanzarlo sin hacer push: **Actions → elige el flujo → Run workflow**.
 
 > Los flujos solo se ejecutan si el archivo existe en la rama que subes. La insignia de CI del README apunta a `develop`: se pone verde cuando `develop` ya tiene `ci.yml` (al hacer merge de la rama) y se ha ejecutado una vez.
 
@@ -27,12 +27,12 @@ Sonar necesita dos cosas: **un servidor Sonar** y **alguien que ejecute el anál
 
 ### Opción A · SonarCloud (la más rápida, gratis para repositorios públicos)
 
-1. Entra en <https://sonarcloud.io> con tu cuenta de GitHub y pulsa **Analyze new project** → elige `Tecsharp/Nora`. Elige *«With GitHub Actions»* (no *Automatic Analysis*).
+1. Entra en <https://sonarcloud.io> con tu cuenta de GitHub y presiona **Analyze new project** → elige `Tecsharp/Nora`. Elige *«With GitHub Actions»* (no *Automatic Analysis*).
 2. SonarCloud te da una **organización** y una **clave de proyecto** (suele ser `Tecsharp_Nora`; si es otra, cámbiala en el README y en `sonar-project.properties`).
 3. En SonarCloud: **My Account → Security → Generate token** y copia el token.
 4. En GitHub: **Settings → Secrets and variables → Actions**
    - pestaña *Secrets* → **New repository secret**: `SONAR_TOKEN` = el token.
-   - pestaña *Variables* → **New repository variable**: `SONAR_ORGANIZATION` = tu organización de SonarCloud (por ejemplo `tecsharp`). Si la clave del proyecto no es `Tecsharp_Nora`, añade también `SONAR_PROJECT_KEY`.
+   - pestaña *Variables* → **New repository variable**: `SONAR_ORGANIZATION` = tu organización de SonarCloud (por ejemplo `tecsharp`). Si la clave del proyecto no es `Tecsharp_Nora`, agrega también `SONAR_PROJECT_KEY`.
 5. Haz un push a `develop` (o lanza el flujo a mano en **Actions → Calidad (SonarQube) → Run workflow**). En unos minutos aparece el análisis en SonarCloud y las insignias del README se rellenan.
 6. Recomendado: en SonarCloud desactiva **Automatic Analysis** (Administration → Analysis Method) para que no se duplique con el flujo.
 
@@ -59,7 +59,7 @@ docker run -d --name sonarqube --restart unless-stopped -p 9000:9000 \
 ### Qué analiza y qué no
 
 - Analiza **Java** (backend) y **TypeScript/React** (frontend); el agente en **Rust** está en la lista de fuentes, pero Sonar solo lo revisa si tu edición incluye analizador de Rust. Se excluyen `node_modules`, `dist`, `target`, CSS y documentación.
-- La **cobertura de pruebas** no aparece todavía: hoy el repositorio apenas tiene pruebas unitarias. Para medirla, añade el plugin **JaCoCo** a `backend/pom.xml` y pasa `-Dsonar.coverage.jacoco.xmlReportPaths=backend/target/site/jacoco/jacoco.xml`.
+- La **cobertura de pruebas** no aparece todavía: hoy el repositorio apenas tiene pruebas unitarias. Para medirla, agrega el plugin **JaCoCo** a `backend/pom.xml` y pasa `-Dsonar.coverage.jacoco.xmlReportPaths=backend/target/site/jacoco/jacoco.xml`.
 - El flujo espera al **Quality Gate** (`sonar.qualitygate.wait=true`): si el código nuevo no lo cumple, el flujo falla y lo verás en el *pull request*. Para que sea informativo y no bloquee, quita esa línea de `sonar.yml`.
 
 ## Coverity Scan

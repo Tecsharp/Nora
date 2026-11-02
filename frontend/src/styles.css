@@ -771,7 +771,7 @@ table.table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 .prep-note span { display: flex; flex-direction: column; gap: 2px; }
 .prep-note small { font-size: 0.8rem; opacity: 0.85; line-height: 1.4; }
 
-/* Selección múltiple en Archivos y selección con el ratón */
+/* Selección múltiple en Archivos y selección con el mouse */
 .fcheck { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; opacity: 0; transition: opacity 0.12s; }
 .fitem:hover .fcheck, .fitem:focus-within .fcheck, .fitem.selected .fcheck, .sel-active .fcheck, .fcheck:focus-visible { opacity: 1; }
 .fcheck.on { color: var(--accent); }

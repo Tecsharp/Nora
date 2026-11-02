@@ -5,8 +5,8 @@ export interface MarqueeBox { left: number; top: number; width: number; height: 
 const INTERACTIVE = '[data-sel-id], button, a, input, select, textarea, label, .menu, .fitem, .board-card, [role=button], [role=menuitem]'
 
 /**
- * Selección con el ratón (rectángulo elástico): al arrastrar sobre un hueco del contenedor se dibuja un rectángulo y se
- * seleccionan los elementos con `data-sel-id` que toca. Con Ctrl/⌘ o Mayús se suma a lo ya seleccionado.
+ * Selección con el mouse (rectángulo elástico): al arrastrar sobre un horario del contenedor se dibuja un rectángulo y se
+ * seleccionan los elementos con `data-sel-id` que toca. Con Ctrl/⌘ o Shift se suma a lo ya seleccionado.
  * `onSelect` recibe los ids tocados y si se suma. Devuelve el rectángulo para dibujarlo y si acaba de terminar un arrastre
  * (para que el clic que sigue no borre la selección).
  */

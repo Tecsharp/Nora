@@ -6,7 +6,7 @@ import java.util.Map;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-/** Ajustes del sistema que decide el administrador en caliente; lo que no está guardado sale de la configuración (variables de entorno). */
+/** Configuración del sistema que decide el administrador en caliente; lo que no está guardado sale de la configuración (variables de entorno). */
 @Service
 public class SettingsService {
 

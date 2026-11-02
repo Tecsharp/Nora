@@ -390,7 +390,7 @@ export default function SlidesEditor({ provider, editable }: Props) {
     setChartDlg(null)
   }
 
-  if (!slideId) return <div className="empty"><strong>Esta presentación no tiene diapositivas</strong>{editable && <button className="btn" onClick={() => setCurrent(store.addSlide())}>Añadir diapositiva</button>}</div>
+  if (!slideId) return <div className="empty"><strong>Esta presentación no tiene diapositivas</strong>{editable && <button className="btn" onClick={() => setCurrent(store.addSlide())}>Agregar diapositiva</button>}</div>
 
   const single = sel.length === 1 ? sel[0]! : null
   const boxStyle = (el: Elem) => ({ left: `${el.x}%`, top: `${el.y}%`, width: `${el.w}%`, height: `${el.h}%`, transform: el.rot ? `rotate(${el.rot}deg)` : undefined })

@@ -7,7 +7,7 @@ import { prettyLibraryName } from './libraryNames'
 export interface SysItem { id: string; name?: string; elements: unknown[] }
 export interface SysGroup { id: string; name: string; items: SysItem[] }
 
-const SHOWN = 8 // elementos que se ven de cada biblioteca hasta pulsar «Ver todos»
+const SHOWN = 8 // elementos que se ven de cada biblioteca hasta presionar «Ver todos»
 const previews = new Map<string, string>() // id+tema → data URL del SVG (se dibuja una sola vez)
 
 /** Miniatura de un elemento de biblioteca: se dibuja solo cuando entra en pantalla, para no cargar la app. */
@@ -33,7 +33,7 @@ const Tile = memo(function Tile({ item, dark, onInsert }: { item: SysItem; dark:
     return () => { alive = false; io.disconnect() }
   }, [src, key, item.elements, dark])
   return (
-    <button ref={box} type="button" className="syslib-tile" title={item.name ? `${item.name} · clic para añadir` : 'Clic para añadirlo a la pizarra'} onClick={() => onInsert(item)}>
+    <button ref={box} type="button" className="syslib-tile" title={item.name ? `${item.name} · clic para agregar` : 'Clic para agregarlo a la pizarra'} onClick={() => onInsert(item)}>
       {src ? <img src={src} alt={item.name ?? ''} draggable={false} /> : <span className="syslib-ph" />}
     </button>
   )

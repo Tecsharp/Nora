@@ -130,7 +130,7 @@ function DockWindow({ conv, min }: { conv: Conv; min: boolean }) {
         </span>
         {min && conv.unread > 0 && !conv.muted && <span className="cbadge">{conv.unread > 99 ? '99+' : conv.unread}</span>}
         <span className="cwin-btns" onClick={(e) => e.stopPropagation()}>
-          <button className="icon-btn sm" aria-label="Ajustes del chat" title="Ajustes" onClick={() => setInfo(true)}><Settings2 size={15} /></button>
+          <button className="icon-btn sm" aria-label="Configuración del chat" title="Configuración" onClick={() => setInfo(true)}><Settings2 size={15} /></button>
           <button className="icon-btn sm" aria-label="Abrir en el chat completo" title="Abrir en el chat completo" onClick={() => chat.openFull(conv.id)}><Maximize2 size={14} /></button>
           <button className="icon-btn sm" aria-label={min ? 'Restaurar' : 'Minimizar'} title={min ? 'Restaurar' : 'Minimizar'} onClick={() => chat.toggleMin(conv.id)}><Minus size={15} /></button>
           <button className="icon-btn sm" aria-label="Cerrar" title="Cerrar" onClick={() => chat.closeWindow(conv.id)}><X size={15} /></button>

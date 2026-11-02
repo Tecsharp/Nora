@@ -73,7 +73,7 @@ export function startUpload(code: string, file: File, onUpdate: (p: UploadProgre
           await attempt()
           return
         } catch (e) {
-          // La sesión puede haber caducado en el servidor: se crea otra una sola vez.
+          // La sesión puede haber vencido en el servidor: se crea otra una sola vez.
           if (e instanceof SessionGone && restart < 1 && !canceled) continue
           throw e
         }
@@ -214,7 +214,7 @@ export function startUpload(code: string, file: File, onUpdate: (p: UploadProgre
             lastLoaded.delete(n)
             if (e instanceof Canceled || e instanceof FatalError || e instanceof SessionGone) throw e
             if (e instanceof ApiError && e.status === 401) {
-              if (!(await refreshSession())) throw new FatalError('Tu sesión ha caducado')
+              if (!(await refreshSession())) throw new FatalError('Tu sesión ha vencido')
               continue
             }
             if (tries + 1 >= MAX_ATTEMPTS) throw new FatalError('No se pudo subir tras varios intentos')

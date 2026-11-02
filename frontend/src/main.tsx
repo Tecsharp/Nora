@@ -2,7 +2,7 @@
 // Tiene que estar puesto antes de que se cargue su código, por eso vive en el punto de entrada.
 ;(window as unknown as { EXCALIDRAW_ASSET_PATH: string }).EXCALIDRAW_ASSET_PATH = '/excalidraw-assets/'
 
-// Excalidraw añade a cada fuente una copia de respaldo en https://esm.sh. Aquí no hace falta (y la CSP la bloquearía, además de
+// Excalidraw agrega a cada fuente una copia de respaldo en https://esm.sh. Aquí no hace falta (y la CSP la bloquearía, además de
 // que Nora no debe pedir nada a terceros), así que se descarta esa dirección y solo quedan las locales.
 const NativeFontFace = window.FontFace
 window.FontFace = class extends NativeFontFace {

@@ -42,7 +42,7 @@ export default function ChatApp({ focus }: { focus?: FocusTarget | null }) {
   }, [focus, convs])
   // por defecto, la general (o la que se estaba mirando en el dock)
   useEffect(() => {
-    if (sel || !loaded || chat.narrow || (focus?.conv && convs.some((c) => c.id === focus.conv))) return // en el móvil se empieza por la lista; con una conversación pedida (barra lateral, aviso) manda esa
+    if (sel || !loaded || chat.narrow || (focus?.conv && convs.some((c) => c.id === focus.conv))) return // en el celular se empieza por la lista; con una conversación pedida (barra lateral, aviso) manda esa
     const dockFirst = chat.dock.wins.find((w) => !w.min && convs.some((c) => c.id === w.id))?.id
     setSel(dockFirst ?? convs.find((c) => c.kind === 'ROOM')?.id ?? convs[0]?.id ?? null)
   }, [sel, loaded, convs, chat.dock.wins, chat.narrow, focus])
@@ -118,7 +118,7 @@ export default function ChatApp({ focus }: { focus?: FocusTarget | null }) {
           : <div className="capp-blank"><Sparkles size={34} /><strong>Elige una conversación</strong><span className="small muted">O empieza un grupo o un mensaje directo con las personas de la sala.</span></div>}
       </section>
       {panel === 'info' && current && (
-        <aside className="capp-info" aria-label="Ajustes de la conversación">
+        <aside className="capp-info" aria-label="Configuración de la conversación">
           <ConvInfo conv={current} onClose={() => setPanel('none')} onGone={() => { setPanel('none'); setSel(null) }} />
         </aside>
       )}
@@ -146,14 +146,14 @@ function Conversation({ conv, panel, onPanel, onBack, focusMsg }: { conv: Conv; 
     <>
       <header className="capp-head">
         <button className="icon-btn capp-back" aria-label="Volver a los chats" onClick={onBack}><ArrowLeft size={18} /></button>
-        <button className="capp-who" onClick={() => onPanel('info')} aria-label="Ver ajustes de la conversación">
+        <button className="capp-who" onClick={() => onPanel('info')} aria-label="Ver configuración de la conversación">
           <ConvAvatar conv={conv} size={40} />
           <span><b className="truncate">{chat.title(conv)}</b><small className="truncate">{sub}</small></span>
         </button>
         <span className="spacer" />
         <AiAssist actions={SUMMARY} getText={text} label="Resumir" title="Resumir la conversación con IA" disabled={store.items.length < 3} />
         <button className={`icon-btn ${panel === 'search' ? 'on' : ''}`} aria-label="Buscar en la conversación" aria-pressed={panel === 'search'} title="Buscar en la conversación" onClick={() => onPanel('search')}><Search size={18} /></button>
-        <button className={`icon-btn ${panel === 'info' ? 'on' : ''}`} aria-label="Ajustes de la conversación" aria-pressed={panel === 'info'} title="Ajustes" onClick={() => onPanel('info')}><Info size={18} /></button>
+        <button className={`icon-btn ${panel === 'info' ? 'on' : ''}`} aria-label="Configuración de la conversación" aria-pressed={panel === 'info'} title="Configuración" onClick={() => onPanel('info')}><Info size={18} /></button>
       </header>
       <ChatPane conv={conv} store={store} variant="full" focusMsg={focusMsg} />
     </>

@@ -29,7 +29,7 @@ const dayLabel = (d: Date) => {
 const clock = (d: Date) => d.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-/** Texto con enlaces pulsables y @menciones resaltadas (sin HTML: nada del mensaje se interpreta). */
+/** Texto con enlaces clicables y @menciones resaltadas (sin HTML: nada del mensaje se interpreta). */
 export function rich(text: string, names: string[], me: string): ReactNode[] {
   const mention = names.length ? `|@(?:${[...names].sort((a, b) => b.length - a.length).map(escapeRe).join('|')})` : ''
   const re = new RegExp(`(https?:\\/\\/[^\\s<]+[^\\s<.,;:!?)\\]'"])${mention}`, 'giu')
@@ -176,7 +176,7 @@ export default function ChatPane({ conv, store, variant, focusMsg }: Props) {
       anchor.current = null
       const idx = rows.findIndex((r) => r.key === a.key)
       const start = idx >= 0 ? virtualizer.measurementsCache[idx]?.start : undefined
-      if (start != null) el.scrollTop += start - a.start // lo añadido por encima (con alturas estimadas)
+      if (start != null) el.scrollTop += start - a.start // lo agregado por encima (con alturas estimadas)
       // al pintarse las filas nuevas se miden y cambian de altura: unos fotogramas se recoloca lo leído en su sitio exacto
       const t0 = Date.now()
       const settle = () => {

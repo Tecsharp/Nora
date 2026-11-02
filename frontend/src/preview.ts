@@ -19,7 +19,7 @@ export const isEditable = (name: string) => EDITABLE.has(ext(name))
 
 const ext = (name: string) => name.split('.').pop()?.toLowerCase() ?? ''
 
-/** Qué visor corresponde al archivo. Los vídeos (y el resto) no se previsualizan: se descargan. */
+/** Qué visor corresponde al archivo. Los videos (y el resto) no se previsualizan: se descargan. */
 export function previewKind(name: string): PreviewKind | null {
   const e = ext(name)
   if (e in IMAGE) return 'image'

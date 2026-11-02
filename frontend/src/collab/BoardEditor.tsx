@@ -38,15 +38,15 @@ const saveSnap = (on: boolean) => {
   } catch { /* sin almacenamiento: solo dura esta sesión */ }
 }
 
-/** Botones de alineación. Los nombres son los de Excalidraw en español: se usan para pulsar su botón nativo, que mueve también el texto ligado, las flechas y los grupos. */
+/** Botones de alineación. Los nombres son los de Excalidraw en español: se usan para presionar su botón nativo, que mueve también el texto ligado, las flechas y los grupos. */
 const ALIGN: ({ label: string; icon: LucideIcon; hint?: string } | null)[] = [
-  { label: 'Alinear a la izquierda', icon: AlignStartVertical, hint: 'Ctrl+Mayús+←' },
+  { label: 'Alinear a la izquierda', icon: AlignStartVertical, hint: 'Ctrl+Shift+←' },
   { label: 'Centrar horizontalmente', icon: AlignCenterVertical, hint: 'quedan en columna, con el mismo centro' },
-  { label: 'Alinear a la derecha', icon: AlignEndVertical, hint: 'Ctrl+Mayús+→' },
+  { label: 'Alinear a la derecha', icon: AlignEndVertical, hint: 'Ctrl+Shift+→' },
   null,
-  { label: 'Alineación superior', icon: AlignStartHorizontal, hint: 'Ctrl+Mayús+↑' },
+  { label: 'Alineación superior', icon: AlignStartHorizontal, hint: 'Ctrl+Shift+↑' },
   { label: 'Centrar verticalmente', icon: AlignCenterHorizontal, hint: 'quedan en fila, con el mismo centro' },
-  { label: 'Alineación inferior', icon: AlignEndHorizontal, hint: 'Ctrl+Mayús+↓' },
+  { label: 'Alineación inferior', icon: AlignEndHorizontal, hint: 'Ctrl+Shift+↓' },
 ]
 const DISTRIBUTE: { label: string; icon: LucideIcon }[] = [
   { label: 'Distribuir horizontalmente', icon: AlignHorizontalDistributeCenter },
@@ -106,7 +106,7 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
     }
   })
   const [sbEl, setSbEl] = useState<HTMLElement | null>(null)
-  const [phone, setPhone] = useState(false) // diseño de móvil de Excalidraw: sin panel de propiedades a mano, la barra no puede pulsar sus botones
+  const [phone, setPhone] = useState(false) // diseño de celular de Excalidraw: sin panel de propiedades a mano, la barra no puede presionar sus botones
 
   const initialData = useMemo(() => {
     const grid = typeof store.meta.get('grid') === 'number'
@@ -252,10 +252,10 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
   }
   useEffect(() => () => clearTimeout(libTimer.current), [])
 
-  /** Añade un elemento de una biblioteca del sistema en el centro de lo que se está viendo (con ids nuevos). */
+  /** Agrega un elemento de una biblioteca del sistema en el centro de lo que se está viendo (con ids nuevos). */
   const insertSystem = useCallback((item: SysItem) => {
     if (!api) return
-    if (!editableRef.current) return toast('Solo lectura: no puedes añadir elementos', 'warning')
+    if (!editableRef.current) return toast('Solo lectura: no puedes agregar elementos', 'warning')
     // las bibliotecas (sobre todo las antiguas) pueden traer elementos sin campos que hoy son obligatorios (groupIds, version, index…):
     // se completan igual que hace Excalidraw al cargar un archivo, y se desbloquean para que el elemento insertado se pueda mover
     const fresh = restoreElements(
@@ -534,7 +534,7 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
     api.updateScene({ appState: { objectsSnapModeEnabled: !api.getAppState().objectsSnapModeEnabled, gridModeEnabled: false }, captureUpdate: CaptureUpdateAction.NEVER })
   }, [api])
 
-  /** Pulsa el botón de alineación de Excalidraw (el panel de propiedades): así se mueven también el texto ligado, las flechas y los grupos. */
+  /** Presiona el botón de alineación de Excalidraw (el panel de propiedades): así se mueven también el texto ligado, las flechas y los grupos. */
   const align = useCallback((label: string) => {
     const btn = root.current?.querySelector<HTMLButtonElement>(`.excalidraw button[aria-label="${label}"]`)
     if (btn) btn.click()
@@ -610,7 +610,7 @@ export default function BoardEditor({ provider, editable, onHandle, onImportRequ
         </MainMenu>
       </Excalidraw>
       {sbEl && !phone && createPortal(
-        // dentro de la propia barra: así Excalidraw no la cierra al pulsar el asa (lo haría con un clic «fuera»)
+        // dentro de la propia barra: así Excalidraw no la cierra al presionar el asa (lo haría con un clic «fuera»)
         <div className="board-sb-handle" role="separator" aria-orientation="vertical" aria-label="Cambiar el ancho de la barra de bibliotecas" title="Cambiar el ancho"
           onPointerDown={startResize} onDoubleClick={() => { setSbWidth(302); try { localStorage.removeItem('nora-board-sidebar') } catch { /* nada */ } }} />,
         sbEl,

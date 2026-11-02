@@ -24,15 +24,15 @@ las **conversaciones abiertas como ventanas** que se minimizan, se cierran o se 
 El estado del dock se recuerda por sala. En pantallas estrechas el dock se reduce al botón «Chat» y abre la vista completa.
 
 **Vista completa** (tarjeta Chat, al estilo de Telegram Web): lista de chats con buscador y filtros (Todos, No leídos, Grupos, Directos), conversación y panel de ajustes. Mensajes con respuestas citadas, reacciones, @menciones con
-autocompletado, enlaces pulsables, editar/borrar los propios (y borrar quien modera o administra), «Mensajes nuevos» al abrir, carga de anteriores y resumen con IA. Los lectores leen y reaccionan pero no escriben.
+autocompletado, enlaces clicables, editar/borrar los propios (y borrar quien modera o administra), «Mensajes nuevos» al abrir, carga de anteriores y resumen con IA. Los lectores leen y reaccionan pero no escriben.
 
-**Ajustes de un grupo:** nombre, descripción y color; quién puede escribir y quién puede añadir personas (todas o solo administración); miembros con rol de administración (nombrar, quitar, expulsar); añadir personas de la sala;
+**Configuración de un grupo:** nombre, descripción y color; quién puede escribir y quién puede agregar personas (todas o solo administración); miembros con rol de administración (nombrar, quitar, expulsar); agregar personas de la sala;
 silenciar y fijar (por persona); salir y borrar el grupo. El grupo nunca se queda sin administración (si sale la última persona administradora, pasa a la más antigua). Los cambios quedan como mensajes de sistema.
 Quien sale de la sala o es expulsado deja también sus grupos y directos.
 
 **Historial grande:** todos los mensajes se guardan en la base de datos mientras exista la sala (sin límite ni retención) y se cargan por páginas de 50; al subir con la rueda se piden los anteriores solos y lo que lees no se mueve.
 La lista es **virtual**: solo se pintan los mensajes que se ven (unas decenas), así que una conversación de miles de mensajes va igual de fluida. **Buscar** (lupa de la cabecera de una conversación, o el buscador de la lista de chats para todas las que ves) usa un índice de trigramas de PostgreSQL (`pg_trgm`, migración `V21`): encuentra texto parcial, sin distinguir mayúsculas, y los resultados llegan por páginas.
-Pulsar un resultado (o una notificación o una cita) lleva al mensaje pidiendo **una ventana alrededor de él** (`GET …/conversations/{id}/window?around=`), no todo lo anterior; bajando se piden los siguientes (`?after=`) y «Ir a los mensajes recientes» vuelve al final.
+Presionar un resultado (o una notificación o una cita) lleva al mensaje pidiendo **una ventana alrededor de él** (`GET …/conversations/{id}/window?around=`), no todo lo anterior; bajando se piden los siguientes (`?after=`) y «Ir a los mensajes recientes» vuelve al final.
 Las citas de respuestas llegan ya resueltas por el servidor, aunque el mensaje original no esté cargado. Para salas grandes, el reparto en vivo va por un índice de conexiones por persona, la lista de conversaciones se calcula con unas pocas consultas, y las menciones y avisos de grupo se escriben por lotes.
 
 **Avisos:** los mensajes nuevos **no** llegan a la campana: ya tienes el contador y la ventana del dock. Solo avisa cuando un mensaje lleva **más de 2 horas sin leerse** (`NORA_CHAT_NOTIFY_AFTER_MINUTES`, 120 por defecto): un único aviso por conversación («Ana te escribió», «3 mensajes sin leer en el grupo…») con enlace al mensaje, que no se repite y desaparece al leerla. No avisa de conversaciones silenciadas ni de mensajes que ya viste. Ningún otro mensaje del chat (tampoco las menciones) genera notificación; los avisos antiguos se borran al actualizar (migración `V23`).
@@ -45,7 +45,7 @@ API: `/api/rooms/{code}/chat/…` (`conversations`, `dm`, `messages`, `members`,
 Tablero de cuatro columnas (Por hacer, En curso, En revisión, Hecho) con **arrastrar y soltar** entre columnas y para ordenar (el orden se guarda con un valor intermedio entre las vecinas),
 alta rápida con Enter, tarjetas con prioridad, fecha límite (vencida/hoy/pronto), responsable, etiquetas y progreso de la lista de pasos, ficha de detalle, búsqueda y filtros («Mis tareas»,
 prioridad) y barra de progreso de la sala. Todo el que escribe puede mover y completar cualquier tarea; borrar es de su autora o de quien modera; los lectores solo ven. En pantallas táctiles se mueve
-con las flechas de la tarjeta o su menú «Mover a». Con la IA activa: **Crear desde texto** (extrae tareas con responsable y fecha de unas notas, para revisar antes de añadir) y **Sugerir con IA** una descripción y pasos.
+con las flechas de la tarjeta o su menú «Mover a». Con la IA activa: **Crear desde texto** (extrae tareas con responsable y fecha de unas notas, para revisar antes de agregar) y **Sugerir con IA** una descripción y pasos.
 
 ## Votaciones
 
@@ -55,34 +55,34 @@ borrar, de su autor o de quien modera. En las **anónimas el servidor nunca env�
 
 ## Media Review
 
-Revisión de **vídeo, audio e imagen** de los archivos de la sala. El reproductor salta con precisión (flechas ±5 s, Mayús ±1 s, espacio para pausar, `C` para comentar), la **línea de tiempo muestra una marca por comentario** y pulsar una marca o su hora lleva a ese
+Revisión de **video, audio e imagen** de los archivos de la sala. El reproductor salta con precisión (flechas ±5 s, Shift ±1 s, espacio para pausar, `C` para comentar), la **línea de tiempo muestra una marca por comentario** y presionar una marca o su hora lleva a ese
 momento. En imágenes se **señala un punto** (pin numerado). Los comentarios se pueden resolver/reabrir, editar y borrar, se filtran (todos/pendientes/resueltos), se copian como lista de cambios y, con la IA activa, se resumen. Cada archivo muestra cuántos
 comentarios tiene pendientes (o un visto si todo está resuelto). Lectores: ven y reproducen, no comentan.
 
 **Reproducción:** el navegador no puede enviar el token de sesión desde `<video>`, así que `POST /api/rooms/{code}/files/{id}/stream` devuelve una dirección **firmada y de 6 horas** (`/api/media/{token}`) que el servidor atiende **por tramos (Range, 206)** para poder saltar sin bajar el archivo entero.
-Solo se sirven tipos de audio, vídeo e imagen raster conocidos (nunca SVG ni nada ejecutable), con `nosniff`.
+Solo se sirven tipos de audio, video e imagen raster conocidos (nunca SVG ni nada ejecutable), con `nosniff`.
 
 ## Calendario
 
 Vistas de **semana** (por defecto) y **día** con la cuadrícula de **horas** (como Google Calendar: fila «Todo el día», línea roja de la hora actual, eventos que se pisan repartidos en columnas, **arrastrar sobre la cuadrícula para crear un evento con su hora**), de **mes** (6 semanas, lunes primero, «+N más») y de **agenda** (próximos días agrupados: Hoy, Mañana…). Los eventos de **todo el día** van en la fila superior y en color sólido; la vista elegida se recuerda. Un clic en un día vacío crea un evento; los eventos tienen hora de inicio/fin o «todo el día»,
-lugar o enlace de reunión (clicable), descripción y color. Cada participante responde **Voy / Quizás / No voy** (también los lectores) y todos ven quién va, en vivo. **Exportar `.ics`** (todos o uno) para el calendario del móvil o del ordenador.
+lugar o enlace de reunión (clicable), descripción y color. Cada participante responde **Voy / Quizás / No voy** (también los lectores) y todos ven quién va, en vivo. **Exportar `.ics`** (todos o uno) para el calendario del celular o del computadora.
 La herramienta muestra una insignia con los **eventos de hoy** y avisa con un mensaje **10 minutos antes** de los que empiezan (salvo los que se han rechazado). Con la IA activa: **Crear desde texto** («mañana a las 17:00 reunión en la sala 2») con revisión antes de guardar.
 Las horas se guardan sin zona (hora local de quien las ve), pensado para equipos en la misma zona horaria.
 
-**Crear una cita (tarjeta rápida).** Al arrastrar sobre la cuadrícula, pulsar un día del mes o usar «Nueva cita» aparece una **tarjeta flotante** junto a ese hueco, como la de Google Calendar: título, fecha y horas (al mover el inicio, el final se mueve con él), **Agregar invitados** (buscas por nombre o invitas a toda la sala), **Agregar una llamada de Nora**, lugar, descripción, color y visibilidad. «Más opciones» abre el formulario completo con lo escrito; la tarjeta se puede arrastrar y se cierra con Esc.
+**Crear una cita (tarjeta rápida).** Al arrastrar sobre la cuadrícula, presionar un día del mes o usar «Nueva cita» aparece una **tarjeta flotante** junto a ese hueco, como la de Google Calendar: título, fecha y horas (al mover el inicio, el final se mueve con él), **Agregar invitados** (buscas por nombre o invitas a toda la sala), **Agregar una llamada de Nora**, lugar, descripción, color y visibilidad. «Más opciones» abre el formulario completo con lo escrito; la tarjeta se puede arrastrar y se cierra con Esc.
 
 **Reuniones, llamadas y disponibilidad.** Al crear una cita puedes:
 - **Invitar a personas de la sala**: reciben una notificación con el enlace al evento (el resto de la sala la ve en el calendario, pero no recibe aviso).
-- **Añadir llamada**: se crea una llamada con su código (se ve en la ficha de la cita con «Unirse a la llamada» y «Copiar enlace»). Eliges si las personas entran directamente o si las admites tú. Cuando faltan 10 minutos, las personas que tienen ese hueco (quien lo creó, las invitadas y quienes dijeron «Voy») reciben un aviso **con enlace directo a la llamada**, aunque no tengan Nora abierta. Si quitas la llamada o borras la cita, la llamada termina; las programadas no terminan solas por estar vacías antes de su hora y aparecen en *Llamadas → Programadas desde el calendario*.
+- **Agregar llamada**: se crea una llamada con su código (se ve en la ficha de la cita con «Unirse a la llamada» y «Copiar enlace»). Eliges si las personas entran directamente o si las admites tú. Cuando faltan 10 minutos, las personas que tienen ese hueco (quien lo creó, las invitadas y quienes dijeron «Voy») reciben un aviso **con enlace directo a la llamada**, aunque no tengan Nora abierta. Si quitas la llamada o borras la cita, la llamada termina; las programadas no terminan solas por estar vacías antes de su hora y aparecen en *Llamadas → Programadas desde el calendario*.
 - **Cita personal**: solo la ven quien la crea y sus invitadas; el resto de la sala solo verá que estás «Ocupado» en ese hueco (nunca el título ni los detalles). Solo su autor puede editarla.
-- **Ver la disponibilidad**: al elegir invitadas, el propio formulario muestra una cuadrícula de cada persona ese día, avisa si alguien tiene algo a esa hora y ofrece **«Sugerir hora libre»**. La vista **Disponibilidad** del calendario muestra, por persona y día, sus huecos ocupados (los eventos personales ajenos salen como «Ocupado»), lista los **mejores momentos para todas** (días laborables de 8:00 a 19:00, con la duración que elijas) y al pulsar un hueco libre propone la reunión con las personas elegidas.
+- **Ver la disponibilidad**: al elegir invitadas, el propio formulario muestra una cuadrícula de cada persona ese día, avisa si alguien tiene algo a esa hora y ofrece **«Sugerir hora libre»**. La vista **Disponibilidad** del calendario muestra, por persona y día, sus huecos ocupados (los eventos personales ajenos salen como «Ocupado»), lista los **mejores momentos para todas** (días laborables de 8:00 a 19:00, con la duración que elijas) y al presionar un horario libre propone la reunión con las personas elegidas.
 
 Quién está ocupado en un hueco: quien creó la cita y sus invitadas (o, si no hay invitadas, quienes dijeron «Voy»), menos quien dijo «No voy». API: `GET /api/rooms/{code}/availability?from=AAAA-MM-DD&to=AAAA-MM-DD` (solo huecos; el título solo se devuelve a quien puede ver ese evento).
 
 ## Enlaces
 
 Marcadores compartidos de la sala: **pega una dirección y Enter** (se normaliza, se evita el duplicado) o «Con detalles…» para título, descripción y etiquetas. Tarjetas con inicial de color por dominio (no se consultan iconos de Internet), **fijar arriba**, filtro por etiqueta y búsqueda,
-copiar y abrir en pestaña nueva (`noopener noreferrer`). El servidor solo admite `http(s)`. Cualquier escritor puede fijar; editar y quitar es de quien lo añadió o de quien modera.
+copiar y abrir en pestaña nueva (`noopener noreferrer`). El servidor solo admite `http(s)`. Cualquier escritor puede fijar; editar y quitar es de quien lo agregó o de quien modera.
 
 ## Foco (Pomodoro compartido)
 
@@ -93,14 +93,14 @@ Cada persona puede **unirse al grupo de foco** con una frase de en qué trabaja;
 
 ## Reproductor sincronizado
 
-Escuchad música o mirad un vídeo **a la vez**: una **cola compartida** (YouTube, enlaces directos a audio/vídeo y archivos de la sala) y un solo reproductor cuyo play, pausa, salto, velocidad y siguiente se aplican a todas las personas. Quien llega tarde se pone solo en el punto exacto.
+Escuchad música o mirad un video **a la vez**: una **cola compartida** (YouTube, enlaces directos a audio/video y archivos de la sala) y un solo reproductor cuyo play, pausa, salto, velocidad y siguiente se aplican a todas las personas. Quien llega tarde se pone solo en el punto exacto.
 Se puede cerrar la ventana y **sigue sonando** (el Reproductor permanece montado; la insignia de la herramienta muestra que suena).
 
 **Cómo se sincroniza.** El servidor (`LiveService`, en memoria) guarda «qué suena, la posición a la hora X del servidor, si está sonando y la velocidad». Cada navegador calcula dónde debería ir ahora con su desfase de reloj y corrige la deriva cada 1,5 s (si se aleja más de 1,2 s salta);
 los gestos de quien reproduce se envían al servidor y los ajenos se aplican con una ventana de silencio para no devolver el eco. Si el navegador bloquea el sonido hasta que se pulse algo, aparece «Toca para unirte a la reproducción».
 
 **YouTube y los anuncios.** Se incrusta con `youtube-nocookie.com` y se controla por `postMessage` **sin cargar ningún script de YouTube** (la política de seguridad solo permite ese iframe: `frame-src https://www.youtube-nocookie.com`). Nora **no bloquea ni salta anuncios** de YouTube (hacerlo infringe sus condiciones y se rompe a menudo): con YouTube Premium no salen,
-y en el resto de casos pueden aparecer. Lo que **nunca** tiene anuncios: los audios y vídeos de los archivos de la sala y los enlaces directos (`media-src 'self' https:`). Los títulos de YouTube se piden al servidor (oEmbed público, solo `youtube.com`).
+y en el resto de casos pueden aparecer. Lo que **nunca** tiene anuncios: los audios y videos de los archivos de la sala y los enlaces directos (`media-src 'self' https:`). Los títulos de YouTube se piden al servidor (oEmbed público, solo `youtube.com`).
 
 ## Notificaciones
 
@@ -109,7 +109,7 @@ Qué avisa: te asignan una tarea, alguien crea una votación o agenda un evento,
 
 **Cada aviso lleva el lugar exacto** (`link`: `tool`, `item`, `file`, `conv`, `msg`). Al pulsarlo se abre `/room/{código}?tool=…&item=…` y la herramienta se coloca justo ahí: la tarea se abre, el evento se abre en su día, la votación y el enlace se resaltan, el comentario de Media Review se resalta con su archivo elegido y el archivo nuevo se selecciona en su carpeta.
 Las notificaciones se guardan en la tabla `notifications` (V18), se purgan las leídas con más de 30 días y se borran con la sala.
-Para añadir un aviso nuevo basta llamar a `NotificationService.notify(...)` con el `link` al lugar; la herramienta recibe el destino en su prop `focus` y usa `useFocusTarget` y `flash` (`tools/focus.ts`).
+Para agregar un aviso nuevo basta llamar a `NotificationService.notify(...)` con el `link` al lugar; la herramienta recibe el destino en su prop `focus` y usa `useFocusTarget` y `flash` (`tools/focus.ts`).
 
 ## Llamadas
 

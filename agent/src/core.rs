@@ -31,15 +31,15 @@ pub enum Status {
 pub struct State {
     pub status: Status,
     pub server: String,
-    /// Quién es el usuario de Nora al que está vinculado este equipo (lo manda Nora al conectar).
+    /// Quién es el usuario de Nora al que está vinculado esta computadora (lo manda Nora al conectar).
     pub user_name: String,
     pub user_email: String,
     /// Mensaje de error de la última acción (vincular…).
     pub error: String,
-    /// Quién está controlando el equipo ahora mismo.
+    /// Quién está controlando la computadora ahora mismo.
     pub controlled_by: Option<String>,
     pub screen: (i32, i32),
-    /// Por qué no se puede controlar este equipo (falta de permiso, Wayland…). Vacío si todo va bien.
+    /// Por qué no se puede controlar esta computadora (falta de permiso, Wayland…). Vacío si todo va bien.
     pub blocked: String,
     pub quit: bool,
 }
@@ -48,9 +48,9 @@ pub type Shared = Arc<Mutex<State>>;
 
 pub enum Command {
     Pair { server: String, code: String },
-    /// Olvida la vinculación de este equipo.
+    /// Olvida la vinculación de esta computadora.
     Reset,
-    /// Detiene el control que alguien tenga ahora mismo sobre este equipo.
+    /// Detiene el control que alguien tenga ahora mismo sobre esta computadora.
     StopControl,
     Quit,
 }
@@ -125,7 +125,7 @@ fn pair(server: &str, code: &str) -> Result<String, String> {
     let resp = ureq::post(&format!("{server}/api/assist/agent/pair")).timeout(Duration::from_secs(15)).send_json(json!({ "code": code.trim().to_uppercase() }));
     match resp {
         Ok(r) => r.into_json::<Value>().ok().and_then(|v| v["token"].as_str().map(String::from)).ok_or_else(|| "Respuesta inesperada del servidor".to_string()),
-        Err(ureq::Error::Status(_, _)) => Err("Código no válido o caducado. Genera uno nuevo en Nora › Asistencia.".to_string()),
+        Err(ureq::Error::Status(_, _)) => Err("Código no válido o vencido. Genera uno nuevo en Nora › Asistencia.".to_string()),
         Err(e) => Err(format!("No se pudo conectar con {server}: {e}")),
     }
 }
@@ -200,7 +200,7 @@ impl Worker {
                 continue;
             }
 
-            // ---- vinculado: se necesita poder controlar el equipo para conectar ----
+            // ---- vinculado: se necesita poder controlar la computadora para conectar ----
             if ctl.is_none() {
                 match Controller::new() {
                     Ok(c) => {
@@ -209,11 +209,11 @@ impl Worker {
                     }
                     Err(e) => {
                         let msg = if platform::wayland_session() {
-                            "Tu sesión usa Wayland, que no permite controlar el equipo desde un programa. Inicia sesión con X11.".to_string()
+                            "Tu sesión usa Wayland, que no permite controlar la computadora desde un programa. Inicia sesión con X11.".to_string()
                         } else if cfg!(target_os = "macos") {
-                            "Falta el permiso de Accesibilidad: concédeselo a Nora Agent en Ajustes del Sistema › Privacidad y seguridad.".to_string()
+                            "Falta el permiso de Accesibilidad: concédeselo a Nora Agent en Configuración del Sistema › Privacidad y seguridad.".to_string()
                         } else {
-                            format!("No se pudo acceder al teclado y al ratón de este equipo: {e}")
+                            format!("No se pudo acceder al teclado y al mouse de esta computadora: {e}")
                         };
                         self.set(|s| { s.blocked = msg; s.status = Status::Connecting; });
                         if self.wait_commands(&rx, Duration::from_secs(2), &mut cfg, &mut ctl) {
@@ -252,7 +252,7 @@ impl Worker {
                 Outcome::Unauthorized => {
                     forget_config();
                     cfg = None;
-                    self.set(|s| { s.status = Status::Unpaired; s.controlled_by = None; s.error = "Nora no reconoce este equipo (la sesión se cerró o caducó). Vuelve a vincularlo con un código nuevo.".into(); });
+                    self.set(|s| { s.status = Status::Unpaired; s.controlled_by = None; s.error = "Nora no reconoce esta computadora (la sesión se cerró o venció). Vuelve a vincularlo con un código nuevo.".into(); });
                     continue;
                 }
                 Outcome::Retry => {}
@@ -322,7 +322,7 @@ impl Worker {
                         if ctl.stop() {
                             let _ = ws.send(Message::text("{\"type\":\"control.revoke\"}")); // Nora avisa a quien controlaba
                             self.set(|s| s.controlled_by = None);
-                            platform::notify("Detuviste el control de tu equipo.");
+                            platform::notify("Detuviste el control de tu computadora.");
                         }
                     }
                     Ok(Command::Reset) => { ctl.stop(); let _ = ws.close(None); return Outcome::Reset; }
@@ -350,12 +350,12 @@ impl Worker {
             "control.start" => {
                 ctl.start();
                 let who = v["controller"].as_str().filter(|s| !s.is_empty()).unwrap_or("Alguien").to_string();
-                platform::notify(&format!("{who} está controlando tu equipo. Puedes detenerlo desde Nora."));
+                platform::notify(&format!("{who} está controlando tu computadora. Puedes detenerlo desde Nora."));
                 self.set(|s| s.controlled_by = Some(who));
             }
             "control.stop" => {
                 if ctl.stop() {
-                    platform::notify("Se terminó el control de tu equipo.");
+                    platform::notify("Se terminó el control de tu computadora.");
                 }
                 self.set(|s| s.controlled_by = None);
             }

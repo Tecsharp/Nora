@@ -178,7 +178,7 @@ final class ItemSchemas {
 
     private static final Pattern YT_ID = Pattern.compile("^[A-Za-z0-9_-]{11}$");
 
-    /** Identificador de un vídeo de YouTube a partir de su enlace (watch, youtu.be, shorts, embed, live); null si no lo es. */
+    /** Identificador de un video de YouTube a partir de su enlace (watch, youtu.be, shorts, embed, live); null si no lo es. */
     static String youtubeId(String url) {
         try {
             java.net.URI u = java.net.URI.create(url);

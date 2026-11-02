@@ -141,7 +141,7 @@ public class ChatService {
 
     // ---- chat de una llamada (lo usa CallService; aparece en Mensajes como un grupo más) ----
 
-    /** Crea el grupo del chat de una llamada con las personas que están ahora en ella (las demás se añaden al entrar). */
+    /** Crea el grupo del chat de una llamada con las personas que están ahora en ella (las demás se agregan al entrar). */
     @Transactional
     public UUID createCallChat(Room room, UUID creator, String creatorName, String title, java.util.Collection<UUID> people) {
         ChatConversation c = new ChatConversation(room.getId(), ChatConversation.GROUP, name(title), creator);
@@ -235,7 +235,7 @@ public class ChatService {
             names.add(userName(u));
         }
         if (!names.isEmpty()) {
-            system(x.conv(), p.userId(), actor(p) + " añadió a " + String.join(", ", names), x.room());
+            system(x.conv(), p.userId(), actor(p) + " agregó a " + String.join(", ", names), x.room());
             notifyConv(x.room(), x.conv(), "members");
         }
         return memberDtos(x.conv());

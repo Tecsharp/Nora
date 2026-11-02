@@ -267,7 +267,7 @@ public class RoomService {
             if (limit != null) throw ApiException.forbidden("Tu cuenta no permite salas sin expiración");
             room.setExpiresAt(null);
         } else {
-            if (req.deltaMinutes() == null || req.deltaMinutes() == 0) throw ApiException.badRequest("Indica cuántos minutos añadir o quitar");
+            if (req.deltaMinutes() == null || req.deltaMinutes() == 0) throw ApiException.badRequest("Indica cuántos minutos agregar o quitar");
             Instant base = room.getExpiresAt() != null ? room.getExpiresAt() : now;
             Instant next = base.plus(Duration.ofMinutes(req.deltaMinutes()));
             if (next.isBefore(now.plus(Duration.ofMinutes(1)))) {

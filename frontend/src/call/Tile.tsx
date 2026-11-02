@@ -24,7 +24,7 @@ export interface TileProps {
   fit?: 'cover' | 'contain'
 }
 
-/** Una persona (o una pantalla presentada) en el mosaico. El elemento de vídeo existe siempre, aunque no se vea: es el que reproduce el audio. */
+/** Una persona (o una pantalla presentada) en el mosaico. El elemento de video existe siempre, aunque no se vea: es el que reproduce el audio. */
 export default function Tile(p: TileProps) {
   const ref = useRef<HTMLVideoElement>(null)
   useEffect(() => {
