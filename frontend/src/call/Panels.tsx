@@ -133,7 +133,7 @@ export function ChatPanel({ call, roomCode, user }: { call: CallApi; roomCode: s
     setItems((l) => (l.some((m) => m.id === d.message.id) ? l : [...l, d.message]))
     chatApi.read(roomCode, conv).catch(() => {})
   })
-  useRealtime('chat.message.updated', (d: Message) => { if (conv && d.conv === conv) setItems((l) => l.map((m) => (m.id === d.id ? d : m))) })
+  useRealtime('chat.message.updated', (d: { conv: string; message: Message }) => { if (conv && d.conv === conv) setItems((l) => l.map((m) => (m.id === d.message.id ? d.message : m))) })
   useRealtime('chat.message.deleted', (d: { conv: string; id: string }) => { if (conv && d.conv === conv) setItems((l) => l.filter((m) => m.id !== d.id)) })
   useEffect(() => { end.current?.scrollIntoView({ block: 'end' }) }, [items.length])
   useEffect(() => {
@@ -173,19 +173,32 @@ export function ChatPanel({ call, roomCode, user }: { call: CallApi; roomCode: s
     <div className="cp-chat">
       <div className="cp-msgs">
         {items.length === 0 && <p className="cp-muted center">Todavía no hay mensajes.</p>}
-        {items.map((m) => {
+        {items.map((m, i) => {
           if (m.kind === 'SYSTEM') return <div key={m.id} className="cp-sys">{m.text}</div>
           const mine = m.authorId === user.id
           const reacts = Object.entries(m.reactions ?? {})
+          const minute = m.createdAt.slice(0, 16)
+          const prev = items[i - 1]
+          // la hora (y el nombre) salen una vez por tanda: mensajes seguidos de la misma persona dentro del mismo minuto comparten la de arriba
+          const head = !prev || prev.kind === 'SYSTEM' || prev.authorId !== m.authorId || prev.createdAt.slice(0, 16) !== minute
           return (
-            <div key={m.id} className={`cp-msg ${mine ? 'mine' : ''}`}>
-              <span className={`cp-react-btn ${picking === m.id ? 'open' : ''}`}>
-                <button type="button" aria-label="Reaccionar" title="Reaccionar" onClick={() => setPicking((p) => (p === m.id ? null : m.id))}><SmilePlus size={15} /></button>
-              </span>
-              {picking === m.id && <div className="cp-picker"><ReactionPicker dark quick={REACTIONS} onPick={(e) => react(m, e)} onClose={() => setPicking(null)} /></div>}
-              {!mine && <strong>{m.authorName}</strong>}
-              {m.text && <span>{m.text}</span>}
-              <MessageMeta code={roomCode} meta={m.meta} />
+            <div key={m.id} className={`cp-item ${mine ? 'mine' : ''} ${head ? 'head' : 'cont'}`}>
+              {head && (
+                <div className="cp-meta">
+                  {!mine && <strong>{m.authorName}</strong>}
+                  <time dateTime={m.createdAt}>{new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>
+                </div>
+              )}
+              <div className="cp-bubble-wrap">
+                <div className="cp-bubble">
+                  {m.text && <span>{m.text}</span>}
+                  <MessageMeta code={roomCode} meta={m.meta} />
+                </div>
+                <span className={`cp-react-btn ${picking === m.id ? 'open' : ''}`}>
+                  <button type="button" aria-label="Reaccionar" title="Reaccionar" onClick={() => setPicking((p) => (p === m.id ? null : m.id))}><SmilePlus size={15} /></button>
+                </span>
+                {picking === m.id && <div className="cp-picker"><ReactionPicker dark quick={REACTIONS} onPick={(e) => react(m, e)} onClose={() => setPicking(null)} /></div>}
+              </div>
               {reacts.length > 0 && (
                 <div className="cp-reacts">
                   {reacts.map(([e, ids]) => (
@@ -193,7 +206,6 @@ export function ChatPanel({ call, roomCode, user }: { call: CallApi; roomCode: s
                   ))}
                 </div>
               )}
-              <time>{new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>
             </div>
           )
         })}
