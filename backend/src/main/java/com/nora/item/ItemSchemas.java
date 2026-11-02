@@ -73,7 +73,7 @@ final class ItemSchemas {
                 String start = datetime(str(d, "start", 16, true));
                 String end = opt(d, "end", 16);
                 end = end == null ? start : datetime(end);
-                if (end.compareTo(start) < 0) throw ApiException.badRequest("El evento no puede terminar antes de empezar");
+                if (end.compareTo(start) < 0) throw ApiException.badRequest("La cita no puede terminar antes de empezar");
                 out.put("start", start);
                 out.put("end", end);
                 String color = opt(d, "color", 7);

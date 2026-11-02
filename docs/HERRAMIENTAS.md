@@ -69,13 +69,15 @@ lugar o enlace de reunión (clicable), descripción y color. Cada participante r
 La herramienta muestra una insignia con los **eventos de hoy** y avisa con un mensaje **10 minutos antes** de los que empiezan (salvo los que se han rechazado). Con la IA activa: **Crear desde texto** («mañana a las 17:00 reunión en la sala 2») con revisión antes de guardar.
 Las horas se guardan sin zona (hora local de quien las ve), pensado para equipos en la misma zona horaria.
 
-**Reuniones, llamadas y disponibilidad.** Al crear un evento puedes:
-- **Invitar a personas de la sala**: reciben una notificación con el enlace al evento (el resto de la sala lo ve en el calendario, pero no recibe aviso).
-- **Añadir llamada**: se crea una llamada con su código (se ve en la ficha del evento con «Unirse a la llamada» y «Copiar enlace»). Eliges si las personas entran directamente o si las admites tú. Cuando faltan 10 minutos, las personas que tienen ese hueco (quien lo creó, las invitadas y quienes dijeron «Voy») reciben un aviso **con enlace directo a la llamada**, aunque no tengan Nora abierta. Si quitas la llamada o borras el evento, la llamada termina; las programadas no terminan solas por estar vacías antes de su hora y aparecen en *Llamadas → Programadas desde el calendario*.
-- **Evento personal**: solo lo ven quien lo crea y sus invitadas; el resto de la sala solo verá que estás «Ocupado» en ese hueco (nunca el título ni los detalles). Solo su autor puede editarlo.
+**Crear una cita (tarjeta rápida).** Al arrastrar sobre la cuadrícula, pulsar un día del mes o usar «Nueva cita» aparece una **tarjeta flotante** junto a ese hueco, como la de Google Calendar: título, fecha y horas (al mover el inicio, el final se mueve con él), **Agregar invitados** (buscas por nombre o invitas a toda la sala), **Agregar una llamada de Nora**, lugar, descripción, color y visibilidad. «Más opciones» abre el formulario completo con lo escrito; la tarjeta se puede arrastrar y se cierra con Esc.
+
+**Reuniones, llamadas y disponibilidad.** Al crear una cita puedes:
+- **Invitar a personas de la sala**: reciben una notificación con el enlace al evento (el resto de la sala la ve en el calendario, pero no recibe aviso).
+- **Añadir llamada**: se crea una llamada con su código (se ve en la ficha de la cita con «Unirse a la llamada» y «Copiar enlace»). Eliges si las personas entran directamente o si las admites tú. Cuando faltan 10 minutos, las personas que tienen ese hueco (quien lo creó, las invitadas y quienes dijeron «Voy») reciben un aviso **con enlace directo a la llamada**, aunque no tengan Nora abierta. Si quitas la llamada o borras la cita, la llamada termina; las programadas no terminan solas por estar vacías antes de su hora y aparecen en *Llamadas → Programadas desde el calendario*.
+- **Cita personal**: solo la ven quien la crea y sus invitadas; el resto de la sala solo verá que estás «Ocupado» en ese hueco (nunca el título ni los detalles). Solo su autor puede editarla.
 - **Ver la disponibilidad**: al elegir invitadas, el propio formulario muestra una cuadrícula de cada persona ese día, avisa si alguien tiene algo a esa hora y ofrece **«Sugerir hora libre»**. La vista **Disponibilidad** del calendario muestra, por persona y día, sus huecos ocupados (los eventos personales ajenos salen como «Ocupado»), lista los **mejores momentos para todas** (días laborables de 8:00 a 19:00, con la duración que elijas) y al pulsar un hueco libre propone la reunión con las personas elegidas.
 
-Quién está ocupado en un hueco: quien creó el evento y sus invitadas (o, si no hay invitadas, quienes dijeron «Voy»), menos quien dijo «No voy». API: `GET /api/rooms/{code}/availability?from=AAAA-MM-DD&to=AAAA-MM-DD` (solo huecos; el título solo se devuelve a quien puede ver ese evento).
+Quién está ocupado en un hueco: quien creó la cita y sus invitadas (o, si no hay invitadas, quienes dijeron «Voy»), menos quien dijo «No voy». API: `GET /api/rooms/{code}/availability?from=AAAA-MM-DD&to=AAAA-MM-DD` (solo huecos; el título solo se devuelve a quien puede ver ese evento).
 
 ## Enlaces
 
