@@ -24,25 +24,49 @@ export interface TileProps {
   fit?: 'cover' | 'contain'
 }
 
-/** Una persona (o una pantalla presentada) en el mosaico. El elemento de video existe siempre, aunque no se vea: es el que reproduce el audio. */
+/**
+ * Una persona (o una pantalla presentada) en el mosaico. La imagen va en un `<video>` mudo y el sonido en un `<audio>` aparte: si el audio
+ * viajara dentro del `<video>`, el navegador no empezaría a reproducirlo mientras la cámara de esa persona estuviera apagada (no llegan
+ * fotogramas), y no se oiría a quien habla sin cámara.
+ */
 export default function Tile(p: TileProps) {
   const ref = useRef<HTMLVideoElement>(null)
+  const audio = useRef<HTMLAudioElement>(null)
+  const hear = !p.silent && !p.local
   useEffect(() => {
     const el = ref.current
     if (!el) return
     if (el.srcObject !== p.stream) el.srcObject = p.stream
     if (p.stream) el.play().catch(() => {})
   }, [p.stream])
+  // el sonido: un flujo con solo las pistas de audio, que se rehace cuando llegan o se van pistas
   useEffect(() => {
-    const el = ref.current as (HTMLVideoElement & { setSinkId?: (id: string) => Promise<void> }) | null
+    const el = audio.current
+    const src = p.stream
+    if (!el || !src || !hear) { if (el) el.srcObject = null; return }
+    const sync = () => {
+      const tracks = src.getAudioTracks()
+      const cur = el.srcObject as MediaStream | null
+      if (cur && cur.getAudioTracks().length === tracks.length && tracks.every((t) => cur.getAudioTracks().includes(t))) return
+      el.srcObject = tracks.length ? new MediaStream(tracks) : null
+      if (tracks.length) el.play().catch(() => {})
+    }
+    sync()
+    src.addEventListener('addtrack', sync)
+    src.addEventListener('removetrack', sync)
+    return () => { src.removeEventListener('addtrack', sync); src.removeEventListener('removetrack', sync); el.srcObject = null }
+  }, [p.stream, hear])
+  useEffect(() => {
+    const el = audio.current as (HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> }) | null
     if (el?.setSinkId && p.speakerId) el.setSinkId(p.speakerId).catch(() => {})
-  }, [p.speakerId])
+  }, [p.speakerId, hear])
 
   const showVideo = p.video && !!p.stream
   return (
     <div className={`ct ${p.speaking ? 'speaking' : ''} ${p.presentation ? 'presentation' : ''} ${p.className ?? ''}`} data-name={p.name}>
       <video ref={ref} className={`${showVideo ? '' : 'off'} ${p.local && !p.presentation ? 'mirror' : ''} ${p.fit === 'contain' || p.presentation ? 'contain' : ''}`}
-        autoPlay playsInline muted={p.silent || p.local} />
+        autoPlay playsInline muted />
+      {hear && <audio ref={audio} autoPlay />}
       {!showVideo && (
         <div className="ct-avatar"><Avatar name={p.name} userId={p.userId ?? ''} version={0} size={88} /></div>
       )}
